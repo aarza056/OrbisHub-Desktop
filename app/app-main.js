@@ -5912,7 +5912,7 @@ if (loginForm) {
                 if (checkUserExists && checkUserExists.data && checkUserExists.data.length > 0) {
                     showLoginError('Invalid password for user: ' + username)
                 } else {
-                    showLoginError('User not found. Click "Reset Database & Create Admin" to create admin user.')
+                    showLoginError('User not found. Please contact your system administrator.')
                 }
                 return
             }
@@ -6584,72 +6584,7 @@ if (createDatabaseBtn) {
 // END SYSTEM CONFIGURATION
 // ============================================
 
-// Reset database button
-const resetDbBtn = document.getElementById('resetDbBtn')
-if (resetDbBtn) {
-    resetDbBtn.addEventListener('click', async () => {
-        if (!confirm('This will create/reset the admin user in the database. Continue?')) {
-            return
-        }
-        
-        try {
-            resetDbBtn.disabled = true
-            resetDbBtn.textContent = 'Creating admin user...'
-            
-            console.log('🔄 Resetting admin user in database...')
-            
-            // First, try to delete existing admin user
-            try {
-                await window.electronAPI.dbExecute(
-                    `DELETE FROM Users WHERE username = @param0`,
-                    [{ value: 'admin' }]
-                )
-                console.log('🗑️ Deleted existing admin user')
-            } catch (e) {
-                console.log('ℹ️ No existing admin user to delete')
-            }
-            
-            // Create fresh admin user
-            const adminId = uid()
-            const result = await window.electronAPI.dbExecute(
-                `INSERT INTO Users (id, username, password, name, email, role, position, squad, lastLogin, lastActivity, ip, isActive, changePasswordOnLogin, created_at) 
-                 VALUES (@param0, @param1, @param2, @param3, @param4, @param5, @param6, @param7, @param8, @param9, @param10, @param11, @param12, GETDATE())`,
-                [
-                    { value: adminId },
-                    { value: 'admin' },
-                    { value: 'admin' },
-                    { value: 'Administrator' },
-                    { value: 'admin@orbishub.com' },
-                    { value: 'Super Admin' },
-                    { value: 'System Administrator' },
-                    { value: 'IT Operations' },
-                    { value: Date.now() },
-                    { value: Date.now() },
-                    { value: getLocalIP() },
-                    { value: 1 },
-                    { value: 0 } // No password change required
-                ]
-            )
-            
-            console.log('✅ Admin user created:', result)
-            
-            if (result && result.success) {
-                alert('✅ Admin user created successfully!\n\nUsername: admin\nPassword: admin\n\nYou can now log in.')
-            } else {
-                alert('❌ Failed to create admin user: ' + (result?.error || 'Unknown error'))
-            }
-            
-            resetDbBtn.disabled = false
-            resetDbBtn.textContent = 'Reset Database & Create Admin'
-            
-        } catch (error) {
-            console.error('❌ Failed to reset admin user:', error)
-            alert('❌ Error: ' + error.message)
-            resetDbBtn.disabled = false
-            resetDbBtn.textContent = 'Reset Database & Create Admin'
-        }
-    })
-}
+// Reset database button functionality removed - no longer needed
 
 // Initialize authentication state
 function initAuth() {
