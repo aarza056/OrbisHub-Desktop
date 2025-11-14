@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, shell } = require('electron');
 const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -336,6 +336,11 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
             CREATE TABLE Environments (
                 id NVARCHAR(50) PRIMARY KEY,
                 name NVARCHAR(255) NOT NULL,
+                type NVARCHAR(100),
+                url NVARCHAR(500),
+                health NVARCHAR(50),
+                deployerCredentialId NVARCHAR(50),
+                mappedServers NVARCHAR(MAX),
                 description NVARCHAR(MAX),
                 color NVARCHAR(50),
                 created_at DATETIME DEFAULT GETDATE()
@@ -456,15 +461,99 @@ ipcMain.handle('db-create-database', async (event, config) => {
             .query(`SELECT database_id FROM sys.databases WHERE name = @dbname`);
         
         if (checkDb.recordset.length > 0) {
+            // Database exists - try to drop it
+            console.log(`Database '${config.database}' exists. Attempting to drop...`);
+            try {
+                await pool.request().query(`
+                    ALTER DATABASE [${config.database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                    DROP DATABASE [${config.database}];
+                `);
+                console.log(`Database '${config.database}' dropped successfully`);
+            } catch (dropError) {
+                console.error('Drop error:', dropError);
+                await pool.close();
+                return { 
+                    success: false, 
+                    error: `Database exists and could not be dropped: ${dropError.message}` 
+                };
+            }
+        }
+        
+        // Check if physical files exist and try to delete them
+        const dataPath = `C:\\Program Files\\Microsoft SQL Server\\MSSQL15.MSSQLSERVER\\MSSQL\\DATA\\`;
+        const mdfFile = `${dataPath}${config.database}.mdf`;
+        const ldfFile = `${dataPath}${config.database}_log.ldf`;
+        
+        try {
+            // Check if files exist using master.sys.master_files
+            const filesCheck = await pool.request().query(`
+                SELECT physical_name 
+                FROM master.sys.master_files 
+                WHERE physical_name LIKE '%${config.database}%'
+            `);
+            
+            if (filesCheck.recordset.length > 0) {
+                console.log('Orphaned database files found. Attempting cleanup...');
+                // Files exist but database doesn't - need manual cleanup
+                await pool.close();
+                return {
+                    success: false,
+                    error: `Database files already exist at: ${mdfFile}. Please delete these files manually or use SSMS to drop the database completely.`
+                };
+            }
+        } catch (fileCheckError) {
+            console.log('File check failed (may be normal):', fileCheckError.message);
+        }
+        
+        // Create database using simplest possible syntax
+        console.log(`Creating database '${config.database}'...`);
+        try {
+            // First, get SQL Server's default data path
+            const pathQuery = await pool.request().query(`
+                SELECT 
+                    SERVERPROPERTY('InstanceDefaultDataPath') as DataPath,
+                    SERVERPROPERTY('InstanceDefaultLogPath') as LogPath
+            `);
+            
+            const dataPath = pathQuery.recordset[0].DataPath;
+            const logPath = pathQuery.recordset[0].LogPath;
+            
+            console.log(`SQL Server data path: ${dataPath}`);
+            console.log(`SQL Server log path: ${logPath}`);
+            
+            // If we have valid paths, use them explicitly
+            if (dataPath && logPath) {
+                const dbName = config.database;
+                await pool.request().query(`
+                    CREATE DATABASE [${dbName}]
+                    ON PRIMARY (
+                        NAME = N'${dbName}',
+                        FILENAME = N'${dataPath}${dbName}.mdf',
+                        SIZE = 8MB,
+                        FILEGROWTH = 64MB
+                    )
+                    LOG ON (
+                        NAME = N'${dbName}_log',
+                        FILENAME = N'${logPath}${dbName}_log.ldf',
+                        SIZE = 8MB,
+                        FILEGROWTH = 64MB
+                    )
+                `);
+            } else {
+                // Fallback to simple creation
+                await pool.request().query(`CREATE DATABASE [${config.database}]`);
+            }
+            
+            console.log(`Database '${config.database}' created successfully`);
+        } catch (createError) {
+            console.error('Create error:', createError);
             await pool.close();
-            return { 
-                success: false, 
-                error: `Database '${config.database}' already exists` 
+            return {
+                success: false,
+                error: `CREATE DATABASE failed: ${createError.message}`
             };
         }
         
-        // Create database
-        await pool.request().query(`CREATE DATABASE [${config.database}]`);
         await pool.close();
         
         return { 
@@ -472,6 +561,7 @@ ipcMain.handle('db-create-database', async (event, config) => {
             message: `Database '${config.database}' created successfully` 
         };
     } catch (error) {
+        console.error('Database creation error:', error);
         return { 
             success: false, 
             error: error.message 
@@ -495,6 +585,17 @@ ipcMain.handle('get-local-ip', async () => {
         return '127.0.0.1'; // Fallback to localhost
     } catch (error) {
         return '127.0.0.1';
+    }
+});
+
+// Open external URL in default browser
+ipcMain.handle('open-external', async (event, url) => {
+    try {
+        await shell.openExternal(url);
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to open external URL:', error);
+        return { success: false, error: error.message };
     }
 });
 

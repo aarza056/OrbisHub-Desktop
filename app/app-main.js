@@ -616,15 +616,20 @@ function renderEnvs(filter = '') {
 			const id = b.dataset.id
 			const action = b.dataset.action
 			
-			// Handle open-url action
+			// Handle open-url action - use external browser
 			if (action === 'open-url') {
 				const url = b.dataset.url
-				if (url) window.open(url, '_blank')
+				if (url && window.electronAPI && window.electronAPI.openExternal) {
+					window.electronAPI.openExternal(url)
+				} else if (url) {
+					window.open(url, '_blank')
+				}
 				return
 			}
 			
-			// [Removed - database-only architecture]
-			const env = db2.environments.find(x => x.id === id)
+			// Get current environment from database
+			const db = store.readSync()
+			const env = db.environments.find(x => x.id === id)
 			if (env) onEnvAction(env, action)
 		}))
 		
@@ -2987,9 +2992,11 @@ if (envForm) {
                 mappedServers: []
             }
             
-            
             db.environments.push(newEnv)
-            store.write(db)
+            
+            // Save to database and update memory cache
+            await store.write(db)
+            memoryCache = db
             
             // Audit log
             logAudit('create', 'environment', name, { url, type })
@@ -4417,14 +4424,7 @@ async function renderAllViews() {
     // Load data from database (database-first approach)
     try {
         console.log('🔄 Loading data from database...')
-        const db = store.readSync()
-        
-        
-        try {
-            
-        } catch (e) {
-            console.warn('Failed to cache data:', e)
-        }
+        const db = await store.read()
         
         console.log('✅ Data loaded successfully')
     } catch (error) {

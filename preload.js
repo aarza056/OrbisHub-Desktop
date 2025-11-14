@@ -20,6 +20,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // System info
     getLocalIP: () => ipcRenderer.invoke('get-local-ip'),
     
+    // External links
+    openExternal: (url) => ipcRenderer.invoke('open-external', url),
+    
     // App info
     isElectron: true,
     platform: process.platform
