@@ -1151,14 +1151,11 @@ if (envDetailsMapServersBtn) {
 const editEnvModal = document.getElementById('editEnvModal')
 function openEditEnv(env) {
     if (!editEnvModal) return
-    // Populate deployer dropdown with latest credentials
-    populateDeployerDropdowns()
     // Prefill fields
     document.getElementById('editEnvId').value = env.id
     document.getElementById('editEnvName').value = env.name
     document.getElementById('editEnvUrl').value = env.url
     document.getElementById('editEnvType').value = env.type
-    document.getElementById('editEnvDeployer').value = env.deployerId || ''
     try { editEnvModal.showModal(); document.getElementById('editEnvName').focus() } catch (e) { editEnvModal.setAttribute('open','') }
 }
 
@@ -1184,7 +1181,6 @@ if (editEnvModal) {
         const name = document.getElementById('editEnvName').value.trim()
         const url = document.getElementById('editEnvUrl').value.trim()
         const type = document.getElementById('editEnvType').value
-        const deployerId = document.getElementById('editEnvDeployer').value
         if (!id || !name || !url) return
         const db = store.readSync()
         const env = db.environments.find(x => x.id === id)
@@ -1192,20 +1188,18 @@ if (editEnvModal) {
             const oldValues = {
                 name: env.name,
                 url: env.url,
-                type: env.type,
-                deployerId: env.deployerId
+                type: env.type
             }
             
             env.name = name
             env.url = url
             env.type = type
-            env.deployerId = deployerId || null
             store.write(db)
             
             // Audit log with old and new values
             logAudit('update', 'environment', name, { 
                 old: oldValues,
-                new: { name, url, type, deployerId: deployerId || null }
+                new: { name, url, type }
             })
             
             // Show success toast
@@ -2035,23 +2029,19 @@ function onCredentialAction(credential, action) {
         credentialToDelete = credential
         const db = store.readSync()
         const serversUsing = (db.servers || []).filter(s => s.credentialId === credential.id)
-        const envsUsing = (db.environments || []).filter(e => e.deployerId === credential.id)
 
         const nameEl = document.getElementById('deleteCredName')
         const sCount = document.getElementById('deleteCredUsageServers')
-        const eCount = document.getElementById('deleteCredUsageEnvs')
         const details = document.getElementById('deleteCredUsageDetails')
 
         if (nameEl) nameEl.textContent = credential.name || '(unnamed)'
         if (sCount) sCount.textContent = String(serversUsing.length)
-        if (eCount) eCount.textContent = String(envsUsing.length)
         if (details) {
-            if (serversUsing.length === 0 && envsUsing.length === 0) {
+            if (serversUsing.length === 0) {
                 details.innerHTML = '<em>No current assignments.</em>'
             } else {
                 const serverItems = serversUsing.map(s => `<li>Server: ${s.displayName || s.name || s.hostname || s.ipAddress}</li>`).join('')
-                const envItems = envsUsing.map(env => `<li>Environment: ${env.name} (deployer)</li>`).join('')
-                details.innerHTML = `<ul style="margin:0 0 8px 16px;">${serverItems}${envItems}</ul>`
+                details.innerHTML = `<ul style="margin:0 0 8px 16px;">${serverItems}</ul>`
             }
         }
 
@@ -2923,45 +2913,12 @@ function closeEnvModal() {
     document.getElementById('envName').value = ''
     document.getElementById('envUrl').value = ''
     document.getElementById('envType').value = 'Production'
-    document.getElementById('envDeployer').value = ''
     
     // move focus back to the Add button so keyboard users continue where they left off
     try { addEnvBtn.focus() } catch (e) {}
 }
 
-function populateDeployerDropdowns() {
-    const db = store.readSync()
-    const credentials = db.credentials || []
-    
-    // Populate Add Environment modal
-    const envDeployerSelect = document.getElementById('envDeployer')
-    if (envDeployerSelect) {
-        // Keep the first option and remove the rest
-        envDeployerSelect.innerHTML = '<option value="">-- Select Credential --</option>'
-        credentials.forEach(cred => {
-            const option = document.createElement('option')
-            option.value = cred.id
-            option.textContent = `${cred.name} (${cred.type})`
-            envDeployerSelect.appendChild(option)
-        })
-    }
-    
-    // Populate Edit Environment modal
-    const editEnvDeployerSelect = document.getElementById('editEnvDeployer')
-    if (editEnvDeployerSelect) {
-        editEnvDeployerSelect.innerHTML = '<option value="">-- Select Credential --</option>'
-        credentials.forEach(cred => {
-            const option = document.createElement('option')
-            option.value = cred.id
-            option.textContent = `${cred.name} (${cred.type})`
-            editEnvDeployerSelect.appendChild(option)
-        })
-    }
-}
-
 addEnvBtn.addEventListener('click', () => {
-	// Populate deployer dropdown with latest credentials
-	populateDeployerDropdowns()
 	// show modal and focus first input
 	try { envModal.showModal(); envModal.querySelector('#envName')?.focus() } catch (e) { envModal.setAttribute('open', '') }
 })
@@ -2999,7 +2956,6 @@ if (envForm) {
         const name = document.getElementById('envName').value.trim()
         const url = document.getElementById('envUrl').value.trim()
         const type = document.getElementById('envType').value
-        const deployerId = document.getElementById('envDeployer').value
         if (!name || !url) return
 
         try {
@@ -3010,7 +2966,6 @@ if (envForm) {
                 url, 
                 type, 
                 health: 'ok',
-                deployerId: deployerId || null,
                 mappedServers: []
             }
             
@@ -3036,7 +2991,6 @@ if (envForm) {
             document.getElementById('envName').value = ''
             document.getElementById('envUrl').value = ''
             document.getElementById('envType').value = 'Production' // Reset to default
-            document.getElementById('envDeployer').value = ''
 
             try { envModal.close() } catch (e) { /* ignore */ }
             
@@ -3718,7 +3672,6 @@ if (confirmDeleteCredBtn) {
                 
                 // 1) Unassign credential from servers and environments first (to satisfy FK constraints)
                 const updatedServers = []
-                const updatedEnvs = []
                 if (Array.isArray(db.servers)) {
                     db.servers.forEach(s => {
                         if (s.credentialId === credId) {
@@ -3727,25 +3680,16 @@ if (confirmDeleteCredBtn) {
                         }
                     })
                 }
-                if (Array.isArray(db.environments)) {
-                    db.environments.forEach(env => {
-                        if (env.deployerId === credId) {
-                            env.deployerId = null
-                            updatedEnvs.push({ ...env })
-                        }
-                    })
-                }
 
                 // If in use, persist the reference clear before deleting the row
-                if (updatedServers.length > 0 || updatedEnvs.length > 0) {
+                if (updatedServers.length > 0) {
                     try {
-                        console.log('🔄 Clearing credential references in DB...', { servers: updatedServers.length, environments: updatedEnvs.length })
+                        console.log('🔄 Clearing credential references in DB...', { servers: updatedServers.length })
                         const syncRes = await fetch(`${API_BASE_URL}/api/sync-data`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                servers: updatedServers,
-                                environments: updatedEnvs
+                                servers: updatedServers
                             })
                         })
                         const syncJson = await syncRes.json()
@@ -3812,7 +3756,6 @@ if (confirmDeleteCredBtn) {
                 await renderCredentials()
                 renderServers()
                 renderEnvs(document.getElementById('search')?.value || '')
-                populateDeployerDropdowns()
             }
         }
         closeDeleteCredentialModal()

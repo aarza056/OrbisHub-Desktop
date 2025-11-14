@@ -1037,7 +1037,7 @@
       </div>
       <div style="flex:1;">
         <h2 style="margin:0 0 4px 0;">Delete Credential?</h2>
-        <p class="muted" style="margin:0; font-size:14px;">This will unassign the credential from all servers and environments.</p>
+        <p class="muted" style="margin:0; font-size:14px;">This will unassign the credential from all servers.</p>
       </div>
     </div>
     <div style="background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:16px;">
@@ -1045,7 +1045,6 @@
       <div style="font-weight:600;" id="deleteCredName">-</div>
       <div style="display:flex; gap:16px; margin-top:12px; font-size:13px;">
         <div>Servers using: <strong id="deleteCredUsageServers">0</strong></div>
-        <div>Environments using: <strong id="deleteCredUsageEnvs">0</strong></div>
       </div>
       <div id="deleteCredUsageDetails" style="margin-top:8px; max-height:140px; overflow:auto; font-size:12px; color:var(--muted);"></div>
     </div>
@@ -2472,11 +2471,7 @@
 <option>Dev</option>
 </select>
 </label>
-<label class="label">Deployer Credential
-<select id="envDeployer" class="input">
-<option value="">-- Select Credential --</option>
-</select>
-</label>
+ 
 <menu class="row end">
 <button id="saveEnvBtn" type="submit" value="default" class="btn">Save</button>
 </menu>
@@ -2507,11 +2502,7 @@
 <option>Dev</option>
 </select>
 </label>
-<label class="label">Deployer Credential
-<select id="editEnvDeployer" class="input">
-<option value="">-- Select Credential --</option>
-</select>
-</label>
+ 
 <menu class="row end">
 <button id="saveEditEnvBtn" type="submit" value="default" class="btn">Save Changes</button>
 </menu>

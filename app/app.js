@@ -123,7 +123,7 @@ async function handleElectronAPI(url, options) {
                                     name: e.name,
                                     url: extra.url || extra.envUrl || '',
                                     type: extra.type || extra.envType || '',
-                                    deployerId: extra.deployerId || null,
+                                    
                                     mappedServers: Array.isArray(extra.mappedServers) ? extra.mappedServers : [],
                                     description: (typeof e.description === 'string' && !e.description.trim().startsWith('{')) ? (e.description || '') : (extra.note || ''),
                                     color: e.color || '#3b82f6'
@@ -221,7 +221,6 @@ async function handleElectronAPI(url, options) {
                             const extra = {
                                 url: env.url || '',
                                 type: env.type || '',
-                                deployerId: env.deployerId || null,
                                 mappedServers: Array.isArray(env.mappedServers) ? env.mappedServers : [],
                                 note: env.description || ''
                             };
