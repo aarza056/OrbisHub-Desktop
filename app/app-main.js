@@ -1274,7 +1274,8 @@ function renderServers() {
 				<th style="padding:12px 16px; text-align:left; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; width:40px;">Status</th>
 				<th style="padding:12px 16px; text-align:left; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Name</th>
 				<th style="padding:12px 16px; text-align:left; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Host</th>
-				<th style="padding:12px 16px; text-align:left; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Type</th>
+                <th style="padding:12px 16px; text-align:left; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Type</th>
+                <th style="padding:12px 16px; text-align:left; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">OS</th>
 				<th style="padding:12px 16px; text-align:left; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Credential</th>
 				<th style="padding:12px 16px; text-align:right; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; width:200px;">Actions</th>
 			</tr>
@@ -1308,9 +1309,12 @@ function renderServers() {
 				<td style="padding:12px 16px;">
 					<span style="font-family:monospace; font-size:13px; color:var(--text);">${server.ipAddress}</span>
 				</td>
-				<td style="padding:12px 16px;">
-					<span style="font-size:13px; color:var(--muted);">${server.type}</span>
-				</td>
+                <td style="padding:12px 16px;">
+                    <span style="font-size:13px; color:var(--muted);">${server.type}</span>
+                </td>
+                <td style="padding:12px 16px;">
+                    <span style="font-size:13px; color:var(--muted);">${server.os || 'Windows'}</span>
+                </td>
 				<td style="padding:12px 16px;">
 					<span style="font-size:12px; color:${server.credentialId ? '#10b981' : 'var(--muted)'};">${credentialName}</span>
 				</td>
@@ -1366,7 +1370,7 @@ function renderServers() {
 let serverToDelete = null
 
 // Test server connectivity using backend API
-async function testServerConnection(ipAddress, serverName) {
+async function testServerConnection(ipAddress, serverName, port = 3389) {
     try {
         console.log(`🔍 Testing connection to ${serverName} (${ipAddress})...`)
         
@@ -1377,7 +1381,8 @@ async function testServerConnection(ipAddress, serverName) {
             },
             body: JSON.stringify({
                 ipAddress: ipAddress,
-                serverName: serverName
+                serverName: serverName,
+                port
             }),
             signal: AbortSignal.timeout(5000) // 5 second timeout
         })
@@ -1419,9 +1424,37 @@ async function connectToServer(server) {
 		alert('Assigned credential not found. Please edit the server and assign a valid credential.')
 		return
 	}
-	
-	// Generate RDP file content
-	const rdpContent = `full address:s:${server.ipAddress}
+
+    const os = server.os || 'Windows'
+    if (os === 'Linux') {
+        // SSH/PuTTY
+        try {
+            if (window.electronAPI && window.electronAPI.connectSSH) {
+                const result = await window.electronAPI.connectSSH({
+                    displayName: server.displayName,
+                    ipAddress: server.ipAddress,
+                    hostname: server.hostname,
+                    port: server.port || 22
+                }, credential)
+                if (result.success) {
+                    await logAudit('connect', 'server', server.displayName, { ipAddress: server.ipAddress, username: credential.username, protocol: 'ssh' })
+                    ToastManager.success('SSH Connection', `Launching SSH to ${server.displayName}...`, 3000)
+                } else {
+                    alert(`Failed to launch SSH connection: ${result.error}`)
+                }
+            } else {
+                alert('SSH connection is only available in the desktop application.')
+            }
+        } catch (error) {
+            console.error('❌ SSH connection error:', error)
+            alert(`Failed to launch SSH connection: ${error.message}`)
+        }
+        return
+    }
+
+    // Windows → RDP
+    // Generate RDP file content
+    const rdpContent = `full address:s:${server.ipAddress}
 username:s:${credential.username}
 domain:s:${credential.domain || ''}
 screen mode id:i:2
@@ -1469,51 +1502,28 @@ use redirection server name:i:0
 rdgiskdcproxy:i:0
 kdcproxyname:s:`
 
-	// Launch RDP using Electron IPC
-	try {
-		console.log('🖥️ Launching RDP connection to:', server.displayName)
-		
-		// Use Electron IPC to launch mstsc
-		if (window.electronAPI && window.electronAPI.connectRDP) {
-			const result = await window.electronAPI.connectRDP(
-				{
-					displayName: server.displayName,
-					ipAddress: server.ipAddress,
-					hostname: server.hostname,
-					port: server.port || 3389
-				},
-				credential,
-				rdpContent
-			)
-			
-			if (result.success) {
-				console.log('✅ RDP connection launched successfully')
-				
-				// Log audit
-				await logAudit('connect', 'server', server.displayName, { 
-					ipAddress: server.ipAddress,
-					username: credential.username 
-				})
-				
-				// Show success notification
-				ToastManager.success(
-					'RDP Connection',
-					`Launching Remote Desktop to ${server.displayName}...`,
-					3000
-				)
-			} else {
-				console.error('❌ RDP connection failed:', result.error)
-				alert(`Failed to launch RDP connection: ${result.error}`)
-			}
-		} else {
-			// Fallback for non-Electron environment
-			console.warn('⚠️ Electron API not available')
-			alert('RDP connection is only available in the desktop application.')
-		}
-	} catch (error) {
-		console.error('❌ RDP connection error:', error)
-		alert(`Failed to launch RDP connection: ${error.message}`)
-	}
+    // Launch RDP using Electron IPC
+    try {
+        console.log('🖥️ Launching RDP connection to:', server.displayName)
+        if (window.electronAPI && window.electronAPI.connectRDP) {
+            const result = await window.electronAPI.connectRDP(
+                { displayName: server.displayName, ipAddress: server.ipAddress, hostname: server.hostname, port: server.port || 3389 },
+                credential,
+                rdpContent
+            )
+            if (result.success) {
+                await logAudit('connect', 'server', server.displayName, { ipAddress: server.ipAddress, username: credential.username, protocol: 'rdp' })
+                ToastManager.success('RDP Connection', `Launching Remote Desktop to ${server.displayName}...`, 3000)
+            } else {
+                alert(`Failed to launch RDP connection: ${result.error}`)
+            }
+        } else {
+            alert('RDP connection is only available in the desktop application.')
+        }
+    } catch (error) {
+        console.error('❌ RDP connection error:', error)
+        alert(`Failed to launch RDP connection: ${error.message}`)
+    }
 }
 
 function openEditServer(server) {
@@ -1539,6 +1549,7 @@ function openEditServer(server) {
 	document.getElementById('editServerHostname').value = server.hostname
 	document.getElementById('editServerIp').value = server.ipAddress
 	document.getElementById('editServerType').value = server.type || ''
+    document.getElementById('editServerOS').value = server.os || 'Windows'
 	document.getElementById('editServerGroup').value = server.serverGroup || ''
 	document.getElementById('editServerCredential').value = server.credentialId || ''
 	
@@ -4020,6 +4031,7 @@ function closeServerModal() {
     document.getElementById('serverHostname').value = ''
     document.getElementById('serverIp').value = ''
     document.getElementById('serverType').value = ''
+    const osSel = document.getElementById('serverOS'); if (osSel) osSel.value = 'Windows'
     document.getElementById('serverGroup').value = ''
 }
 
@@ -4050,9 +4062,10 @@ if (saveServerBtn) {
         const hostname = document.getElementById('serverHostname').value.trim()
         const ip = document.getElementById('serverIp').value.trim()
         const type = document.getElementById('serverType').value
+        const os = (document.getElementById('serverOS')?.value) || 'Windows'
         const group = document.getElementById('serverGroup').value.trim()
         
-        console.log('🔍 Server form values:', { displayName, hostname, ip, type, group })
+        console.log('🔍 Server form values:', { displayName, hostname, ip, type, os, group })
         
         if (!displayName || !hostname || !ip || !type) {
             console.warn('❌ Missing required fields')
@@ -4070,14 +4083,17 @@ if (saveServerBtn) {
                 hostname,
                 ipAddress: ip,
                 type,
+                os,
                 status: 'active',
                 serverGroup: group || 'Ungrouped',
                 health: 'checking'
             }
             
-            // Test RDP connection
-            const isReachable = await testServerConnection(ip, displayName)
+            // Test connection based on OS (RDP 3389 vs SSH 22)
+            const testPort = os === 'Linux' ? 22 : 3389
+            const isReachable = await testServerConnection(ip, displayName, testPort)
             newServer.health = isReachable ? 'ok' : 'error'
+            newServer.port = testPort
             
             // Save to database FIRST
             console.log('💾 Saving server to database...')
@@ -4108,7 +4124,7 @@ if (saveServerBtn) {
             await logAudit('create', 'server', displayName, { 
                 hostname, 
                 ip, 
-                type, 
+                type, os,
                 group: group || 'Ungrouped',
                 connectionTest: isReachable ? 'success' : 'failed'
             })
@@ -4160,6 +4176,7 @@ if (saveEditServerBtn) {
         const hostname = document.getElementById('editServerHostname').value.trim()
         const ip = document.getElementById('editServerIp').value.trim()
         const type = document.getElementById('editServerType').value
+        const os = (document.getElementById('editServerOS')?.value) || 'Windows'
         const group = document.getElementById('editServerGroup').value.trim()
         const credentialId = document.getElementById('editServerCredential').value
         
@@ -4185,15 +4202,18 @@ if (saveEditServerBtn) {
                 
                 // Always test connection on save (not just when IP changes)
                 console.log(`🔍 Testing connection for ${displayName}...`)
-                const isReachable = await testServerConnection(ip, displayName)
+                const testPort = os === 'Linux' ? 22 : (server.port || 3389)
+                const isReachable = await testServerConnection(ip, displayName, testPort)
                 server.health = isReachable ? 'ok' : 'error'
                 
                 server.displayName = displayName
                 server.hostname = hostname
                 server.ipAddress = ip
                 server.type = type
+                server.os = os
                 server.serverGroup = group || 'Ungrouped'
                 server.credentialId = credentialId || null
+                server.port = testPort
                 
                 // Sync to database FIRST
                 console.log('💾 Updating server in database...')
@@ -4221,7 +4241,7 @@ if (saveEditServerBtn) {
                 // Audit log with old and new values
                 await logAudit('update', 'server', displayName, { 
                     old: oldValues,
-                    new: { displayName, hostname, ipAddress: ip, type, serverGroup: group || 'Ungrouped', credentialId, health: server.health }
+                    new: { displayName, hostname, ipAddress: ip, type, os, serverGroup: group || 'Ungrouped', credentialId, health: server.health }
                 })
                 
                 // Show appropriate toast based on connection test

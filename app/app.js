@@ -101,6 +101,7 @@ async function handleElectronAPI(url, options) {
                                     hostname: extraData.hostname || s.name,
                                     ipAddress: s.host,
                                     port: s.port || 3389,
+                                    os: extraData.os || 'Windows',
                                     type: extraData.type || 'Windows Server',
                                     serverGroup: extraData.serverGroup || 'Ungrouped',
                                     environmentId: s.environment_id,
@@ -281,6 +282,7 @@ async function handleElectronAPI(url, options) {
                         for (const server of servers) {
                             // Store UI data in description as JSON for fields not in schema
                             const extraData = JSON.stringify({
+                                os: server.os || 'Windows',
                                 type: server.type,
                                 serverGroup: server.serverGroup,
                                 health: server.health,
@@ -296,7 +298,7 @@ async function handleElectronAPI(url, options) {
                                     { value: server.id },
                                     { value: server.displayName || server.name },
                                     { value: server.ipAddress || server.host },
-                                    { value: server.port || 3389 },
+                                    { value: server.port || (server.os === 'Linux' ? 22 : 3389) },
                                     { value: server.environmentId || server.environment_id || null },
                                     { value: server.credentialId || server.credential_id || null },
                                     { value: extraData }, // Store extra fields as JSON

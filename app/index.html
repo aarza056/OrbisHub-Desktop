@@ -3099,6 +3099,12 @@ Channels
 <option value="Win Server">Win Server</option>
 </select>
 </label>
+<label class="label">Operating System
+<select id="serverOS" class="input" required>
+<option value="Windows">Windows</option>
+<option value="Linux">Linux</option>
+</select>
+</label>
 <label class="label">Group
 <select id="serverGroup" class="input">
 <option value="">-- Select Group --</option>
@@ -3142,6 +3148,12 @@ Channels
 <option value="Win Server">Win Server</option>
 </select>
 </label>
+<label class="label">Operating System
+<select id="editServerOS" class="input" required>
+<option value="Windows">Windows</option>
+<option value="Linux">Linux</option>
+</select>
+</label>
 <label class="label">Group
 <select id="editServerGroup" class="input">
 <option value="">-- Select Group --</option>
@@ -3155,7 +3167,7 @@ Channels
 <select id="editServerCredential" class="input">
 <option value="">-- Select Credential --</option>
 </select>
-<span style="font-size:12px; color:var(--muted); margin-top:4px; display:block;">Select saved credential for RDP connection</span>
+<span style="font-size:12px; color:var(--muted); margin-top:4px; display:block;">Select saved credential for connection</span>
 </label>
 <menu class="row end">
 <button id="saveEditServerBtn" type="submit" value="default" class="btn">Save Changes</button>

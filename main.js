@@ -186,23 +186,131 @@ ipcMain.handle('rdp-connect', async (event, { server, credential, rdpContent }) 
     }
 });
 
-// Test server connectivity (RDP port 3389 by default)
+// Test server connectivity using ICMP ping first, then TCP probes
 ipcMain.handle('test-server', async (event, { ipAddress, serverName, port = 3389 }) => {
-    try {
-        const isWindows = process.platform === 'win32';
-        const cmd = isWindows
-            ? `powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Test-NetConnection -ComputerName '${ipAddress}' -Port ${port} -InformationLevel Quiet -WarningAction SilentlyContinue; if ($r) { 'True' } else { 'False' } } catch { 'False' }"`
-            : `nc -z -w 2 ${ipAddress} ${port} && echo True || echo False`;
+    const isWindows = process.platform === 'win32';
 
+    // Quick ICMP ping (kept for environments where ping is allowed)
+    async function pingHost() {
         return await new Promise((resolve) => {
-            exec(cmd, { timeout: 7000 }, (error, stdout) => {
-                const out = (stdout || '').toString().trim();
-                const reachable = /true/i.test(out);
-                resolve({ success: true, reachable, message: reachable ? 'Reachable' : 'Unreachable', debug: { stdout: out } });
+            const cmd = isWindows
+                ? `ping -n 1 -w 800 ${ipAddress}`
+                : `ping -c 1 -W 1 ${ipAddress}`;
+            exec(cmd, { timeout: 1200 }, (error, stdout) => {
+                const out = (stdout || '').toString();
+                const ok = !error; // rely on exit code
+                resolve({ ok, out });
             });
         });
+    }
+
+    // Minimal TCP port set to fit UI timeout budget
+    const reqPort = Number(port) || 3389;
+    let fallbacks = [];
+    if (reqPort === 3389) fallbacks = [5985, 445];
+    else if (reqPort === 22) fallbacks = [80];
+    else fallbacks = [3389];
+    const portsToTry = Array.from(new Set([reqPort, ...fallbacks]));
+
+    async function tryPort(p) {
+        return await new Promise((resolve) => {
+            const cmd = isWindows
+                ? `powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Test-NetConnection -ComputerName '${ipAddress}' -Port ${p} -InformationLevel Quiet -WarningAction SilentlyContinue; if ($r) { 'True' } else { 'False' } } catch { 'False' }"`
+                : `nc -z -w 1 ${ipAddress} ${p} && echo True || echo False`;
+
+            exec(cmd, { timeout: 1000 }, (error, stdout) => {
+                const out = (stdout || '').toString().trim();
+                const ok = /true/i.test(out);
+                resolve({ ok, out });
+            });
+        });
+    }
+
+    try {
+        const attempted = [];
+        const ping = await pingHost();
+        if (ping.ok) {
+            return {
+                success: true,
+                reachable: true,
+                message: 'Reachable by ICMP ping',
+                port: null,
+                pingReachable: true,
+                tcpReachable: false,
+                debug: { attempted, pingOut: ping.out, stdout: ping.out }
+            };
+        }
+
+        for (const p of portsToTry) {
+            const r = await tryPort(p);
+            attempted.push({ port: p, reachable: r.ok });
+            if (r.ok) {
+                return {
+                    success: true,
+                    reachable: true,
+                    message: `Reachable on TCP port ${p}`,
+                    port: p,
+                    pingReachable: false,
+                    tcpReachable: true,
+                    debug: { attempted, stdout: r.out }
+                };
+            }
+        }
+
+        return {
+            success: true,
+            reachable: false,
+            message: 'Ping and TCP checks failed',
+            port: null,
+            pingReachable: false,
+            tcpReachable: false,
+            debug: { attempted, pingOut: ping.out, stdout: ping.out }
+        };
     } catch (error) {
         return { success: false, reachable: false, error: error.message };
+    }
+});
+
+// SSH/PuTTY connection
+ipcMain.handle('ssh-connect', async (event, { server, credential }) => {
+    try {
+        const host = server.ipAddress || server.hostname;
+        const port = server.port || 22;
+        const user = credential.username;
+        const password = credential.password; // Note: passed to PuTTY with -pw
+
+        // Try to locate PuTTY
+        const puttyPaths = [
+            'C:\\Program Files\\PuTTY\\putty.exe',
+            'C:\\Program Files (x86)\\PuTTY\\putty.exe'
+        ];
+        let puttyExe = null;
+        for (const p of puttyPaths) {
+            try { if (fs.existsSync(p)) { puttyExe = p; break; } } catch {}
+        }
+
+        let command;
+        if (puttyExe) {
+            // Launch PuTTY with username, host, port and password
+            const args = [`-ssh`, `${user}@${host}`, `-P`, `${port}`];
+            if (password) args.push(`-pw`, `${password}`);
+            command = `start "" "${puttyExe}" ${args.map(a => (a.includes(' ') ? '"'+a+'"' : a)).join(' ')}`;
+        } else {
+            // Fallback to Windows OpenSSH (opens a new cmd window)
+            // Password auth will prompt; key auth not handled here
+            command = `start "" cmd /c ssh ${user}@${host} -p ${port}`;
+        }
+
+        exec(command, (error) => {
+            if (error) {
+                console.error('SSH launch error:', error);
+            }
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error('SSH connection error:', error);
+        return { success: false, error: error.message };
     }
 });
 

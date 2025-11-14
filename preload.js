@@ -5,6 +5,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // RDP Connection
     connectRDP: (server, credential, rdpContent) => 
         ipcRenderer.invoke('rdp-connect', { server, credential, rdpContent }),
+    // SSH/PuTTY Connection
+    connectSSH: (server, credential) =>
+        ipcRenderer.invoke('ssh-connect', { server, credential }),
     
     // Database Configuration
     getDbConfig: () => ipcRenderer.invoke('db-get-config'),
