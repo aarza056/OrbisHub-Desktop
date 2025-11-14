@@ -20,28 +20,79 @@ window.fetch = function(url, options) {
     return originalFetch(url, options);
 };
 
+let MESSAGES_TABLE = null
+let MESSAGES_SCHEMA = null
+
+async function resolveMessagesTable() {
+    if (MESSAGES_TABLE) return MESSAGES_TABLE
+    try {
+        const any = await window.electronAPI.dbQuery(
+            `SELECT TOP 1 s.name AS schemaName
+             FROM sys.tables t
+             JOIN sys.schemas s ON t.schema_id = s.schema_id
+             WHERE t.name = 'Messages'
+             ORDER BY CASE WHEN s.name='dbo' THEN 0 ELSE 1 END`,
+            []
+        )
+        if (any.success && Array.isArray(any.data) && any.data.length > 0) {
+            MESSAGES_SCHEMA = any.data[0].schemaName || 'dbo'
+            MESSAGES_TABLE = `[${MESSAGES_SCHEMA}].Messages`
+            return MESSAGES_TABLE
+        }
+    } catch {}
+    return null
+}
+
 // Ensure Messages table exists (auto-migrate on first use)
 async function ensureMessagesTable() {
     try {
-        const exists = await window.electronAPI.dbQuery(
-            "SELECT 1 AS ok FROM sysobjects WHERE name='Messages' AND xtype='U'",
-            []
-        )
-        if (exists.success && Array.isArray(exists.data) && exists.data.length > 0) {
+        let tbl = await resolveMessagesTable()
+        if (tbl) {
+            // Table exists – verify column sizes and widen if needed for cross-user DMs
+            try {
+                const cols = await window.electronAPI.dbQuery(
+                    `SELECT COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH AS len
+                     FROM INFORMATION_SCHEMA.COLUMNS 
+                     WHERE TABLE_NAME = 'Messages' AND (@param0 IS NULL OR TABLE_SCHEMA = @param0)
+                       AND COLUMN_NAME IN ('SenderId','RecipientId')`,
+                    [{ value: MESSAGES_SCHEMA }]
+                )
+                if (cols.success && Array.isArray(cols.data)) {
+                    for (const c of cols.data) {
+                        const name = c.COLUMN_NAME || c.Column_name || c.column_name
+                        const len = c.len || c.CHARACTER_MAXIMUM_LENGTH
+                        if (name && (len === null || len < 128)) {
+                            await window.electronAPI.dbExecute(
+                                `ALTER TABLE ${tbl} ALTER COLUMN ${name} NVARCHAR(128) ${name === 'SenderId' ? 'NOT NULL' : 'NULL'}`,
+                                []
+                            )
+                        }
+                    }
+                }
+            } catch (migErr) {
+                console.warn('ensureMessagesTable: column widen check failed:', migErr)
+            }
             return true
         }
         const create = await window.electronAPI.dbExecute(
-            `CREATE TABLE Messages (
-                Id NVARCHAR(50) PRIMARY KEY,
-                SenderId NVARCHAR(50) NOT NULL,
-                RecipientId NVARCHAR(50) NULL,
+            `IF NOT EXISTS (SELECT 1 FROM sys.tables t JOIN sys.schemas s ON t.schema_id = s.schema_id WHERE t.name='Messages' AND s.name='dbo')
+             BEGIN
+               CREATE TABLE [dbo].[Messages] (
+                Id NVARCHAR(64) PRIMARY KEY,
+                SenderId NVARCHAR(128) NOT NULL,
+                RecipientId NVARCHAR(128) NULL,
                 ChannelId NVARCHAR(50) NULL,
                 Content NVARCHAR(MAX) NOT NULL,
                 SentAt DATETIME DEFAULT GETDATE(),
                 [Read] BIT DEFAULT 0
-            )`,
+               )
+             END`,
             []
         )
+        if (create.success) {
+            MESSAGES_SCHEMA = 'dbo'
+            MESSAGES_TABLE = '[dbo].Messages'
+        }
         return !!create.success
     } catch (e) {
         console.error('ensureMessagesTable failed:', e)
@@ -49,9 +100,12 @@ async function ensureMessagesTable() {
     }
 }
 
-async function handleElectronAPI(url, options) {
+async function handleElectronAPI(url, options = {}) {
     const endpoint = url.split('/api/')[1];
     const body = options && options.body ? JSON.parse(options.body) : {};
+    const method = options.method || 'GET';
+    
+    console.log('[API] Handling endpoint:', endpoint, 'method:', method)
     
     try {
         let result;
@@ -63,9 +117,9 @@ async function handleElectronAPI(url, options) {
                 
             // Database configuration
             case 'db-config':
-                if (options.method === 'GET') {
+                if (method === 'GET') {
                     result = await window.electronAPI.getDbConfig();
-                } else if (options.method === 'POST') {
+                } else if (method === 'POST') {
                     result = await window.electronAPI.saveDbConfig(body);
                 }
                 break;
@@ -421,21 +475,26 @@ async function handleElectronAPI(url, options) {
             
             // Messaging: create direct message
             case 'messages': {
-                if (options.method === 'POST') {
+                if (method === 'POST') {
                     await ensureMessagesTable()
                     const { senderId, recipientId, content } = body;
+                    const sId = String(senderId || '').trim()
+                    const rId = recipientId != null ? String(recipientId).trim() : null
+                    console.log('[MessagesAPI] Insert DM', { senderId: sId, recipientId: rId })
                     const msgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+                    await ensureMessagesTable();
+                    const tbl = MESSAGES_TABLE || '[dbo].Messages'
                     const insert = await window.electronAPI.dbExecute(
-                        `INSERT INTO Messages (Id, SenderId, RecipientId, Content, SentAt, [Read]) VALUES (@param0, @param1, @param2, @param3, GETDATE(), 0)`,
+                        `INSERT INTO ${tbl} (Id, SenderId, RecipientId, Content, SentAt, [Read]) VALUES (@param0, @param1, @param2, @param3, GETDATE(), 0)`,
                         [
                             { value: msgId },
-                            { value: senderId },
-                            { value: recipientId },
+                            { value: sId },
+                            { value: rId },
                             { value: content }
                         ]
                     );
                     if (insert.success) {
-                        result = { success: true, message: { Id: msgId, SenderId: senderId, RecipientId: recipientId, Content: content, SentAt: new Date().toISOString(), Read: 0 } };
+                        result = { success: true, message: { Id: msgId, SenderId: sId, RecipientId: rId, Content: content, SentAt: new Date().toISOString(), Read: 0 } };
                     } else {
                         result = { success: false, error: insert.error || 'Insert failed' };
                     }
@@ -447,7 +506,7 @@ async function handleElectronAPI(url, options) {
             
             // Users list (for messaging member pickers)
             case 'users': {
-                if (options.method === 'GET') {
+                if (method === 'GET') {
                     const q = await window.electronAPI.dbQuery(`SELECT id AS Id, username AS Username, name AS FullName, email AS Email FROM Users`, []);
                     result = q.success ? q.data : [];
                 } else {
@@ -518,14 +577,16 @@ async function handleElectronAPI(url, options) {
                 if (endpoint.startsWith('messages/unread/')) {
                     await ensureMessagesTable()
                     const userId = endpoint.substring('messages/unread/'.length);
+                    const tbl = MESSAGES_TABLE || '[dbo].Messages'
                     const q = await window.electronAPI.dbQuery(
-                        `SELECT COUNT(*) AS cnt FROM Messages WHERE RecipientId = @param0 AND [Read] = 0`,
+                        `SELECT COUNT(*) AS cnt FROM ${tbl} WHERE LOWER(LTRIM(RTRIM(RecipientId))) = LOWER(LTRIM(RTRIM(@param0))) AND [Read] = 0`,
                         [{ value: userId }]
                     );
                     const count = q.success && q.data && q.data[0] ? (q.data[0].cnt || 0) : 0;
                     result = { success: true, unreadCount: count };
-                } else if (endpoint.startsWith('messages/') && options.method === 'GET') {
+                } else if (endpoint.startsWith('messages/') && method === 'GET') {
                     await ensureMessagesTable()
+                    const tbl = MESSAGES_TABLE || '[dbo].Messages'
                     // GET /api/messages/{currentUserId}?otherUserId=...
                     const pathPart = endpoint.split('?')[0];
                     const currentUserId = pathPart.substring('messages/'.length);
@@ -538,35 +599,105 @@ async function handleElectronAPI(url, options) {
                         const curId = String(currentUserId).trim()
                         const othId = String(otherUserId).trim()
 
+                        console.log('[MessagesAPI] Query params', { curId, othId, table: tbl })
+
                         let q
                         if (curId === othId) {
                             // Self-DM: include messages to self and any legacy self-notes with NULL recipient
                             console.log('[MessagesAPI] Fetch self-DM', { userId: curId })
+                            try {
+                                const dbn = await window.electronAPI.dbQuery('SELECT DB_NAME() as dbname', [])
+                                const total = await window.electronAPI.dbQuery(`SELECT COUNT(*) as total FROM ${tbl}` , [])
+                                console.log('[MessagesAPI] Context', { db: dbn?.data?.[0]?.dbname, total: total?.data?.[0]?.total })
+                            } catch {}
+                            // JOIN with Users table to get sender name
                             q = await window.electronAPI.dbQuery(
-                                `SELECT Id, SenderId, RecipientId, Content, SentAt, [Read] FROM Messages
-                                 WHERE SenderId = @param0 AND (RecipientId = @param0 OR RecipientId IS NULL)
-                                 ORDER BY SentAt ASC`,
+                                `SELECT m.Id, m.SenderId, m.RecipientId, m.Content, m.SentAt, m.[Read],
+                                        u.name AS SenderName, u.username AS SenderUsername
+                                 FROM ${tbl} m
+                                 LEFT JOIN Users u ON LOWER(LTRIM(RTRIM(m.SenderId))) = LOWER(LTRIM(RTRIM(u.id)))
+                                 WHERE LOWER(LTRIM(RTRIM(m.SenderId))) = LOWER(LTRIM(RTRIM(@param0)))
+                                   AND (
+                                        LOWER(LTRIM(RTRIM(m.RecipientId))) = LOWER(LTRIM(RTRIM(@param0)))
+                                     OR m.RecipientId IS NULL
+                                     OR LTRIM(RTRIM(m.RecipientId)) = ''
+                                   )
+                                 ORDER BY m.SentAt ASC`,
                                 [{ value: curId }]
                             )
+                            console.log('[MessagesAPI] Self-DM query result', { success: q.success, rowCount: q.data?.length })
+                            // Fallback: if still empty, include any row where user appears as sender or recipient
+                            if (!(q.success && Array.isArray(q.data) && q.data.length > 0)) {
+                                console.log('[MessagesAPI] Self-DM empty, trying fallback query')
+                                const q2 = await window.electronAPI.dbQuery(
+                                    `SELECT m.Id, m.SenderId, m.RecipientId, m.Content, m.SentAt, m.[Read],
+                                            u.name AS SenderName, u.username AS SenderUsername
+                                     FROM ${tbl} m
+                                     LEFT JOIN Users u ON LOWER(LTRIM(RTRIM(m.SenderId))) = LOWER(LTRIM(RTRIM(u.id)))
+                                     WHERE LOWER(LTRIM(RTRIM(m.SenderId))) = LOWER(LTRIM(RTRIM(@param0)))
+                                        OR LOWER(LTRIM(RTRIM(m.RecipientId))) = LOWER(LTRIM(RTRIM(@param0)))
+                                     ORDER BY m.SentAt ASC`,
+                                    [{ value: curId }]
+                                )
+                                if (q2.success) q = q2
+                                console.log('[MessagesAPI] Fallback query result', { success: q2.success, rowCount: q2.data?.length })
+                            }
                         } else {
                             console.log('[MessagesAPI] Fetch DM pair', { currentUserId: curId, otherUserId: othId })
+                            try {
+                                const dbn = await window.electronAPI.dbQuery('SELECT DB_NAME() as dbname', [])
+                                const total = await window.electronAPI.dbQuery(`SELECT COUNT(*) as total FROM ${tbl}`, [])
+                                const allMsgs = await window.electronAPI.dbQuery(`SELECT Id, SenderId, RecipientId, Content FROM ${tbl}`, [])
+                                console.log('[MessagesAPI] Context', { db: dbn?.data?.[0]?.dbname, total: total?.data?.[0]?.total })
+                                console.log('[MessagesAPI] All messages in DB:', allMsgs.data)
+                                
+                                // Also check what the user IDs look like in the Users table
+                                const users = await window.electronAPI.dbQuery(`SELECT id, username, name FROM Users`, [])
+                                console.log('[MessagesAPI] All users in DB:', users.data)
+                                console.log('[MessagesAPI] Looking for match with curId:', curId, 'othId:', othId)
+                            } catch (e) {
+                                console.log('[MessagesAPI] Context query error:', e.message)
+                            }
+                            // JOIN with Users table to get sender name
+                            // Try simpler query first without complex string matching
                             q = await window.electronAPI.dbQuery(
-                                `SELECT Id, SenderId, RecipientId, Content, SentAt, [Read] FROM Messages
-                                 WHERE (SenderId = @param0 AND RecipientId = @param1)
-                                    OR (SenderId = @param1 AND RecipientId = @param0)
-                                 ORDER BY SentAt ASC`,
+                                `SELECT m.Id, m.SenderId, m.RecipientId, m.Content, m.SentAt, m.[Read],
+                                        u.name AS SenderName, u.username AS SenderUsername
+                                 FROM ${tbl} m
+                                 LEFT JOIN Users u ON m.SenderId = u.id
+                                 WHERE (m.SenderId = @param0 AND m.RecipientId = @param1)
+                                    OR (m.SenderId = @param1 AND m.RecipientId = @param0)
+                                 ORDER BY m.SentAt ASC`,
                                 [{ value: curId }, { value: othId }]
                             )
+                            console.log('[MessagesAPI] DM pair query result (simple match)', { success: q.success, rowCount: q.data?.length, error: q.error, firstRow: q.data?.[0] })
+                            
+                            // If that didn't work, try the complex string matching
+                            if (!q.success || !q.data || q.data.length === 0) {
+                                console.log('[MessagesAPI] Trying complex string matching query...')
+                                q = await window.electronAPI.dbQuery(
+                                    `SELECT m.Id, m.SenderId, m.RecipientId, m.Content, m.SentAt, m.[Read],
+                                            u.name AS SenderName, u.username AS SenderUsername
+                                     FROM ${tbl} m
+                                     LEFT JOIN Users u ON LOWER(LTRIM(RTRIM(m.SenderId))) = LOWER(LTRIM(RTRIM(u.id)))
+                                     WHERE (LOWER(LTRIM(RTRIM(m.SenderId))) = LOWER(LTRIM(RTRIM(@param0))) AND LOWER(LTRIM(RTRIM(m.RecipientId))) = LOWER(LTRIM(RTRIM(@param1))))
+                                        OR (LOWER(LTRIM(RTRIM(m.SenderId))) = LOWER(LTRIM(RTRIM(@param1))) AND LOWER(LTRIM(RTRIM(m.RecipientId))) = LOWER(LTRIM(RTRIM(@param0))))
+                                     ORDER BY m.SentAt ASC`,
+                                    [{ value: curId }, { value: othId }]
+                                )
+                                console.log('[MessagesAPI] Complex string match result', { success: q.success, rowCount: q.data?.length })
+                            }
                         }
                         const rows = q.success && Array.isArray(q.data) ? q.data : []
-                        console.log('[MessagesAPI] Rows returned:', { count: rows.length })
+                        console.log('[MessagesAPI] Final rows returned:', { count: rows.length, firstRow: rows[0] })
                         result = rows;
                     }
-                } else if (endpoint === 'messages/read' && options.method === 'PUT') {
+                } else if (endpoint === 'messages/read' && method === 'PUT') {
                     await ensureMessagesTable()
                     const { userId, otherUserId } = body;
+                    const tbl = MESSAGES_TABLE || '[dbo].Messages'
                     const upd = await window.electronAPI.dbExecute(
-                        `UPDATE Messages SET [Read] = 1 WHERE RecipientId = @param0 AND SenderId = @param1 AND [Read] = 0`,
+                        `UPDATE ${tbl} SET [Read] = 1 WHERE LOWER(LTRIM(RTRIM(RecipientId))) = LOWER(LTRIM(RTRIM(@param0))) AND LOWER(LTRIM(RTRIM(SenderId))) = LOWER(LTRIM(RTRIM(@param1))) AND [Read] = 0`,
                         [{ value: userId }, { value: otherUserId }]
                     );
                     result = { success: !!upd.success, rowsAffected: upd.rowsAffected };

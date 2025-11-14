@@ -1379,7 +1379,7 @@
             <line x1="12" y1="5" x2="12" y2="19"></line>
             <polyline points="19 12 12 19 5 12"></polyline>
           </svg>
-          Migrate from localStorage
+          Import data
         </button>
       </div>
       
@@ -1691,7 +1691,7 @@
           <ul class="doc-feature-list">
             <li>Store usernames, passwords, and domains</li>
             <li>Used for RDP connections and integrations</li>
-            <li>Encrypted storage in localStorage</li>
+            <li>Encrypted storage in database</li>
             <li>Easy assignment to servers and services</li>
             <li>Credential auditing and tracking</li>
           </ul>
@@ -1717,7 +1717,7 @@
           <ul class="doc-feature-list">
             <li>SQL Server connection configuration</li>
             <li>Schema initialization and migration</li>
-            <li>LocalStorage to database migration</li>
+            <li>Data migration tools</li>
             <li>Connection testing and validation</li>
             <li>Automated table creation</li>
           </ul>
@@ -1870,7 +1870,7 @@
           </div>
           <div class="doc-tech-item">
             <strong>Storage</strong>
-            <p>LocalStorage (Client-side) / SQL Server (Optional)</p>
+            <p>SQL Server (local/remote)</p>
           </div>
           <div class="doc-tech-item">
             <strong>Backend</strong>
@@ -1898,7 +1898,7 @@
 
       <div class="doc-card">
         <h3>Data Structure</h3>
-        <p>OrbisHub stores data in localStorage with the following schema:</p>
+        <p>OrbisHub stores data in SQL Server with the following conceptual schema:</p>
         <pre class="doc-code">
 {
   "environments": [],      // Deployment environments
@@ -1943,7 +1943,7 @@
           <li>Real-time build execution</li>
         </ul>
         <div class="doc-warning">
-          <strong>⚠️ Note:</strong> Backend is optional. OrbisHub works fully offline using LocalStorage.
+          <strong>⚠️ Note:</strong> Backend is optional. The Electron app can work directly with SQL Server.
         </div>
       </div>
     </div>
@@ -1955,7 +1955,7 @@
       <div class="doc-faq">
         <details class="doc-faq-item">
           <summary>Where is my data stored?</summary>
-          <p>All data is stored in your browser's LocalStorage. This means your data never leaves your machine and is completely private. However, clearing browser data will delete your OrbisHub data.</p>
+          <p>All data is stored in your configured SQL Server database. Data remains on your infrastructure and does not leave your machine/network.</p>
         </details>
 
         <details class="doc-faq-item">
@@ -2159,8 +2159,8 @@
       <div class="doc-card">
         <div class="settings-row">
           <div class="settings-row-info">
-            <h3>Storage Usage</h3>
-            <p>Monitor your LocalStorage usage</p>
+            <h3>Database Usage</h3>
+            <p>Monitor your database usage</p>
           </div>
           <div class="settings-row-control">
             <div id="storageUsageDisplay" class="storage-usage">
@@ -2409,7 +2409,7 @@
         </div>
         <div class="doc-tech-item">
           <strong>Storage Type</strong>
-          <p>LocalStorage</p>
+          <p>SQL Server</p>
         </div>
         <div class="doc-tech-item">
           <strong>Last Backup</strong>
@@ -3341,7 +3341,7 @@ Channels
   </div>
   <div style="flex:1;">
     <h2 style="margin:0 0 8px 0;">Migrate Data to Database</h2>
-    <p style="margin:0; color:var(--muted); font-size:14px;">Transfer all data from localStorage to SQL Server database.</p>
+    <p style="margin:0; color:var(--muted); font-size:14px;">Transfer existing data into the SQL Server database.</p>
   </div>
 </div>
 
@@ -3383,7 +3383,7 @@ Channels
     </svg>
     <div style="flex:1;">
       <div style="font-weight:600; margin-bottom:4px; color:#f59e0b;">Warning</div>
-      <div style="font-size:13px; color:var(--muted);">This operation will insert all localStorage data into the database. Make sure the database schema is initialized first.</div>
+      <div style="font-size:13px; color:var(--muted);">This operation will insert selected data into the database. Make sure the database schema is initialized first.</div>
     </div>
   </div>
 </div>

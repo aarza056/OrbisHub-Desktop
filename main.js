@@ -13,10 +13,13 @@ app.commandLine.appendSwitch('disable-software-rasterizer');
 let mainWindow;
 let tray;
 let dbPool = null;
+let poolConnectPromise = null;
 let dbConfig = null;
 
-// Config file path
-const configPath = path.join(app.getPath('userData'), 'db-config.json');
+// Config file paths (support legacy location under product name)
+const userDataDir = app.getPath('userData');
+const configPath = path.join(userDataDir, 'db-config.json');
+const legacyConfigPath = path.join(app.getPath('appData'), 'OrbisHub Desktop', 'db-config.json');
 
 // Create main window
 function createWindow() {
@@ -78,13 +81,59 @@ function createTray() {
     });
 }
 
+// Best-effort cleanup of Chromium caches that may block startup on some systems
+async function clearChromiumCaches() {
+    try {
+        const { session } = require('electron');
+        const udir = app.getPath('userData');
+        const paths = [
+            path.join(udir, 'Service Worker'),
+            path.join(udir, 'GPUCache'),
+            path.join(udir, 'Code Cache')
+        ];
+        for (const p of paths) {
+            try {
+                if (fs.existsSync(p)) {
+                    fs.rmSync(p, { recursive: true, force: true });
+                }
+            } catch (e) {
+                console.warn('Cache cleanup warning:', p, e.message);
+            }
+        }
+        try {
+            await session.defaultSession.clearStorageData({ storages: ['serviceworkers'] });
+        } catch (e) {
+            console.warn('Session storage cleanup warning:', e.message);
+        }
+    } catch (e) {
+        console.warn('Chromium cache cleanup skipped:', e.message);
+    }
+}
+
 // Load database configuration
 function loadDbConfig() {
     try {
+        // Preferred location
         if (fs.existsSync(configPath)) {
             const data = fs.readFileSync(configPath, 'utf8');
             dbConfig = JSON.parse(data);
             return dbConfig;
+        }
+        // Legacy migration: copy from legacy path if it exists
+        if (fs.existsSync(legacyConfigPath)) {
+            try {
+                // Ensure userData directory exists
+                if (!fs.existsSync(userDataDir)) {
+                    fs.mkdirSync(userDataDir, { recursive: true });
+                }
+                const data = fs.readFileSync(legacyConfigPath, 'utf8');
+                fs.writeFileSync(configPath, data);
+                dbConfig = JSON.parse(data);
+                console.log('Migrated DB config from legacy path:', legacyConfigPath);
+                return dbConfig;
+            } catch (mErr) {
+                console.warn('Legacy DB config migration failed:', mErr.message);
+            }
         }
     } catch (error) {
         console.error('Error loading DB config:', error);
@@ -95,6 +144,10 @@ function loadDbConfig() {
 // Save database configuration
 function saveDbConfig(config) {
     try {
+        // Ensure directory exists
+        if (!fs.existsSync(userDataDir)) {
+            fs.mkdirSync(userDataDir, { recursive: true });
+        }
         fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
         dbConfig = config;
         return true;
@@ -104,14 +157,25 @@ function saveDbConfig(config) {
     }
 }
 
-// Get database connection pool
+// Get database connection pool (lazy-load persisted config on cold start)
 async function getDbPool() {
     if (!dbConfig || !dbConfig.connected) {
-        throw new Error('Database not configured');
+        const loaded = loadDbConfig();
+        if (loaded && loaded.connected) {
+            dbConfig = loaded;
+        } else {
+            throw new Error('Database not configured');
+        }
     }
 
-    if (dbPool && dbPool.connected) {
-        return dbPool;
+    if (dbPool && dbPool.connected) return dbPool;
+    if (poolConnectPromise) {
+        try {
+            await poolConnectPromise;
+            if (dbPool && dbPool.connected) return dbPool;
+        } catch (_) {
+            // fallthrough to attempt a fresh connect
+        }
     }
 
     const config = {
@@ -120,7 +184,8 @@ async function getDbPool() {
         options: {
             encrypt: dbConfig.encrypt,
             trustServerCertificate: dbConfig.trustCert,
-            enableArithAbort: true
+            enableArithAbort: true,
+            connectTimeout: 10000
         },
         pool: {
             max: 10,
@@ -140,8 +205,21 @@ async function getDbPool() {
         };
     }
 
-    dbPool = await sql.connect(config);
-    return dbPool;
+    const pool = new sql.ConnectionPool(config);
+    pool.on('error', err => {
+        console.error('DB pool error:', err.message);
+    });
+    poolConnectPromise = pool.connect();
+    try {
+        await poolConnectPromise;
+        dbPool = pool;
+        return dbPool;
+    } catch (e) {
+        // ensure failed pool is closed and reset promise
+        try { await pool.close(); } catch {}
+        poolConnectPromise = null;
+        throw e;
+    }
 }
 
 // IPC Handlers
@@ -559,18 +637,24 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
         `);
         migrations.push('AuditLogs table created');
         
-        // Messages table (for direct and channel messages)
+        // Messages table (for direct and channel messages) - ensure dbo schema
         await pool.request().query(`
-            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Messages' AND xtype='U')
-            CREATE TABLE Messages (
-                Id NVARCHAR(50) PRIMARY KEY,
-                SenderId NVARCHAR(50) NOT NULL,
-                RecipientId NVARCHAR(50) NULL,
-                ChannelId NVARCHAR(50) NULL,
-                Content NVARCHAR(MAX) NOT NULL,
-                SentAt DATETIME DEFAULT GETDATE(),
-                [Read] BIT DEFAULT 0
+            IF NOT EXISTS (
+                SELECT 1 FROM sys.tables t
+                JOIN sys.schemas s ON t.schema_id = s.schema_id
+                WHERE t.name = 'Messages' AND s.name = 'dbo'
             )
+            BEGIN
+                CREATE TABLE [dbo].[Messages] (
+                    Id NVARCHAR(64) PRIMARY KEY,
+                    SenderId NVARCHAR(128) NOT NULL,
+                    RecipientId NVARCHAR(128) NULL,
+                    ChannelId NVARCHAR(50) NULL,
+                    Content NVARCHAR(MAX) NOT NULL,
+                    SentAt DATETIME DEFAULT GETDATE(),
+                    [Read] BIT DEFAULT 0
+                )
+            END
         `);
         migrations.push('Messages table created');
         
@@ -615,28 +699,15 @@ ipcMain.handle('db-create-database', async (event, config) => {
         const pool = await sql.connect(testConfig);
         
         // Check if database exists
-        const checkDb = await pool.request()
-            .input('dbname', sql.NVarChar, config.database)
-            .query(`SELECT database_id FROM sys.databases WHERE name = @dbname`);
-        
-        if (checkDb.recordset.length > 0) {
-            // Database exists - try to drop it
-            console.log(`Database '${config.database}' exists. Attempting to drop...`);
-            try {
-                await pool.request().query(`
-                    ALTER DATABASE [${config.database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-                    DROP DATABASE [${config.database}];
-                `);
-                console.log(`Database '${config.database}' dropped successfully`);
-            } catch (dropError) {
-                console.error('Drop error:', dropError);
+            const checkDb = await pool.request()
+                .input('dbname', sql.NVarChar, config.database)
+                .query(`SELECT database_id FROM sys.databases WHERE name = @dbname`);
+
+            // If exists, do NOT drop; keep data and return success with message
+            if (checkDb.recordset.length > 0) {
                 await pool.close();
-                return { 
-                    success: false, 
-                    error: `Database exists and could not be dropped: ${dropError.message}` 
-                };
+                return { success: true, message: `Database '${config.database}' already exists` };
             }
-        }
         
         // Check if physical files exist and try to delete them
         const dataPath = `C:\\Program Files\\Microsoft SQL Server\\MSSQL15.MSSQLSERVER\\MSSQL\\DATA\\`;
@@ -759,7 +830,8 @@ ipcMain.handle('open-external', async (event, url) => {
 });
 
 // App lifecycle
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+    await clearChromiumCaches();
     createWindow();
     createTray();
     
