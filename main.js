@@ -433,6 +433,23 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
             )
         `);
         migrations.push('Builds table created');
+
+        // AuditLogs table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AuditLogs' AND xtype='U')
+            CREATE TABLE AuditLogs (
+                id NVARCHAR(50) PRIMARY KEY,
+                action NVARCHAR(50) NOT NULL,
+                entityType NVARCHAR(50) NOT NULL,
+                entityName NVARCHAR(255) NOT NULL,
+                [user] NVARCHAR(255) NOT NULL,
+                username NVARCHAR(255) NOT NULL,
+                [timestamp] DATETIME NOT NULL,
+                ip NVARCHAR(50),
+                details NVARCHAR(MAX)
+            )
+        `);
+        migrations.push('AuditLogs table created');
         
         await pool.close();
         
@@ -448,7 +465,6 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
         };
     }
 });
-
 // Create database
 ipcMain.handle('db-create-database', async (event, config) => {
     try {

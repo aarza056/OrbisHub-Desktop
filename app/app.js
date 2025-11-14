@@ -64,6 +64,7 @@ async function handleElectronAPI(url, options) {
                     const credentials = await window.electronAPI.dbQuery('SELECT * FROM Credentials', []);
                     const scripts = await window.electronAPI.dbQuery('SELECT * FROM Scripts', []);
                     const builds = await window.electronAPI.dbQuery('SELECT * FROM Builds', []);
+                    const auditLogs = await window.electronAPI.dbQuery('SELECT TOP 1000 * FROM AuditLogs ORDER BY [timestamp] DESC', []);
                     
                     result = {
                         success: true,
@@ -167,6 +168,19 @@ async function handleElectronAPI(url, options) {
                                 log: b.log || '',
                                 created_at: b.created_at,
                                 updated_at: b.updated_at
+                            })) : [],
+                            auditLogs: auditLogs.success && auditLogs.data ? auditLogs.data.map(a => ({
+                                id: a.id,
+                                action: a.action,
+                                entityType: a.entityType,
+                                entityName: a.entityName,
+                                user: a.user,
+                                username: a.username,
+                                timestamp: a.timestamp,
+                                ip: a.ip || '—',
+                                details: (() => {
+                                    try { return a.details && a.details.startsWith('{') ? JSON.parse(a.details) : (a.details || {}) } catch { return {} }
+                                })()
                             })) : []
                         }
                     };
@@ -186,7 +200,7 @@ async function handleElectronAPI(url, options) {
             case 'sync-data':
                 // Sync data to database (insert/update)
                 try {
-                    const { users, servers, environments, credentials, scripts, builds } = body;
+                    const { users, servers, environments, credentials, scripts, builds, auditLogs } = body;
                     
                     // Sync users
                     if (users && users.length > 0) {
@@ -331,7 +345,44 @@ async function handleElectronAPI(url, options) {
                         }
                     }
                     
+                    // Sync audit logs
+                    if (auditLogs && auditLogs.length > 0) {
+                        for (const log of auditLogs) {
+                            const detailsStr = typeof log.details === 'string' ? log.details : JSON.stringify(log.details || {});
+                            await window.electronAPI.dbExecute(
+                                `IF EXISTS (SELECT 1 FROM AuditLogs WHERE id = @param0)
+                                    UPDATE AuditLogs SET action = @param1, entityType = @param2, entityName = @param3, [user] = @param4, username = @param5, [timestamp] = @param6, ip = @param7, details = @param8 WHERE id = @param0
+                                ELSE
+                                    INSERT INTO AuditLogs (id, action, entityType, entityName, [user], username, [timestamp], ip, details) VALUES (@param0, @param1, @param2, @param3, @param4, @param5, @param6, @param7, @param8)`,
+                                [
+                                    { value: log.id },
+                                    { value: log.action },
+                                    { value: log.entityType },
+                                    { value: log.entityName },
+                                    { value: log.user },
+                                    { value: log.username },
+                                    { value: log.timestamp },
+                                    { value: log.ip || '—' },
+                                    { value: detailsStr }
+                                ]
+                            );
+                        }
+                    }
+
                     result = { success: true, message: 'Data synced to database' };
+                } catch (error) {
+                    result = { success: false, error: error.message };
+                }
+                break;
+
+            case 'clear-audit-logs':
+                try {
+                    const del = await window.electronAPI.dbExecute('DELETE FROM AuditLogs', []);
+                    if (del.success) {
+                        result = { success: true, message: 'Audit logs cleared' };
+                    } else {
+                        result = { success: false, error: del.error || 'Failed to clear' };
+                    }
                 } catch (error) {
                     result = { success: false, error: error.message };
                 }
