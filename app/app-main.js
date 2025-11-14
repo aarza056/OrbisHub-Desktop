@@ -8794,7 +8794,6 @@ function startConversationPolling(userId, intervalMs = 3000) {
             conversationPollInFlight = false
         }
     }, intervalMs)
-    console.log('[Polling] Started polling for userId:', userId, 'interval:', intervalMs)
 }
 
 function stopConversationPolling() {
@@ -9178,7 +9177,6 @@ async function openConversation(user, e) {
     updateSendButtonState(true)
     const session = getSession()
     const currentUserId = session?.id || session?.Id || null
-    console.log('[Conversation] Opening conversation with user:', user, 'currentUserId:', currentUserId)
     // ALWAYS load fresh on initial open - don't preserve empty state
     await loadMessagesForNewView(user.id || user.Id, { preserveWhenEmpty: false })
     // Start polling for this conversation and mark as read
@@ -9199,23 +9197,20 @@ async function loadMessagesForNewView(userId, opts = {}) {
             return
         }
         
-        console.log('[MessagesUI] Fetching messages', { currentUserId, otherUserId: userId })
         const response = await fetch(`${API_BASE_URL}/api/messages/${currentUserId}?otherUserId=${userId}`)
         let result = await response.json()
-        console.log('[MessagesUI] Raw response from API:', result)
         
         let messages = result
         if (!Array.isArray(result)) {
             if (Array.isArray(result?.data)) {
                 messages = result.data
             } else if (result?.success === false) {
-                console.error('[MessagesUI] API returned error:', result.error)
+                console.error('[MessagesUI] Error loading messages:', result.error)
                 messages = []
             } else {
                 messages = []
             }
         }
-        console.log('[MessagesUI] Messages returned from DB:', { count: messages.length, preserveWhenEmpty, messages })
         
         const container = document.getElementById('messagesChatBody')
         if (!container) {
@@ -9225,12 +9220,10 @@ async function loadMessagesForNewView(userId, opts = {}) {
 
         // If no messages and we should preserve, bail out
         if (messages.length === 0 && preserveWhenEmpty) {
-            console.log('[MessagesUI] No new messages, preserving existing UI')
             return
         }
 
         // Render messages (clear container first)
-        console.log('[MessagesUI] Rendering', messages.length, 'messages...')
         container.innerHTML = ''
 
         if (messages.length === 0) {
@@ -9240,11 +9233,9 @@ async function loadMessagesForNewView(userId, opts = {}) {
                     <small>Start the conversation by sending a message below</small>
                 </div>
             `
-            console.log('[MessagesUI] Rendered empty state')
         } else {
             // Group messages by date and render
             renderMessagesGrouped(messages, container, currentUserId)
-            console.log('[MessagesUI] Rendered message groups')
         }
         
         // Scroll to bottom
@@ -9252,8 +9243,6 @@ async function loadMessagesForNewView(userId, opts = {}) {
         
         // Store current chat user
         window.currentChatUserId = userId
-        
-        console.log('[MessagesUI] Messages rendered successfully')
         
     } catch (error) {
         console.error('[MessagesUI] Error loading messages:', error)

@@ -105,8 +105,6 @@ async function handleElectronAPI(url, options = {}) {
     const body = options && options.body ? JSON.parse(options.body) : {};
     const method = options.method || 'GET';
     
-    console.log('[API] Handling endpoint:', endpoint, 'method:', method)
-    
     try {
         let result;
         
@@ -599,16 +597,11 @@ async function handleElectronAPI(url, options = {}) {
                         const curId = String(currentUserId).trim()
                         const othId = String(otherUserId).trim()
 
-                        console.log('[MessagesAPI] Query params', { curId, othId, table: tbl })
-
                         let q
                         if (curId === othId) {
                             // Self-DM: include messages to self and any legacy self-notes with NULL recipient
-                            console.log('[MessagesAPI] Fetch self-DM', { userId: curId })
                             try {
-                                const dbn = await window.electronAPI.dbQuery('SELECT DB_NAME() as dbname', [])
-                                const total = await window.electronAPI.dbQuery(`SELECT COUNT(*) as total FROM ${tbl}` , [])
-                                console.log('[MessagesAPI] Context', { db: dbn?.data?.[0]?.dbname, total: total?.data?.[0]?.total })
+                                // Database available, proceed with query
                             } catch {}
                             // JOIN with Users table to get sender name
                             q = await window.electronAPI.dbQuery(
@@ -625,10 +618,8 @@ async function handleElectronAPI(url, options = {}) {
                                  ORDER BY m.SentAt ASC`,
                                 [{ value: curId }]
                             )
-                            console.log('[MessagesAPI] Self-DM query result', { success: q.success, rowCount: q.data?.length })
                             // Fallback: if still empty, include any row where user appears as sender or recipient
                             if (!(q.success && Array.isArray(q.data) && q.data.length > 0)) {
-                                console.log('[MessagesAPI] Self-DM empty, trying fallback query')
                                 const q2 = await window.electronAPI.dbQuery(
                                     `SELECT m.Id, m.SenderId, m.RecipientId, m.Content, m.SentAt, m.[Read],
                                             u.name AS SenderName, u.username AS SenderUsername
@@ -640,23 +631,12 @@ async function handleElectronAPI(url, options = {}) {
                                     [{ value: curId }]
                                 )
                                 if (q2.success) q = q2
-                                console.log('[MessagesAPI] Fallback query result', { success: q2.success, rowCount: q2.data?.length })
                             }
                         } else {
-                            console.log('[MessagesAPI] Fetch DM pair', { currentUserId: curId, otherUserId: othId })
                             try {
-                                const dbn = await window.electronAPI.dbQuery('SELECT DB_NAME() as dbname', [])
-                                const total = await window.electronAPI.dbQuery(`SELECT COUNT(*) as total FROM ${tbl}`, [])
-                                const allMsgs = await window.electronAPI.dbQuery(`SELECT Id, SenderId, RecipientId, Content FROM ${tbl}`, [])
-                                console.log('[MessagesAPI] Context', { db: dbn?.data?.[0]?.dbname, total: total?.data?.[0]?.total })
-                                console.log('[MessagesAPI] All messages in DB:', allMsgs.data)
-                                
-                                // Also check what the user IDs look like in the Users table
-                                const users = await window.electronAPI.dbQuery(`SELECT id, username, name FROM Users`, [])
-                                console.log('[MessagesAPI] All users in DB:', users.data)
-                                console.log('[MessagesAPI] Looking for match with curId:', curId, 'othId:', othId)
+                                // Database available, proceed with query
                             } catch (e) {
-                                console.log('[MessagesAPI] Context query error:', e.message)
+                                // Query error
                             }
                             // JOIN with Users table to get sender name
                             // Try simpler query first without complex string matching
@@ -670,11 +650,9 @@ async function handleElectronAPI(url, options = {}) {
                                  ORDER BY m.SentAt ASC`,
                                 [{ value: curId }, { value: othId }]
                             )
-                            console.log('[MessagesAPI] DM pair query result (simple match)', { success: q.success, rowCount: q.data?.length, error: q.error, firstRow: q.data?.[0] })
                             
                             // If that didn't work, try the complex string matching
                             if (!q.success || !q.data || q.data.length === 0) {
-                                console.log('[MessagesAPI] Trying complex string matching query...')
                                 q = await window.electronAPI.dbQuery(
                                     `SELECT m.Id, m.SenderId, m.RecipientId, m.Content, m.SentAt, m.[Read],
                                             u.name AS SenderName, u.username AS SenderUsername
@@ -685,11 +663,9 @@ async function handleElectronAPI(url, options = {}) {
                                      ORDER BY m.SentAt ASC`,
                                     [{ value: curId }, { value: othId }]
                                 )
-                                console.log('[MessagesAPI] Complex string match result', { success: q.success, rowCount: q.data?.length })
                             }
                         }
                         const rows = q.success && Array.isArray(q.data) ? q.data : []
-                        console.log('[MessagesAPI] Final rows returned:', { count: rows.length, firstRow: rows[0] })
                         result = rows;
                     }
                 } else if (endpoint === 'messages/read' && method === 'PUT') {
