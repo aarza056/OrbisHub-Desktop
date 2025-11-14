@@ -1,0 +1,26 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+// Expose protected methods to renderer
+contextBridge.exposeInMainWorld('electronAPI', {
+    // RDP Connection
+    connectRDP: (server, credential, rdpContent) => 
+        ipcRenderer.invoke('rdp-connect', { server, credential, rdpContent }),
+    
+    // Database Configuration
+    getDbConfig: () => ipcRenderer.invoke('db-get-config'),
+    saveDbConfig: (config) => ipcRenderer.invoke('db-save-config', config),
+    testDbConnection: (config) => ipcRenderer.invoke('db-test-connection', config),
+    runMigrations: (config) => ipcRenderer.invoke('db-run-migrations', config),
+    createDatabase: (config) => ipcRenderer.invoke('db-create-database', config),
+    
+    // Database Queries
+    dbQuery: (query, params) => ipcRenderer.invoke('db-query', query, params),
+    dbExecute: (query, params) => ipcRenderer.invoke('db-execute', query, params),
+    
+    // System info
+    getLocalIP: () => ipcRenderer.invoke('get-local-ip'),
+    
+    // App info
+    isElectron: true,
+    platform: process.platform
+});

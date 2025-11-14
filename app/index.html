@@ -1,0 +1,3507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OrbisHub</title>
+<link rel="icon" type="image/x-icon" href="../media/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="loginScreen" class="login-screen">
+<div class="login-container">
+<div class="login-header">
+  <img src="../media/logo.png" alt="OrbisHub logo" class="brand__logo">
+  <div class="login-brand">OrbisHub</div>
+  <p class="login-tagline">By Admins, For Admins</p>
+  
+  <!-- Database Status Indicator -->
+  <div id="loginDbStatus" class="login-db-status">
+    <div class="login-db-status-icon">
+      <div class="spinner-ring" style="width:12px; height:12px; border-width:2px;"></div>
+    </div>
+    <span class="login-db-status-text">Checking database...</span>
+  </div>
+</div>
+<form id="loginForm" class="login-form">
+  <div class="login-error" id="loginError"></div>
+  <label class="label">
+    <span>Username</span>
+    <input id="loginUsername" type="text" class="input" placeholder="Enter your username" required autofocus autocomplete="username" />
+  </label>
+  <label class="label">
+    <span>Password</span>
+    <input id="loginPassword" type="password" class="input" placeholder="Enter your password" required autocomplete="current-password" />
+  </label>
+  <button type="submit" class="btn btn-primary" style="width:100%; margin-top:8px;">Sign In</button>
+</form>
+<div class="login-footer">
+  <button type="button" id="resetDbBtn" class="btn btn-ghost" style="width:100%; margin-bottom:12px; font-size:12px;">Reset Database & Create Admin</button>
+  <p class="muted" style="font-size:12px; text-align:center;">Secure admin access for DevOps teams</p>
+</div>
+</div>
+
+<!-- Loading Screen -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-content">
+    <div class="loading-spinner">
+      <div class="spinner-ring"></div>
+      <div class="spinner-ring"></div>
+      <div class="spinner-ring"></div>
+    </div>
+    <div class="loading-text">Initializing Orbis</div>
+    <div class="loading-subtext">Securing your session...</div>
+  </div>
+</div>
+</div>
+
+<!-- Database Setup Wizard -->
+<div id="setupWizard" class="setup-wizard" style="display:none;">
+  <div class="setup-container">
+    <div class="setup-header">
+      <img src="../media/logo.png" alt="OrbisHub logo" class="brand__logo">
+      <h1>Welcome to OrbisHub Desktop</h1>
+      <p class="setup-tagline">Let's configure your database connection</p>
+    </div>
+    
+    <!-- Step 1: Database Configuration -->
+    <div id="setupStep1" class="setup-step" style="display:block;">
+      <div class="setup-step-header">
+        <div class="setup-step-number">1</div>
+        <h2>Database Configuration</h2>
+      </div>
+      
+      <div class="setup-form">
+        <label class="label">SQL Server Address
+          <input id="setupServerName" class="input" placeholder="localhost\SQLEXPRESS or server.domain.com" value="localhost\SQLEXPRESS" />
+          <span class="input-hint">Enter your SQL Server instance name or IP address</span>
+        </label>
+        
+        <label class="label">Database Name
+          <input id="setupDatabaseName" class="input" placeholder="OrbisHub" value="OrbisHub" />
+          <span class="input-hint">Name for your OrbisHub database</span>
+        </label>
+        
+        <label class="label">Authentication Type
+          <select id="setupAuthType" class="input">
+            <option value="windows">Windows Authentication (Recommended)</option>
+            <option value="sql">SQL Server Authentication</option>
+          </select>
+        </label>
+        
+        <div id="setupSqlAuthFields" style="display:none;">
+          <label class="label">Username
+            <input id="setupUsername" class="input" placeholder="sa" />
+          </label>
+          <label class="label">Password
+            <input id="setupPassword" type="password" class="input" placeholder="••••••••" />
+          </label>
+        </div>
+        
+        <label class="label" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="setupTrustCert" checked />
+          <span>Trust Server Certificate (Required for local SQL Server)</span>
+        </label>
+        
+        <label class="label" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="setupEncrypt" />
+          <span>Encrypt Connection</span>
+        </label>
+      </div>
+      
+      <div class="setup-actions">
+        <button id="setupTestConnectionBtn" class="btn btn-secondary" style="flex:1;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          Test Connection
+        </button>
+        <button id="setupNextBtn" class="btn btn-primary" style="flex:1;" disabled>
+          Next
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:8px;">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
+      
+      <div id="setupConnectionStatus" class="setup-status" style="display:none;"></div>
+    </div>
+    
+    <!-- Step 2: Database Creation -->
+    <div id="setupStep2" class="setup-step" style="display:none;">
+      <div class="setup-step-header">
+        <div class="setup-step-number">2</div>
+        <h2>Database Setup</h2>
+      </div>
+      
+      <div id="setupDbExistsMessage" class="setup-message" style="display:none;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" style="margin-right:12px;">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        <span>Database already exists and is ready to use!</span>
+      </div>
+      
+      <div id="setupDbNotExistsMessage" class="setup-message setup-message-warning" style="display:none;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" style="margin-right:12px;">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span>Database does not exist. It will be created for you.</span>
+      </div>
+      
+      <div class="setup-actions">
+        <button id="setupBackBtn" class="btn btn-ghost">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+          Back
+        </button>
+        <button id="setupCreateDbBtn" class="btn btn-primary" style="flex:1;">
+          Create Database & Setup Schema
+        </button>
+      </div>
+      
+      <div id="setupDbStatus" class="setup-status" style="display:none;"></div>
+    </div>
+    
+    <!-- Step 3: Running Migrations -->
+    <div id="setupStep3" class="setup-step" style="display:none;">
+      <div class="setup-step-header">
+        <div class="setup-step-number">3</div>
+        <h2>Building Database Schema</h2>
+      </div>
+      
+      <div class="setup-progress">
+        <div class="setup-progress-bar">
+          <div id="setupMigrationProgress" class="setup-progress-fill"></div>
+        </div>
+        <div id="setupMigrationStatus" class="setup-progress-text">Initializing...</div>
+      </div>
+      
+      <div id="setupMigrationsList" class="setup-migrations-list"></div>
+    </div>
+    
+    <!-- Step 4: Complete -->
+    <div id="setupStep4" class="setup-step" style="display:none;">
+      <div class="setup-step-header">
+        <div class="setup-step-number">✓</div>
+        <h2>Setup Complete!</h2>
+      </div>
+      
+      <div class="setup-complete-message">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        <h3>Your database is ready!</h3>
+        <p>Default admin account has been created:</p>
+        <div class="setup-credentials">
+          <div><strong>Username:</strong> admin</div>
+          <div><strong>Password:</strong> admin</div>
+        </div>
+        <p class="setup-warning">⚠️ Please change the admin password after your first login!</p>
+      </div>
+      
+      <div class="setup-actions">
+        <button id="setupFinishBtn" class="btn btn-primary" style="width:100%;">
+          Continue to Login
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Password Change Modal -->
+<dialog id="changePasswordModal" class="modal">
+<form method="dialog" class="card">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close" style="display:none;">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Change Password</h2>
+<p class="muted" style="margin-bottom: 16px;">You must change your password before continuing.</p>
+<div id="changePasswordError" class="login-error" style="margin-bottom: 16px;"></div>
+<input type="hidden" id="changePasswordUserId" />
+<label class="label">New Password
+<input id="newPassword" type="password" class="input" placeholder="Enter new password" required />
+</label>
+<label class="label">Confirm Password
+<input id="confirmPassword" type="password" class="input" placeholder="Confirm new password" required />
+</label>
+<menu class="row end">
+<button id="changePasswordBtn" type="submit" value="default" class="btn">Change Password</button>
+</menu>
+</form>
+</dialog>
+
+<!-- Sign Out Confirmation Modal -->
+<dialog id="signOutModal" class="modal modal-confirm">
+<form method="dialog" class="card">
+<div class="modal-icon modal-icon-warning">
+  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+  </svg>
+</div>
+<h2 style="margin-top: 16px;">Sign Out</h2>
+<p class="muted" style="margin-bottom: 24px;">Are you sure you want to end your session?</p>
+<menu class="row end">
+<button type="submit" value="cancel" class="btn btn-ghost">Cancel</button>
+<button id="confirmSignOutBtn" type="submit" value="confirm" class="btn btn-danger">Sign Out</button>
+</menu>
+</form>
+</dialog>
+
+<!-- Environment Details Modal -->
+<dialog id="envDetailsModal" class="modal">
+<form method="dialog" class="card" style="max-width: 700px; min-width: 600px;">
+<button type="submit" value="close" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Environment Details</h2>
+<menu class="row" style="margin: 16px 0 24px 0; gap: 8px; padding: 0;">
+<button type="button" id="envDetailsDeployBtn" class="btn" style="background: linear-gradient(135deg, #5a4fcf 0%, #5e2a84 100%); color: white; border: none;">Deploy</button>
+<button type="button" id="envDetailsSolutionsBtn" class="btn" style="background: linear-gradient(135deg, #d946a6 0%, #c21e56 100%); color: white; border: none;">Show Solutions</button>
+<button type="button" id="envDetailsMapServersBtn" class="btn" style="background: linear-gradient(135deg, #0ea770 0%, #0c8599 100%); color: white; border: none;">Map Servers</button>
+</menu>
+<div id="envDetailsContent" style="margin: 24px 0;">
+  <!-- Details will be populated by JavaScript -->
+</div>
+</form>
+</dialog>
+
+<!-- Main Application (hidden until logged in) -->
+<aside id="appSidebar" class="sidebar" style="display:none;">
+<div class="brand">
+  <img src="../media/logo.png" alt="OrbisHub logo" class="brand__logo">
+  <div class="brand__name">OrbisHub</div>
+</div>
+<nav class="nav">
+<div class="nav__group">
+  <div class="nav__label">General</div>
+  <button class="nav__btn is-active" data-view="summary">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <rect x="3" y="3" width="7" height="7"></rect>
+      <rect x="14" y="3" width="7" height="7"></rect>
+      <rect x="14" y="14" width="7" height="7"></rect>
+      <rect x="3" y="14" width="7" height="7"></rect>
+    </svg>
+    Summary
+  </button>
+</div>
+
+<div class="nav__group">
+  <div class="nav__label">DevOps</div>
+  <button class="nav__btn" data-view="scripts">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <polyline points="16 18 22 12 16 6"></polyline>
+      <polyline points="8 6 2 12 8 18"></polyline>
+    </svg>
+    Scripts
+  </button>
+  <button class="nav__btn" data-view="builds">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+      <line x1="12" y1="22.08" x2="12" y2="12"></line>
+    </svg>
+    Builds
+  </button>
+</div>
+
+<div class="nav__group">
+  <div class="nav__label">System Administrators</div>
+  <button class="nav__btn" data-view="admin-users">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+      <circle cx="9" cy="7" r="4"></circle>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+    </svg>
+    Users / Permissions
+  </button>
+  <button class="nav__btn" data-view="environments">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <circle cx="12" cy="12" r="10"></circle>
+      <line x1="2" y1="12" x2="22" y2="12"></line>
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+    </svg>
+    Environments
+  </button>
+  <button class="nav__btn" data-view="servers">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+      <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+      <line x1="6" y1="6" x2="6.01" y2="6"></line>
+      <line x1="6" y1="18" x2="6.01" y2="18"></line>
+    </svg>
+    Remote Desktop Manager
+  </button>
+  <button class="nav__btn" data-view="admin-integrations">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+    </svg>
+    Integrations
+  </button>
+  <button class="nav__btn" data-view="admin-credentials">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+    </svg>
+    Credentials
+  </button>
+  <button class="nav__btn" data-view="admin-audit">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+      <polyline points="14 2 14 8 20 8"></polyline>
+      <line x1="16" y1="13" x2="8" y2="13"></line>
+      <line x1="16" y1="17" x2="8" y2="17"></line>
+      <polyline points="10 9 9 9 8 9"></polyline>
+    </svg>
+    Audit Logs
+  </button>
+  <button class="nav__btn" data-view="admin-notifications">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+    </svg>
+    Notifications
+  </button>
+</div>
+
+<div class="nav__group">
+  <div class="nav__label">Monitoring</div>
+  <button class="nav__btn" data-view="elasticsearch">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <circle cx="11" cy="11" r="8"></circle>
+      <path d="m21 21-4.35-4.35"></path>
+    </svg>
+    ElasticSearch
+  </button>
+</div>
+
+<div class="nav__group">
+  <div class="nav__label">Other</div>
+  <button class="nav__btn" data-view="admin-documentation">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+    </svg>
+    Documentation
+  </button>
+</div>
+
+<div class="nav__group nav__group--bottom">
+  <div class="nav__label">System</div>
+  <button class="nav__btn" data-view="settings">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M12 1v6m0 6v6"></path>
+      <path d="m4.93 4.93 4.24 4.24m5.66 5.66 4.24 4.24"></path>
+      <path d="M1 12h6m6 0h6"></path>
+      <path d="m4.93 19.07 4.24-4.24m5.66-5.66 4.24-4.24"></path>
+    </svg>
+    Settings
+  </button>
+</div>
+</nav>
+</aside>
+
+
+<main id="appMain" class="main" style="display:none;">
+<header class="topbar">
+<!-- Welcome Text -->
+<div id="welcomeText" style="display:flex; align-items:center; gap:8px; margin-left:0; color:var(--text); font-size:14px;">
+  <span style="color:var(--muted);">Welcome,</span>
+  <span id="welcomeUserName" style="font-weight:600; color:var(--primary);">User</span>
+</div>
+<div style="flex:1"></div>
+<!-- Messages Button -->
+<button class="config-status-btn" data-view="messages" title="Messages" style="margin-right:12px;">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+  </svg>
+  <span>Messages</span>
+  <span class="nav-badge" id="navUnreadBadge" style="display:none; background:#ef4444; color:white; font-size:10px; padding:2px 6px; border-radius:10px; font-weight:600; margin-left:8px;">0</span>
+</button>
+<!-- Configuration Status Button -->
+<button class="config-status-btn" id="configStatusBtn" title="System Configuration">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="3"></circle>
+    <path d="M12 1v6m0 6v6m-9-9h6m6 0h6"></path>
+  </svg>
+  <span id="configStatusText">Configure System</span>
+  <span class="config-status-badge" id="configStatusBadge">1</span>
+</button>
+<div class="user-menu">
+  <button class="user-menu__btn" id="userMenuBtn">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+      <circle cx="12" cy="7" r="4"></circle>
+    </svg>
+  </button>
+  <div class="user-menu__dropdown" id="userMenuDropdown">
+    <div class="user-menu__profile" id="userMenuProfile">
+      <div class="user-menu__profile-name" id="userProfileName">Administrator</div>
+      <div class="user-menu__profile-email" id="userProfileEmail">admin@orbis.com</div>
+      <div class="user-menu__profile-role" id="userProfileRole">Super Admin</div>
+    </div>
+    <div class="user-menu__divider"></div>
+    <button class="user-menu__item" id="viewProfileBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+        <circle cx="12" cy="7" r="4"></circle>
+      </svg>
+      View Profile
+    </button>
+    <button class="user-menu__item" id="signOutBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+        <polyline points="16 17 21 12 16 7"></polyline>
+        <line x1="21" y1="12" x2="9" y2="12"></line>
+      </svg>
+      Sign Out
+    </button>
+  </div>
+</div>
+</header>
+ 
+<div class="views">
+<section id="view-summary" class="view">
+<div class="view__header">
+  <h1>Summary Dashboard</h1>
+  <div style="flex:1"></div>
+</div>
+<div class="stack">
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px; margin-bottom:24px;">
+    <!-- Environments Summary -->
+    <div class="card" style="background:linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(37,99,235,0.05) 100%); border:1px solid rgba(59,130,246,0.2);">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <h3 style="margin:0;">Environments</h3>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(59,130,246,0.6)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        </svg>
+      </div>
+      <div style="font-size:36px; font-weight:700; color:#3b82f6; margin-bottom:8px;" id="summaryEnvCount">0</div>
+      <div style="font-size:13px; color:var(--muted);">Total Environments</div>
+      <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(59,130,246,0.2);">
+        <div style="display:flex; gap:16px; font-size:12px;">
+          <div style="flex:1;">
+            <div style="color:var(--muted);">Healthy</div>
+            <div style="font-weight:600; color:#10b981;" id="summaryEnvHealthy">0</div>
+          </div>
+          <div style="flex:1;">
+            <div style="color:var(--muted);">Issues</div>
+            <div style="font-weight:600; color:#ef4444;" id="summaryEnvIssues">0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Servers Summary -->
+    <div class="card" style="background:linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.05) 100%); border:1px solid rgba(16,185,129,0.2);">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <h3 style="margin:0;">Servers</h3>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(16,185,129,0.6)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+          <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+          <line x1="6" y1="6" x2="6.01" y2="6"></line>
+          <line x1="6" y1="18" x2="6.01" y2="18"></line>
+        </svg>
+      </div>
+      <div style="font-size:36px; font-weight:700; color:#10b981; margin-bottom:8px;" id="summaryServerCount">0</div>
+      <div style="font-size:13px; color:var(--muted);">Total Servers</div>
+      <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(16,185,129,0.2);">
+        <div style="display:flex; gap:16px; font-size:12px;">
+          <div style="flex:1;">
+            <div style="color:var(--muted);">Online</div>
+            <div style="font-weight:600; color:#10b981;" id="summaryServerOnline">0</div>
+          </div>
+          <div style="flex:1;">
+            <div style="color:var(--muted);">Offline</div>
+            <div style="font-weight:600; color:#6b7280;" id="summaryServerOffline">0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Scripts Summary -->
+    <div class="card" style="background:linear-gradient(135deg, rgba(139,92,246,0.1) 0%, rgba(124,58,237,0.05) 100%); border:1px solid rgba(139,92,246,0.2);">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <h3 style="margin:0;">Scripts</h3>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(139,92,246,0.6)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="16 18 22 12 16 6"></polyline>
+          <polyline points="8 6 2 12 8 18"></polyline>
+        </svg>
+      </div>
+      <div style="font-size:36px; font-weight:700; color:#8b5cf6; margin-bottom:8px;" id="summaryScriptCount">0</div>
+      <div style="font-size:13px; color:var(--muted);">Total Scripts</div>
+      <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(139,92,246,0.2);">
+        <div style="display:flex; gap:16px; font-size:12px;">
+          <div style="flex:1;">
+            <div style="color:var(--muted);">PowerShell</div>
+            <div style="font-weight:600; color:#8b5cf6;" id="summaryScriptPS">0</div>
+          </div>
+          <div style="flex:1;">
+            <div style="color:var(--muted);">Bash</div>
+            <div style="font-weight:600; color:#8b5cf6;" id="summaryScriptBash">0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Builds Summary -->
+    <div class="card" style="background:linear-gradient(135deg, rgba(245,158,11,0.1) 0%, rgba(217,119,6,0.05) 100%); border:1px solid rgba(245,158,11,0.2);">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <h3 style="margin:0;">Builds</h3>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(245,158,11,0.6)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+          <line x1="12" y1="22.08" x2="12" y2="12"></line>
+        </svg>
+      </div>
+      <div style="font-size:36px; font-weight:700; color:#f59e0b; margin-bottom:8px;" id="summaryBuildCount">0</div>
+      <div style="font-size:13px; color:var(--muted);">Total Builds</div>
+      <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(245,158,11,0.2);">
+        <div style="display:flex; gap:16px; font-size:12px;">
+          <div style="flex:1;">
+            <div style="color:var(--muted);">Success</div>
+            <div style="font-weight:600; color:#10b981;" id="summaryBuildSuccess">0</div>
+          </div>
+          <div style="flex:1;">
+            <div style="color:var(--muted);">Failed</div>
+            <div style="font-weight:600; color:#ef4444;" id="summaryBuildFailed">0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Recent Activity -->
+  <div class="card">
+    <h3>Recent Activity</h3>
+    <div id="summaryRecentActivity" style="margin-top:16px;">
+      <p class="muted">No recent activity</p>
+    </div>
+  </div>
+  
+  <!-- Quick Actions -->
+  <div class="card">
+    <h3>Quick Actions</h3>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-top:16px;">
+      <button class="btn btn-ghost" onclick="showView('environments'); document.getElementById('addEnvBtn').click();">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="16"></line>
+          <line x1="8" y1="12" x2="16" y2="12"></line>
+        </svg>
+        Add Environment
+      </button>
+      <button class="btn btn-ghost" onclick="showView('servers'); document.getElementById('addServerBtn').click();">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+          <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+          <line x1="12" y1="6" x2="12" y2="6"></line>
+        </svg>
+        Add Server
+      </button>
+      <button class="btn btn-ghost" onclick="showView('scripts'); document.getElementById('addScriptBtn').click();">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+          <polyline points="16 18 22 12 16 6"></polyline>
+          <polyline points="8 6 2 12 8 18"></polyline>
+        </svg>
+        New Script
+      </button>
+      <button class="btn btn-ghost" onclick="showView('builds'); document.getElementById('runBuildBtn').click();">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+        Run Build
+      </button>
+    </div>
+  </div>
+</div>
+</section>
+
+<section id="view-environments" class="view">
+<div class="view__header">
+  <h1>Environments</h1>
+  <div style="flex:1"></div>
+  <button id="addEnvBtn" class="btn">+ Add Environment</button>
+</div>
+<div id="envList" class="grid"></div>
+</section>
+
+
+<section id="view-scripts" class="view">
+<div class="view__header">
+  <h1>Scripts</h1>
+  <div style="flex:1"></div>
+  <button id="addScriptBtn" class="btn">+ New Script</button>
+</div>
+<div id="scriptsList" class="grid"></div>
+</section>
+
+<section id="view-builds" class="view">
+<div class="view__header">
+  <h1>Builds</h1>
+  <div style="flex:1"></div>
+  <button id="addBuildBtn" class="btn">+ Create Build</button>
+</div>
+<div id="buildsList" class="stack"></div>
+</section>
+
+<section id="view-elasticsearch" class="view">
+<div class="view__header">
+  <h1>ElasticSearch</h1>
+  <div style="flex:1"></div>
+  <button class="btn btn-ghost">Configure</button>
+</div>
+<div class="stack">
+  <p class="muted">ElasticSearch logs and analytics viewer.</p>
+</div>
+</section>
+
+
+<!-- Admin Panel -->
+<section id="view-admin" class="view">
+  <div class="view__header">
+    <h1>Admin Panel</h1>
+  </div>
+  <div class="admin-dashboard">
+    <div class="admin-card" data-admin-section="users">
+      <div class="admin-card__bg"></div>
+      <div class="admin-card__content">
+        <h2>Users</h2>
+        <p class="muted">Manage user accounts and permissions</p>
+      </div>
+    </div>
+    <div class="admin-card" data-admin-section="integrations">
+      <div class="admin-card__bg"></div>
+      <div class="admin-card__content">
+        <h2>Integrations</h2>
+        <p class="muted">Connect to external services (Exchange, SMTP, APIs)</p>
+      </div>
+    </div>
+    <div class="admin-card" data-admin-section="credentials">
+      <div class="admin-card__bg"></div>
+      <div class="admin-card__content">
+        <h2>Credentials</h2>
+        <p class="muted">Store and manage authentication credentials</p>
+      </div>
+    </div>
+    <div class="admin-card" data-admin-section="audit">
+      <div class="admin-card__bg"></div>
+      <div class="admin-card__content">
+        <h2>Audit Logs</h2>
+        <p class="muted">View system activity and changes</p>
+      </div>
+    </div>
+    <div class="admin-card" data-admin-section="dbsetup">
+      <div class="admin-card__bg"></div>
+      <div class="admin-card__content">
+        <h2>Database Setup</h2>
+        <p class="muted">Initialize database schema and migrate data</p>
+      </div>
+    </div>
+    <div class="admin-card" data-admin-section="notifications">
+      <div class="admin-card__bg"></div>
+      <div class="admin-card__content">
+        <h2>Notifications</h2>
+        <p class="muted">Configure when and how to send notifications</p>
+      </div>
+    </div>
+    <div class="admin-card" data-admin-section="documentation">
+      <div class="admin-card__bg"></div>
+      <div class="admin-card__content">
+        <h2>📚 Documentation</h2>
+        <p class="muted">Complete guide to OrbisHub features</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Admin Users Management -->
+<section id="view-admin-users" class="view">
+  <div class="view__header">
+    <h1>User Management & Permissions</h1>
+    <div style="flex:1"></div>
+    <!-- <button id="backToAdminBtn" class="btn btn-ghost">← Back to Admin</button> -->
+    <button id="addUserBtn" class="btn">+ Create User</button>
+  </div>
+  
+  <!-- Tab Navigation -->
+  <div class="tab-nav" style="display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 24px;">
+    <button class="tab-btn active" data-tab="users-tab" style="padding: 12px 24px; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-weight: 600; color: var(--muted); transition: all 0.2s;">
+      Users
+    </button>
+    <button class="tab-btn" data-tab="permissions-tab" style="padding: 12px 24px; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-weight: 600; color: var(--muted); transition: all 0.2s;">
+      Permissions
+    </button>
+  </div>
+  
+  <!-- Users Tab Content -->
+  <div id="users-tab" class="tab-content" style="display: block;">
+    <div class="card">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+        <h3>Users</h3>
+        <select id="userRoleFilter" class="input" style="width: 150px;">
+          <option value="">All Roles</option>
+          <option value="admin">Admin</option>
+          <option value="operator">Operator</option>
+          <option value="viewer">Viewer</option>
+        </select>
+      </div>
+      <div id="userList" class="stack" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <!-- Permissions Tab Content -->
+  <div id="permissions-tab" class="tab-content" style="display: none;">
+    <div class="card">
+      <h3>Roles & Permissions</h3>
+      <p class="muted" style="margin: 8px 0 16px 0;">Define what each role can access and modify</p>
+      
+      <div class="stack" style="gap: 16px;">
+        <!-- Admin Role -->
+        <div class="permission-role-card">
+          <div class="permission-role-header">
+            <div>
+              <h4 style="margin: 0; font-size: 16px; color: var(--primary);">Administrator</h4>
+              <p class="muted" style="margin: 4px 0 0 0; font-size: 13px;">Full system access and control</p>
+            </div>
+            <span class="badge" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">ADMIN</span>
+          </div>
+          <div class="permission-grid">
+            <label class="permission-item">
+              <input type="checkbox" checked disabled>
+              <span>Manage Users</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" checked disabled>
+              <span>Manage Environments</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" checked disabled>
+              <span>Manage Servers</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" checked disabled>
+              <span>Manage Databases</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" checked disabled>
+              <span>Manage Credentials</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" checked disabled>
+              <span>Execute Builds</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" checked disabled>
+              <span>View Audit Logs</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" checked disabled>
+              <span>System Settings</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Operator Role -->
+        <div class="permission-role-card">
+          <div class="permission-role-header">
+            <div>
+              <h4 style="margin: 0; font-size: 16px; color: #10b981;">Operator</h4>
+              <p class="muted" style="margin: 4px 0 0 0; font-size: 13px;">Can deploy and manage infrastructure</p>
+            </div>
+            <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">OPERATOR</span>
+          </div>
+          <div class="permission-grid">
+            <label class="permission-item">
+              <input type="checkbox" id="opManageUsers">
+              <span>Manage Users</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" id="opManageEnvs" checked>
+              <span>Manage Environments</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" id="opManageServers" checked>
+              <span>Manage Servers</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" id="opManageDbs" checked>
+              <span>Manage Databases</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" id="opManageCredentials">
+              <span>Manage Credentials</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" id="opExecuteBuilds" checked>
+              <span>Execute Builds</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" id="opViewAudit" checked>
+              <span>View Audit Logs</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" id="opSystemSettings">
+              <span>System Settings</span>
+            </label>
+          </div>
+          <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+            <button class="btn btn-ghost" id="saveOperatorPerms">Save Changes</button>
+          </div>
+        </div>
+
+        <!-- Viewer Role -->
+        <div class="permission-role-card">
+          <div class="permission-role-header">
+            <div>
+              <h4 style="margin: 0; font-size: 16px; color: #f59e0b;">Viewer</h4>
+              <p class="muted" style="margin: 4px 0 0 0; font-size: 13px;">Read-only access to system resources</p>
+            </div>
+            <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">VIEWER</span>
+          </div>
+          <div class="permission-grid">
+            <label class="permission-item">
+              <input type="checkbox" id="viewManageUsers">
+              <span>Manage Users</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" id="viewManageEnvs">
+              <span>Manage Environments</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" id="viewManageServers">
+              <span>Manage Servers</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" id="viewManageDbs">
+              <span>Manage Databases</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" id="viewManageCredentials">
+              <span>Manage Credentials</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" id="viewExecuteBuilds">
+              <span>Execute Builds</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" id="viewViewAudit" checked>
+              <span>View Audit Logs</span>
+            </label>
+            <label class="permission-item">
+              <input type="checkbox" id="viewSystemSettings">
+              <span>System Settings</span>
+            </label>
+          </div>
+          <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+            <button class="btn btn-ghost" id="saveViewerPerms">Save Changes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section id="view-servers" class="view">
+<div class="view__header">
+  <h1>Remote Desktop Manager</h1>
+  <div style="flex:1"></div>
+  <button id="addServerBtn" class="btn">+ Add Server</button>
+</div>
+<div class="stack">
+  <p class="muted" style="margin-bottom:20px;">Manage your remote servers and connect using saved credentials. Click on server icons to establish remote desktop connections.</p>
+  <div id="serversList" class="grid"></div>
+</div>
+</section>
+
+<!-- Admin Integrations Management -->
+<section id="view-admin-integrations" class="view">
+  <div class="view__header">
+    <h1>Integrations</h1>
+    <div style="flex:1"></div>
+    <button id="addIntegrationBtn" class="btn">+ Add Integration</button>
+  </div>
+  <div class="view__toolbar">
+    <input id="integrationSearchInput" class="input" placeholder="Search integrations..." />
+  </div>
+  <div id="integrationList" class="grid"></div>
+</section>
+
+<!-- Admin Credentials Management -->
+<section id="view-admin-credentials" class="view">
+  <div class="view__header">
+    <h1>Credentials Management</h1>
+    <div style="flex:1"></div>
+    <button id="addCredentialBtn" class="btn">+ Add Credential</button>
+  </div>
+  <div class="view__toolbar">
+    <input id="credentialSearchInput" class="input" placeholder="Search credentials..." />
+  </div>
+  <div id="credentialList" class="grid"></div>
+</section>
+
+<!-- Admin Audit Logs -->
+<section id="view-admin-audit" class="view">
+  <div class="view__header">
+    <h1>Audit Logs</h1>
+  </div>
+  <div class="view__toolbar" style="gap:12px; display:flex; align-items:center;">
+    <input id="auditSearchInput" class="input" placeholder="Search by user, entity, or action..." style="max-width:400px;" />
+    <select id="auditActionFilter" class="input" style="width:150px;">
+      <option value="">All Actions</option>
+      <option value="create">Create</option>
+      <option value="update">Update</option>
+      <option value="delete">Delete</option>
+      <option value="run">Run</option>
+    </select>
+    <select id="auditEntityFilter" class="input" style="width:150px;">
+      <option value="">All Types</option>
+      <option value="environment">Environments</option>
+      <option value="user">Users</option>
+      <option value="database">Databases</option>
+      <option value="credential">Credentials</option>
+      <option value="build">Builds</option>
+      <option value="server">Servers</option>
+    </select>
+    <div style="flex:1"></div>
+    <button id="clearAuditBtn" class="btn btn-ghost" style="color:#ef4444;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        <line x1="10" y1="11" x2="10" y2="17"></line>
+        <line x1="14" y1="11" x2="14" y2="17"></line>
+      </svg>
+      Clear History
+    </button>
+    <button id="refreshAuditBtn" class="btn btn-ghost">
+      <svg id="refreshAuditIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"></polyline>
+        <polyline points="1 20 1 14 7 14"></polyline>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+      </svg>
+      Refresh
+    </button>
+  </div>
+  <div style="overflow-x:auto;">
+    <table id="auditLogsTable" class="audit-table">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>User</th>
+          <th>Action</th>
+          <th>Entity Type</th>
+          <th>Entity Name</th>
+          <th>IP Address</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody id="auditLogsTableBody">
+        <tr>
+          <td colspan="7" style="text-align:center; padding:40px; color:var(--muted);">No audit logs yet</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- Pagination Controls -->
+  <div id="auditPaginationContainer" class="pagination-container" style="display: none;">
+    <div class="pagination-info">
+      <span id="auditPageInfo">Showing 0-0 of 0 entries</span>
+      <select id="auditPageSize" class="pagination-select">
+        <option value="10">10 per page</option>
+        <option value="25" selected>25 per page</option>
+        <option value="50">50 per page</option>
+        <option value="100">100 per page</option>
+      </select>
+    </div>
+    <div class="pagination-controls">
+      <button id="auditFirstPageBtn" class="pagination-btn" title="First page">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="11,19 2,12 11,5 11,19"></polygon>
+          <line x1="22" y1="5" x2="22" y2="19"></line>
+        </svg>
+      </button>
+      <button id="auditPrevPageBtn" class="pagination-btn" title="Previous page">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15,18 9,12 15,6"></polyline>
+        </svg>
+      </button>
+      <div class="pagination-pages" id="auditPaginationPages">
+        <button class="pagination-page active">1</button>
+      </div>
+      <button id="auditNextPageBtn" class="pagination-btn" title="Next page">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9,18 15,12 9,6"></polyline>
+        </svg>
+      </button>
+      <button id="auditLastPageBtn" class="pagination-btn" title="Last page">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="13,5 22,12 13,19 13,5"></polygon>
+          <line x1="2" y1="5" x2="2" y2="19"></line>
+        </svg>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- Messages View (Slack/Teams-like) -->
+<section id="view-messages" class="view">
+  <div class="messages-layout">
+    <!-- Left Sidebar: Conversations & Channels -->
+    <aside class="messages-sidebar">
+      <div class="messages-sidebar-header">
+        <h2 class="messages-sidebar-title">Messages</h2>
+        <button id="newMessageBtn" class="icon-btn" title="New message">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            <line x1="9" y1="10" x2="15" y2="10"></line>
+            <line x1="12" y1="7" x2="12" y2="13"></line>
+          </svg>
+        </button>
+      </div>
+      
+      <!-- Tabs for DMs and Channels -->
+      <div class="messages-tabs">
+        <button class="messages-tab active" data-tab="direct">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          Direct Messages
+        </button>
+        <button class="messages-tab" data-tab="channels">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+          </svg>
+          Channels
+        </button>
+      </div>
+      
+      <!-- Search -->
+      <div class="messages-search">
+        <svg class="messages-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <path d="m21 21-4.35-4.35"></path>
+        </svg>
+        <input type="text" id="messagesSearchInput" class="input messages-search-input" placeholder="Search conversations..." />
+      </div>
+      
+      <!-- Direct Messages List -->
+      <div id="directMessagesList" class="messages-list">
+        <div class="messages-list-empty">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <p>No conversations yet</p>
+          <small>Start a new message to begin</small>
+        </div>
+      </div>
+      
+      <!-- Channels List -->
+      <div id="channelsList" class="messages-list" style="display:none;">
+        <button id="createChannelBtnSidebar" class="messages-create-channel-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Create a channel
+        </button>
+        <div class="messages-list-empty" style="display:none;">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+          </svg>
+          <p>No channels yet</p>
+          <small>Create a channel to collaborate with your team</small>
+        </div>
+      </div>
+    </aside>
+    
+    <!-- Main Chat Area -->
+    <main class="messages-main">
+      <!-- No Conversation Selected -->
+      <div id="messagesEmptyState" class="messages-empty-state">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        <h3>Select a conversation</h3>
+        <p>Choose a conversation from the sidebar or start a new one</p>
+      </div>
+      
+      <!-- Active Conversation -->
+      <div id="messagesActiveChat" class="messages-active-chat" style="display:none;">
+        <!-- Chat Header -->
+        <header class="messages-chat-header">
+          <div class="messages-chat-header-user">
+            <div class="messages-avatar" id="activeChatAvatar">
+              <span id="activeChatAvatarText"></span>
+              <div class="messages-avatar-status" id="activeChatStatus"></div>
+            </div>
+            <div class="messages-chat-header-info">
+              <h3 id="activeChatName">User Name</h3>
+              <p id="activeChatMeta">Last seen recently</p>
+            </div>
+          </div>
+          <div class="messages-chat-header-actions">
+            <button class="icon-btn" title="Search in conversation">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
+            <button class="icon-btn" title="Conversation info">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+            </button>
+          </div>
+        </header>
+        
+        <!-- Messages Container -->
+        <div class="messages-chat-body" id="messagesChatBody">
+          <!-- Messages will be rendered here -->
+        </div>
+        
+        <!-- Message Input -->
+        <footer class="messages-chat-footer">
+          <div id="messagesTypingIndicator" class="messages-typing-indicator" style="display:none;">
+            <div class="messages-typing-dots">
+              <span></span><span></span><span></span>
+            </div>
+            <span id="messagesTypingUser">Someone</span> is typing...
+          </div>
+          <div class="messages-input-wrapper">
+            <button class="icon-btn" title="Attach file">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+              </svg>
+            </button>
+            <button class="icon-btn" title="Add emoji">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                <line x1="15" y1="9" x2="15.01" y2="9"></line>
+              </svg>
+            </button>
+            <textarea 
+              id="messagesTextarea" 
+              class="messages-input" 
+              placeholder="Type a message..." 
+              rows="1"></textarea>
+            <button id="messagesSendBtn" class="messages-send-btn" title="Send message">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </div>
+        </footer>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- Admin Database Setup -->
+<section id="view-admin-dbsetup" class="view">
+  <div class="view__header">
+    <h1>Database Setup</h1>
+    <div style="flex:1"></div>
+    <!-- <button id="backToAdminFromDbSetupBtn" class="btn btn-ghost">← Back to Admin</button> -->
+  </div>
+  <div class="stack">
+    <div class="card">
+      <h3>Database Initialization</h3>
+      <p class="muted" style="margin-bottom:20px;">Initialize your SQL Server database with OrbisHub schema. This will create all required tables, indexes, and seed initial data.</p>
+      
+      <label class="label">Select Database Connection
+        <select id="dbSetupConnectionSelect" class="input" style="margin-top:8px;">
+          <option value="">-- Select Database --</option>
+        </select>
+      </label>
+      
+      <div id="dbSetupConnectionInfo" style="display:none; margin-top:16px; padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
+        <div style="display:flex; gap:20px;">
+          <div style="flex:1;">
+            <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Database Type</div>
+            <div id="dbSetupType" style="font-size:14px; font-weight:500;">-</div>
+          </div>
+          <div style="flex:2;">
+            <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Connection String</div>
+            <div id="dbSetupConnString" style="font-size:12px; font-family:monospace; word-break:break-all;">-</div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="display:flex; gap:12px; margin-top:20px;">
+        <button id="testOldDbConnectionBtn" class="btn btn-ghost" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          Test Connection
+        </button>
+        <button id="initializeDbSchemaBtn" class="btn" disabled style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+          </svg>
+          Initialize Database Schema
+        </button>
+        <button id="migrateDataBtn" class="btn btn-ghost" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <polyline points="19 12 12 19 5 12"></polyline>
+          </svg>
+          Migrate from localStorage
+        </button>
+      </div>
+      
+      <div id="dbSetupStatus" style="display:none; margin-top:20px; padding:16px; border-radius:8px;">
+        <!-- Status messages will appear here -->
+      </div>
+    </div>
+    
+    <div class="card">
+      <h3>Schema Information</h3>
+      <p class="muted" style="margin-bottom:16px;">The following tables will be created in your database:</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:12px;">
+        <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
+          <div style="font-weight:600; margin-bottom:4px;">Users</div>
+          <div style="font-size:12px; color:var(--muted);">User accounts & auth</div>
+        </div>
+        <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
+          <div style="font-weight:600; margin-bottom:4px;">Environments</div>
+          <div style="font-size:12px; color:var(--muted);">Environment configs</div>
+        </div>
+        <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
+          <div style="font-weight:600; margin-bottom:4px;">Servers</div>
+          <div style="font-size:12px; color:var(--muted);">Server inventory</div>
+        </div>
+        <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
+          <div style="font-weight:600; margin-bottom:4px;">Scripts</div>
+          <div style="font-size:12px; color:var(--muted);">PowerShell scripts</div>
+        </div>
+        <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
+          <div style="font-weight:600; margin-bottom:4px;">Builds</div>
+          <div style="font-size:12px; color:var(--muted);">Build execution logs</div>
+        </div>
+        <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
+          <div style="font-weight:600; margin-bottom:4px;">Credentials</div>
+          <div style="font-size:12px; color:var(--muted);">Encrypted credentials</div>
+        </div>
+        <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
+          <div style="font-weight:600; margin-bottom:4px;">AuditLogs</div>
+          <div style="font-size:12px; color:var(--muted);">Activity tracking</div>
+        </div>
+        <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
+          <div style="font-weight:600; margin-bottom:4px;">Sessions</div>
+          <div style="font-size:12px; color:var(--muted);">User sessions</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Notifications Configuration -->
+<section id="view-admin-notifications" class="view">
+  <div class="view__header">
+    <h1>Notifications Configuration</h1>
+    <div style="flex:1"></div>
+  </div>
+  <div class="stack">
+    <div class="card">
+      <h3>Build Notifications</h3>
+      <p class="muted" style="margin-bottom:20px;">Configure notifications for build events and execution status updates.</p>
+      
+      <div style="display:flex; align-items:center; margin-bottom:16px;">
+        <label style="flex:1; font-weight:500;">Enable Build Notifications</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="notifyBuildsEnabled">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      
+      <label class="label">Notify On
+        <select id="notifyBuildsOn" class="input" style="margin-top:8px;">
+          <option value="all">All Builds</option>
+          <option value="failures">Failures Only</option>
+          <option value="success">Success Only</option>
+        </select>
+      </label>
+      
+      <label class="label">Notification Channel
+        <select id="notifyBuildsChannel" class="input" style="margin-top:8px;">
+          <option value="">-- Select Integration --</option>
+        </select>
+      </label>
+      
+      <label class="label">Recipients
+        <input type="text" id="notifyBuildsRecipients" class="input" placeholder="email@example.com, user@domain.com" style="margin-top:8px;">
+        <span style="font-size:11px; color:var(--muted); margin-top:4px; display:block;">Comma-separated email addresses or usernames</span>
+      </label>
+    </div>
+    
+    <div class="card">
+      <h3>System Alerts</h3>
+      <p class="muted" style="margin-bottom:20px;">Configure notifications for system events, errors, and critical alerts.</p>
+      
+      <div style="display:flex; align-items:center; margin-bottom:16px;">
+        <label style="flex:1; font-weight:500;">Enable System Alerts</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="notifySystemEnabled">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      
+      <label class="label">Alert Level
+        <select id="notifySystemLevel" class="input" style="margin-top:8px;">
+          <option value="all">All Alerts</option>
+          <option value="warning">Warnings & Errors</option>
+          <option value="error">Errors Only</option>
+        </select>
+      </label>
+      
+      <label class="label">Notification Channel
+        <select id="notifySystemChannel" class="input" style="margin-top:8px;">
+          <option value="">-- Select Integration --</option>
+        </select>
+      </label>
+      
+      <label class="label">Recipients
+        <input type="text" id="notifySystemRecipients" class="input" placeholder="email@example.com, user@domain.com" style="margin-top:8px;">
+        <span style="font-size:11px; color:var(--muted); margin-top:4px; display:block;">Comma-separated email addresses or usernames</span>
+      </label>
+    </div>
+    
+    <div class="card">
+      <h3>Daily Summary Reports</h3>
+      <p class="muted" style="margin-bottom:20px;">Receive daily summary of all activities, builds, and system status.</p>
+      
+      <div style="display:flex; align-items:center; margin-bottom:16px;">
+        <label style="flex:1; font-weight:500;">Enable Daily Summary</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="notifySummaryEnabled">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      
+      <label class="label">Delivery Time
+        <input type="time" id="notifySummaryTime" class="input" value="09:00" style="margin-top:8px;">
+      </label>
+      
+      <label class="label">Notification Channel
+        <select id="notifySummaryChannel" class="input" style="margin-top:8px;">
+          <option value="">-- Select Integration --</option>
+        </select>
+      </label>
+      
+      <label class="label">Recipients
+        <input type="text" id="notifySummaryRecipients" class="input" placeholder="email@example.com, user@domain.com" style="margin-top:8px;">
+        <span style="font-size:11px; color:var(--muted); margin-top:4px; display:block;">Comma-separated email addresses or usernames</span>
+      </label>
+    </div>
+    
+    <div class="card">
+      <h3>Environment Health Monitoring</h3>
+      <p class="muted" style="margin-bottom:20px;">Get notified when environment health status changes.</p>
+      
+      <div style="display:flex; align-items:center; margin-bottom:16px;">
+        <label style="flex:1; font-weight:500;">Enable Health Monitoring</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="notifyHealthEnabled">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      
+      <label class="label">Notify When Status Changes To
+        <select id="notifyHealthStatus" class="input" style="margin-top:8px;">
+          <option value="all">Any Status Change</option>
+          <option value="unhealthy">Unhealthy Only</option>
+          <option value="critical">Critical Only</option>
+        </select>
+      </label>
+      
+      <label class="label">Notification Channel
+        <select id="notifyHealthChannel" class="input" style="margin-top:8px;">
+          <option value="">-- Select Integration --</option>
+        </select>
+      </label>
+      
+      <label class="label">Recipients
+        <input type="text" id="notifyHealthRecipients" class="input" placeholder="email@example.com, user@domain.com" style="margin-top:8px;">
+        <span style="font-size:11px; color:var(--muted); margin-top:4px; display:block;">Comma-separated email addresses or usernames</span>
+      </label>
+    </div>
+    
+    <div style="display:flex; gap:12px; margin-top:20px;">
+      <button id="saveNotificationsBtn" class="btn" style="background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color:white; border:none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        Save Notification Settings
+      </button>
+      <button id="testNotificationBtn" class="btn btn-ghost">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        Send Test Notification
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- Documentation -->
+<section id="view-admin-documentation" class="view">
+  <div class="view__header">
+    <h1>📚 OrbisHub Documentation</h1>
+    <div style="flex:1"></div>
+    <!-- <button class="btn btn-ghost" onclick="showView('admin')">← Back to Admin</button> -->
+  </div>
+  
+  <div class="documentation-container">
+    <!-- Hero Section -->
+    <div class="doc-hero">
+      <h1>OrbisHub</h1>
+      <p class="doc-hero-tagline">By Admins, For Admins</p>
+      <p class="doc-hero-description">A comprehensive system administration and DevOps dashboard for managing environments, servers, remote connections, integrations, notifications, and automated builds—all from one centralized interface.</p>
+    </div>
+
+    <!-- Quick Start -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">🚀 Quick Start</h2>
+      <div class="doc-card">
+        <h3>Getting Started in 5 Steps</h3>
+        <ol class="doc-list">
+          <li><strong>View Summary Dashboard:</strong> Start at the Summary page to see an overview of your entire system—environments, servers, scripts, builds, and recent activity.</li>
+          <li><strong>Add Credentials:</strong> Navigate to Credentials in System Administrators to securely store login credentials for your servers.</li>
+          <li><strong>Register Servers:</strong> Go to Remote Desktop Manager and add your infrastructure with IP addresses and assigned credentials for one-click RDP access.</li>
+          <li><strong>Create Environments:</strong> Define your deployment targets (Production, Staging, Dev) to organize your infrastructure logically.</li>
+          <li><strong>Set Up Integrations:</strong> Configure Exchange, SMTP, Slack, or Teams integrations for notifications and automated communications.</li>
+        </ol>
+        <div class="doc-tip">
+          <strong>💡 Pro Tip:</strong> Press <kbd>Ctrl+`</kbd> to open the Command Palette for quick navigation!
+        </div>
+      </div>
+    </div>
+
+    <!-- Core Features -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">✨ Core Features</h2>
+      
+      <div class="doc-feature-grid">
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">📊</div>
+          <h3>Summary Dashboard</h3>
+          <p>Complete overview of your system at a glance</p>
+          <ul class="doc-feature-list">
+            <li>Real-time statistics for all modules</li>
+            <li>Environment and server health status</li>
+            <li>Recent activity feed with timeline</li>
+            <li>Quick action buttons for common tasks</li>
+            <li>Script and build execution summaries</li>
+          </ul>
+        </div>
+
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">👥</div>
+          <h3>Users & Permissions</h3>
+          <p>Team access control and role management</p>
+          <ul class="doc-feature-list">
+            <li>Role-based access control (Admin, User, Viewer)</li>
+            <li>Online/offline status indicators</li>
+            <li>User activity and session tracking</li>
+            <li>Position and squad organization</li>
+            <li>Password change enforcement</li>
+          </ul>
+        </div>
+
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">🌍</div>
+          <h3>Environments</h3>
+          <p>Organize infrastructure by deployment targets</p>
+          <ul class="doc-feature-list">
+            <li>Multiple environments (Prod, Staging, Dev, Test)</li>
+            <li>Health status monitoring with indicators</li>
+            <li>Environment-specific configurations</li>
+            <li>Card locking to prevent accidental changes</li>
+            <li>Deployment tracking and history</li>
+          </ul>
+        </div>
+
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">🖥️</div>
+          <h3>Remote Desktop Manager</h3>
+          <p>One-click remote server connections</p>
+          <ul class="doc-feature-list">
+            <li>Store server details with IP addresses</li>
+            <li>Assign saved credentials to servers</li>
+            <li>One-click RDP connection launch via mstsc</li>
+            <li>Server grouping (Production, Stage, Test, Dev)</li>
+            <li>Health monitoring and status tracking</li>
+            <li>Card locking for production servers</li>
+          </ul>
+        </div>
+
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">�</div>
+          <h3>Integrations</h3>
+          <p>Connect external services and communication tools</p>
+          <ul class="doc-feature-list">
+            <li>Exchange Server for email automation</li>
+            <li>SMTP server configuration</li>
+            <li>Slack and Microsoft Teams webhooks</li>
+            <li>REST API and custom webhook support</li>
+            <li>Connection testing before deployment</li>
+            <li>Secure storage of integration credentials</li>
+          </ul>
+        </div>
+
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">�</div>
+          <h3>Credentials</h3>
+          <p>Secure credential storage and management</p>
+          <ul class="doc-feature-list">
+            <li>Store usernames, passwords, and domains</li>
+            <li>Used for RDP connections and integrations</li>
+            <li>Encrypted storage in localStorage</li>
+            <li>Easy assignment to servers and services</li>
+            <li>Credential auditing and tracking</li>
+          </ul>
+        </div>
+
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">📋</div>
+          <h3>Audit Logs</h3>
+          <p>Complete activity tracking and compliance</p>
+          <ul class="doc-feature-list">
+            <li>Track all user actions and changes</li>
+            <li>Timestamp and user attribution</li>
+            <li>Filter by action type and date</li>
+            <li>Export logs for compliance</li>
+            <li>RDP connection tracking</li>
+          </ul>
+        </div>
+
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">🗄️</div>
+          <h3>Database Setup</h3>
+          <p>SQL Server integration and schema management</p>
+          <ul class="doc-feature-list">
+            <li>SQL Server connection configuration</li>
+            <li>Schema initialization and migration</li>
+            <li>LocalStorage to database migration</li>
+            <li>Connection testing and validation</li>
+            <li>Automated table creation</li>
+          </ul>
+        </div>
+
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">🔔</div>
+          <h3>Notifications</h3>
+          <p>Automated alerts and daily summaries</p>
+          <ul class="doc-feature-list">
+            <li>Build completion notifications (success/failure)</li>
+            <li>System alerts for errors and warnings</li>
+            <li>Daily summary reports with scheduling</li>
+            <li>Environment health change alerts</li>
+            <li>Integration with Exchange, SMTP, Slack, Teams</li>
+            <li>Test notification functionality</li>
+          </ul>
+        </div>
+
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">�</div>
+          <h3>Scripts</h3>
+          <p>PowerShell script repository and execution</p>
+          <ul class="doc-feature-list">
+            <li>Upload and organize PowerShell scripts</li>
+            <li>Syntax highlighting and preview</li>
+            <li>Version tracking and history</li>
+            <li>Execute on remote servers</li>
+            <li>Script templates and examples</li>
+          </ul>
+        </div>
+
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">🔨</div>
+          <h3>Builds</h3>
+          <p>Automated build execution and monitoring</p>
+          <ul class="doc-feature-list">
+            <li>Configure build pipelines</li>
+            <li>Real-time progress tracking</li>
+            <li>Build history with success/failure status</li>
+            <li>Automatic notifications on completion</li>
+            <li>Build logs and output capture</li>
+          </ul>
+        </div>
+
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">🔍</div>
+          <h3>ElasticSearch</h3>
+          <p>Log analysis and search capabilities</p>
+          <ul class="doc-feature-list">
+            <li>Integration with ElasticSearch clusters</li>
+            <li>Log aggregation and search</li>
+            <li>Real-time log monitoring</li>
+            <li>Analytics and visualization</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Keyboard Shortcuts -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">⌨️ Keyboard Shortcuts</h2>
+      <div class="doc-shortcuts">
+        <div class="doc-shortcut-item">
+          <kbd>Ctrl</kbd> + <kbd>`</kbd>
+          <span>Open Command Palette</span>
+        </div>
+        <div class="doc-shortcut-item">
+          <kbd>Ctrl</kbd> + <kbd>E</kbd>
+          <span>Add Environment</span>
+        </div>
+        <div class="doc-shortcut-item">
+          <kbd>Ctrl</kbd> + <kbd>S</kbd>
+          <span>Add Server</span>
+        </div>
+        <div class="doc-shortcut-item">
+          <kbd>Esc</kbd>
+          <span>Close Modal/Palette</span>
+        </div>
+        <div class="doc-shortcut-item">
+          <kbd>↑</kbd> <kbd>↓</kbd>
+          <span>Navigate Command Palette</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation Structure -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">🧭 Navigation Structure</h2>
+      <div class="doc-card">
+        <h3>Application Sections</h3>
+        <div class="doc-nav-structure">
+          <div class="doc-nav-section">
+            <strong>General</strong>
+            <ul>
+              <li>Summary Dashboard - System overview and quick actions</li>
+            </ul>
+          </div>
+          <div class="doc-nav-section">
+            <strong>DevOps</strong>
+            <ul>
+              <li>Scripts - PowerShell automation repository</li>
+              <li>Builds - Build execution and monitoring</li>
+            </ul>
+          </div>
+          <div class="doc-nav-section">
+            <strong>System Administrators</strong>
+            <ul>
+              <li>Users / Permissions - User management and access control</li>
+              <li>Environments - Deployment target configuration</li>
+              <li>Remote Desktop Manager - Server connections with RDP</li>
+              <li>Integrations - External service connections</li>
+              <li>Credentials - Secure credential storage</li>
+              <li>Audit Logs - Activity tracking and compliance</li>
+              <li>Database Setup - SQL Server integration</li>
+              <li>Notifications - Alert configuration and scheduling</li>
+            </ul>
+          </div>
+          <div class="doc-nav-section">
+            <strong>Monitoring</strong>
+            <ul>
+              <li>ElasticSearch - Log analysis and search</li>
+            </ul>
+          </div>
+          <div class="doc-nav-section">
+            <strong>Other</strong>
+            <ul>
+              <li>Documentation - This comprehensive guide</li>
+            </ul>
+          </div>
+          <div class="doc-nav-section">
+            <strong>System</strong>
+            <ul>
+              <li>Settings - Application configuration</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">🏗️ Architecture</h2>
+      <div class="doc-card">
+        <h3>Technology Stack</h3>
+        <div class="doc-tech-grid">
+          <div class="doc-tech-item">
+            <strong>Frontend</strong>
+            <p>Vanilla JavaScript, HTML5, CSS3</p>
+          </div>
+          <div class="doc-tech-item">
+            <strong>Storage</strong>
+            <p>LocalStorage (Client-side) / SQL Server (Optional)</p>
+          </div>
+          <div class="doc-tech-item">
+            <strong>Backend</strong>
+            <p>Node.js + Express (for RDP connections & notifications)</p>
+          </div>
+          <div class="doc-tech-item">
+            <strong>UI Framework</strong>
+            <p>Custom CSS with modern features</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="doc-card">
+        <h3>Backend Server</h3>
+        <p>OrbisHub includes a Node.js backend server for advanced features:</p>
+        <ul class="doc-list">
+          <li><strong>RDP Connection Service:</strong> Generates temporary RDP files and launches mstsc for one-click server connections</li>
+          <li><strong>Notification Dispatch:</strong> Sends notifications via configured integrations (Exchange, SMTP, Slack, Teams)</li>
+          <li><strong>Database Operations:</strong> Optional SQL Server integration for enterprise deployments</li>
+        </ul>
+        <div class="doc-tip">
+          <strong>🚀 Start Backend:</strong> Run <code>npm start</code> or <code>node server.js</code> in the project directory. Server runs on port 3000 by default.
+        </div>
+      </div>
+
+      <div class="doc-card">
+        <h3>Data Structure</h3>
+        <p>OrbisHub stores data in localStorage with the following schema:</p>
+        <pre class="doc-code">
+{
+  "environments": [],      // Deployment environments
+  "servers": [],          // Server infrastructure with RDP details
+  "scripts": [],          // PowerShell automation scripts
+  "builds": [],           // Build configurations and history
+  "integrations": [],     // External service connections
+  "credentials": [],      // Encrypted login credentials
+  "users": [],            // User accounts with online status
+  "auditLogs": [],        // Complete activity tracking
+  "notificationSettings": {}, // Notification configuration
+  "locks": {}             // Card lock states
+}</pre>
+      </div>
+    </div>
+
+    <!-- Security -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">🔒 Security</h2>
+      <div class="doc-card">
+        <h3>Best Practices</h3>
+        <ul class="doc-list">
+          <li><strong>Authentication:</strong> Always change the default admin password (admin/admin) on first login</li>
+          <li><strong>Credentials:</strong> Use the Credentials vault to securely store sensitive data</li>
+          <li><strong>Audit Logs:</strong> Regularly review audit logs for suspicious activity</li>
+          <li><strong>Sessions:</strong> Sessions are stored securely and expire after inactivity</li>
+          <li><strong>HTTPS:</strong> Always deploy OrbisHub over HTTPS in production</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- API Integration -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">🔌 Backend Integration</h2>
+      <div class="doc-card">
+        <h3>Optional Node.js Backend</h3>
+        <p>OrbisHub can connect to an optional backend for advanced features:</p>
+        <ul class="doc-list">
+          <li>Remote script execution</li>
+          <li>Database connection testing</li>
+          <li>Server health monitoring</li>
+          <li>Real-time build execution</li>
+        </ul>
+        <div class="doc-warning">
+          <strong>⚠️ Note:</strong> Backend is optional. OrbisHub works fully offline using LocalStorage.
+        </div>
+      </div>
+    </div>
+
+    <!-- FAQ -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">❓ Frequently Asked Questions</h2>
+      
+      <div class="doc-faq">
+        <details class="doc-faq-item">
+          <summary>Where is my data stored?</summary>
+          <p>All data is stored in your browser's LocalStorage. This means your data never leaves your machine and is completely private. However, clearing browser data will delete your OrbisHub data.</p>
+        </details>
+
+        <details class="doc-faq-item">
+          <summary>Can I export/import my data?</summary>
+          <p>Yes! Use the Database Setup section in Admin Panel to export your entire database to a JSON file, or import data from a backup.</p>
+        </details>
+
+        <details class="doc-faq-item">
+          <summary>Do I need a backend server?</summary>
+          <p>No, OrbisHub works completely standalone in your browser. The optional Node.js backend adds features like remote script execution, but isn't required.</p>
+        </details>
+
+        <details class="doc-faq-item">
+          <summary>How do I reset everything?</summary>
+          <p>On the login screen, click "Reset Database & Create Admin" to wipe all data and start fresh with default admin credentials.</p>
+        </details>
+
+        <details class="doc-faq-item">
+          <summary>What browsers are supported?</summary>
+          <p>OrbisHub works on all modern browsers: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+. Mobile browsers are also supported.</p>
+        </details>
+
+        <details class="doc-faq-item">
+          <summary>How do I stop a running build?</summary>
+          <p>Click the red "Stop" button that appears on the build card while it's running. The build will be marked as stopped and logged in the audit trail.</p>
+        </details>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="doc-footer">
+      <p>Built with ❤️ for DevOps teams by <strong>Ashot Arzakanyan</strong></p>
+      <p class="doc-footer-meta">Version 1.0 • November 2025</p>
+    </div>
+  </div>
+</section>
+
+<!-- Settings -->
+<!-- Settings -->
+<section id="view-settings" class="view">
+  <div class="view__header">
+    <h1>⚙️ Settings</h1>
+  </div>
+  
+  <div class="documentation-container">
+    <!-- Appearance Section -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">🎨 Appearance</h2>
+      <div class="doc-card">
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Compact Mode</h3>
+            <p>Reduce spacing and padding for a denser layout</p>
+          </div>
+          <div class="settings-row-control">
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsCompactMode">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Sidebar Position</h3>
+            <p>Choose left or right sidebar placement</p>
+          </div>
+          <div class="settings-row-control">
+            <select class="input" id="settingsSidebarPosition" style="width: 150px;">
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Font Size</h3>
+            <p>Adjust the base font size for better readability</p>
+          </div>
+          <div class="settings-row-control">
+            <select class="input" id="settingsFontSize" style="width: 150px;">
+              <option value="small">Small (13px)</option>
+              <option value="medium" selected>Medium (14px)</option>
+              <option value="large">Large (16px)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notifications & Alerts Section -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">🔔 Notifications & Alerts</h2>
+      <div class="doc-card">
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Desktop Notifications</h3>
+            <p>Show browser notifications for important events</p>
+          </div>
+          <div class="settings-row-control">
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsDesktopNotifications" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Build Completion Alerts</h3>
+            <p>Get notified when builds finish executing</p>
+          </div>
+          <div class="settings-row-control">
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsBuildAlerts" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Error Notifications</h3>
+            <p>Display alerts when operations fail</p>
+          </div>
+          <div class="settings-row-control">
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsErrorNotifications" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Sound Effects</h3>
+            <p>Play sounds for notifications and alerts</p>
+          </div>
+          <div class="settings-row-control">
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsSoundEffects">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auto-Refresh & Updates Section -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">🔄 Auto-Refresh & Updates</h2>
+      <div class="doc-card">
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Auto-Refresh Dashboard</h3>
+            <p>Automatically refresh data at regular intervals</p>
+          </div>
+          <div class="settings-row-control">
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsAutoRefresh">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Refresh Interval</h3>
+            <p>Set how often data should auto-refresh</p>
+          </div>
+          <div class="settings-row-control">
+            <select class="input" id="settingsRefreshInterval" style="width: 150px;">
+              <option value="30">30 seconds</option>
+              <option value="60" selected>1 minute</option>
+              <option value="300">5 minutes</option>
+              <option value="600">10 minutes</option>
+              <option value="1800">30 minutes</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Real-time Build Monitoring</h3>
+            <p>Monitor running builds in real-time</p>
+          </div>
+          <div class="settings-row-control">
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsRealtimeBuilds" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data Management Section -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">💾 Data Management</h2>
+      <div class="doc-card">
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Storage Usage</h3>
+            <p>Monitor your LocalStorage usage</p>
+          </div>
+          <div class="settings-row-control">
+            <div id="storageUsageDisplay" class="storage-usage">
+              <span id="storageUsageText" class="muted" style="font-size: 14px; font-weight: 600;">0.00 MB / 5 MB (0.0%)</span>
+              <div class="storage-bar">
+                <div class="storage-bar-fill" id="storageBarFill" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Auto-Backup</h3>
+            <p>Automatically backup your data daily</p>
+          </div>
+          <div class="settings-row-control">
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsAutoBackup">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Data Retention</h3>
+            <p>How long to keep audit logs and build history</p>
+          </div>
+          <div class="settings-row-control">
+            <select class="input" id="settingsDataRetention" style="width: 150px;">
+              <option value="7">7 days</option>
+              <option value="30" selected>30 days</option>
+              <option value="90">90 days</option>
+              <option value="365">1 year</option>
+              <option value="-1">Forever</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Export Format</h3>
+            <p>Choose default format for data exports</p>
+          </div>
+          <div class="settings-row-control">
+            <select class="input" id="settingsExportFormat" style="width: 150px;">
+              <option value="json" selected>JSON</option>
+              <option value="csv">CSV</option>
+              <option value="xml">XML</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Export Data</h3>
+            <p>Download all your data as a backup file</p>
+          </div>
+          <div class="settings-row-control">
+            <button class="btn btn-ghost" id="exportDataBtn" style="display: flex; align-items: center; gap: 8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Export Database
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Import Data</h3>
+            <p>Restore data from a backup file</p>
+          </div>
+          <div class="settings-row-control">
+            <button class="btn btn-ghost" id="importDataBtn" style="display: flex; align-items: center; gap: 8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              Import Database
+            </button>
+            <input type="file" id="importDataFile" accept=".json" style="display:none;">
+          </div>
+        </div>
+
+        <div class="settings-row" style="background: rgba(239, 68, 68, 0.05); border-radius: 8px; padding: 16px; margin-top: 12px;">
+          <div class="settings-row-info">
+            <h3>Clear All Data</h3>
+            <p>Reset OrbisHub to factory defaults (cannot be undone)</p>
+          </div>
+          <div class="settings-row-control">
+            <button class="btn" id="clearAllDataBtn" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; display: flex; align-items: center; gap: 8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              Clear All Data
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Security & Privacy Section -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">🔒 Security & Privacy</h2>
+      <div class="doc-card">
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Auto-Lock Session</h3>
+            <p>Automatically lock after period of inactivity</p>
+          </div>
+          <div class="settings-row-control">
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsAutoLock">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Session Timeout</h3>
+            <p>Time before auto-lock activates</p>
+          </div>
+          <div class="settings-row-control">
+            <select class="input" id="settingsSessionTimeout" style="width: 150px;">
+              <option value="5">5 minutes</option>
+              <option value="15" selected>15 minutes</option>
+              <option value="30">30 minutes</option>
+              <option value="60">1 hour</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Show Passwords</h3>
+            <p>Display passwords in plain text (less secure)</p>
+          </div>
+          <div class="settings-row-control">
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsShowPasswords">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Audit Logging</h3>
+            <p>Track all user actions and system events</p>
+          </div>
+          <div class="settings-row-control">
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsAuditLogging" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Performance Section -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">⚡ Performance</h2>
+      <div class="doc-card">
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Animations</h3>
+            <p>Enable smooth transitions and animations</p>
+          </div>
+          <div class="settings-row-control">
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsAnimations" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Lazy Loading</h3>
+            <p>Load data only when needed to improve speed</p>
+          </div>
+          <div class="settings-row-control">
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingsLazyLoading" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Items Per Page</h3>
+            <p>Number of items to display in lists</p>
+          </div>
+          <div class="settings-row-control">
+            <select class="input" id="settingsItemsPerPage" style="width: 150px;">
+              <option value="10">10 items</option>
+              <option value="25">25 items</option>
+              <option value="50" selected>50 items</option>
+              <option value="100">100 items</option>
+              <option value="-1">Show all</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Cache Duration</h3>
+            <p>How long to cache data before refreshing</p>
+          </div>
+          <div class="settings-row-control">
+            <select class="input" id="settingsCacheDuration" style="width: 150px;">
+              <option value="0">No cache</option>
+              <option value="60">1 minute</option>
+              <option value="300" selected>5 minutes</option>
+              <option value="900">15 minutes</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- System Information Section -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">ℹ️ System Information</h2>
+      <div class="doc-tech-grid">
+        <div class="doc-tech-item">
+          <strong>Version</strong>
+          <p>1.0</p>
+        </div>
+        <div class="doc-tech-item">
+          <strong>Author</strong>
+          <p>Ashot Arzakanyan</p>
+        </div>
+        <div class="doc-tech-item">
+          <strong>Browser</strong>
+          <p id="browserInfo">Chrome</p>
+        </div>
+        <div class="doc-tech-item">
+          <strong>Storage Type</strong>
+          <p>LocalStorage</p>
+        </div>
+        <div class="doc-tech-item">
+          <strong>Last Backup</strong>
+          <p id="lastBackupInfo">Never</p>
+        </div>
+        <div class="doc-tech-item">
+          <strong>Total Records</strong>
+          <p id="totalRecordsInfo">0</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Section -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">⌨️ Keyboard Shortcuts</h2>
+      <div class="doc-shortcuts">
+        <div class="doc-shortcut-item">
+          <kbd>Ctrl</kbd> + <kbd>`</kbd>
+          <span>Command Palette</span>
+        </div>
+        <div class="doc-shortcut-item">
+          <kbd>Ctrl</kbd> + <kbd>E</kbd>
+          <span>Add Environment</span>
+        </div>
+        <div class="doc-shortcut-item">
+          <kbd>Ctrl</kbd> + <kbd>S</kbd>
+          <span>Add Server</span>
+        </div>
+        <div class="doc-shortcut-item">
+          <kbd>Esc</kbd>
+          <span>Close Modal/Palette</span>
+        </div>
+        <div class="doc-shortcut-item">
+          <kbd>Ctrl</kbd> + <kbd>,</kbd>
+          <span>Open Settings</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</div>
+</main>
+
+
+<!-- Modals -->
+<dialog id="envModal" class="modal">
+<form method="dialog" class="card">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Add Environment</h2>
+<label class="label">Display name
+<input id="envName" class="input" placeholder="e.g., Prod EU" required />
+</label>
+<label class="label">URL
+<input id="envUrl" class="input" placeholder="https://org.crm.dynamics.com" required />
+</label>
+<label class="label">Type
+<select id="envType" class="input">
+<option>Production</option>
+<option>Stage</option>
+<option>Test</option>
+<option>Dev</option>
+</select>
+</label>
+<label class="label">Deployer Credential
+<select id="envDeployer" class="input">
+<option value="">-- Select Credential --</option>
+</select>
+</label>
+<menu class="row end">
+<button id="saveEnvBtn" type="submit" value="default" class="btn">Save</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="editEnvModal" class="modal">
+<form method="dialog" class="card">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Edit Environment</h2>
+<input type="hidden" id="editEnvId" />
+<label class="label">Display name
+<input id="editEnvName" class="input" placeholder="e.g., Prod EU" required />
+</label>
+<label class="label">URL
+<input id="editEnvUrl" class="input" placeholder="https://org.crm.dynamics.com" required />
+</label>
+<label class="label">Type
+<select id="editEnvType" class="input">
+<option>Production</option>
+<option>Stage</option>
+<option>Test</option>
+<option>Dev</option>
+</select>
+</label>
+<label class="label">Deployer Credential
+<select id="editEnvDeployer" class="input">
+<option value="">-- Select Credential --</option>
+</select>
+</label>
+<menu class="row end">
+<button id="saveEditEnvBtn" type="submit" value="default" class="btn">Save Changes</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="confirmModal" class="modal">
+<form method="dialog" class="card card--compact">
+<h2>Clear All Jobs</h2>
+<p class="muted">Are you sure you want to clear all jobs? This action cannot be undone.</p>
+<menu class="row end">
+<button value="cancel" class="btn btn-ghost">Cancel</button>
+<button value="confirm" class="btn btn-danger">Clear All Jobs</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="mapServersModal" class="modal">
+<form method="dialog" class="card" style="max-width:600px;">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Map Servers to <span id="mapServersEnvName"></span></h2>
+<p style="color:var(--muted); font-size:14px; margin-bottom:20px;">Select servers from any type, then click Save to map them all at once.</p>
+
+<label class="label">Available Servers (by Type)
+<div id="mapServersAllTypes" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+<div style="color: var(--muted); font-size: 14px; padding: 8px;">Loading servers...</div>
+</div>
+</label>
+<menu class="row end">
+<button id="saveMapServersBtn" type="submit" value="default" class="btn">Save Mapping</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="deleteEnvModal" class="modal">
+<form method="dialog" class="card card--compact">
+<h2>Delete Environment</h2>
+<p class="muted">Are you sure you want to delete "<span id="deleteEnvName"></span>"? This action cannot be undone.</p>
+<menu class="row end">
+<button value="cancel" class="btn btn-ghost">Cancel</button>
+<button value="confirm" class="btn btn-danger">Delete Environment</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="deleteUserModal" class="modal">
+<form method="dialog" class="card">
+<h2>Delete User</h2>
+<p>Are you sure you want to delete <strong><span id="deleteUserName"></span></strong>?</p>
+<menu class="row end">
+<button value="cancel" class="btn btn-ghost">Cancel</button>
+<button id="confirmDeleteUserBtn" type="submit" value="confirm" class="btn btn-danger">Delete</button>
+</menu>
+</form>
+</dialog>
+
+<!-- Integration Modals -->
+<dialog id="integrationModal" class="modal">
+<form method="dialog" class="card">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Add Integration</h2>
+<label class="label">Integration Name
+<input id="integrationName" class="input" placeholder="e.g., Exchange Server" required />
+</label>
+<label class="label">Integration Type
+<select id="integrationType" class="input">
+<option>Exchange Server</option>
+<option>SMTP Server</option>
+<option>Slack</option>
+<option>Microsoft Teams</option>
+<option>REST API</option>
+<option>Webhook</option>
+<option>Other</option>
+</select>
+</label>
+<label class="label">Connection Details
+<textarea id="integrationConnection" class="input" placeholder="Server URL, API endpoint, or connection string..." rows="4" required></textarea>
+</label>
+<label class="label">Description
+<input id="integrationDescription" class="input" placeholder="Optional description" />
+</label>
+<menu class="row end">
+<button id="saveIntegrationBtn" type="submit" value="default" class="btn">Save</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="editIntegrationModal" class="modal">
+<form method="dialog" class="card">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Edit Integration</h2>
+<input type="hidden" id="editIntegrationId" />
+<label class="label">Integration Name
+<input id="editIntegrationName" class="input" placeholder="e.g., Exchange Server" required />
+</label>
+<label class="label">Integration Type
+<select id="editIntegrationType" class="input">
+<option>Exchange Server</option>
+<option>SMTP Server</option>
+<option>Slack</option>
+<option>Microsoft Teams</option>
+<option>REST API</option>
+<option>Webhook</option>
+<option>Other</option>
+</select>
+</label>
+<label class="label">Connection Details
+<textarea id="editIntegrationConnection" class="input" placeholder="Server URL, API endpoint, or connection string..." rows="4" required></textarea>
+</label>
+<label class="label">Description
+<input id="editIntegrationDescription" class="input" placeholder="Optional description" />
+</label>
+<menu class="row end">
+<button id="saveEditIntegrationBtn" type="submit" value="default" class="btn">Save Changes</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="deleteIntegrationModal" class="modal">
+<form method="dialog" class="card">
+<h2>Delete Integration</h2>
+<p>Are you sure you want to delete this integration? This action cannot be undone.</p>
+<menu class="row end">
+<button value="cancel" class="btn btn-ghost">Cancel</button>
+<button id="confirmDeleteIntegrationBtn" type="submit" value="default" class="btn btn-danger">Delete</button>
+</menu>
+</form>
+</dialog>
+
+</body>
+</html>
+
+<dialog id="editUserModal" class="modal">
+<form method="dialog" class="card">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Edit User</h2>
+<input type="hidden" id="editUserId" />
+<label class="label">Full name
+<input id="editUserName" class="input" placeholder="Full name" required />
+</label>
+<label class="label">Username
+<input id="editUserUsername" class="input" placeholder="Username" required />
+</label>
+<label class="label">Password
+<input id="editUserPassword" type="password" class="input" placeholder="Leave empty to keep current" />
+</label>
+<label class="label" style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+<input id="editUserChangePassword" type="checkbox" style="width:auto; margin:0;" />
+<span style="font-weight:normal;">Change password on next logon</span>
+</label>
+<label class="label">Email
+<input id="editUserEmail" class="input" placeholder="Email address" required />
+</label>
+<label class="label">Position
+<input id="editUserPosition" class="input" placeholder="e.g., Senior Admin, Developer" />
+</label>
+<label class="label">Squad
+<input id="editUserSquad" class="input" placeholder="e.g., DevOps, QA Team" />
+</label>
+<label class="label">Role
+<select id="editUserRole" class="input">
+<option>Super Admin</option>
+<option>Admin</option>
+<option>Manager</option>
+<option>Operator</option>
+<option>Viewer</option>
+</select>
+</label>
+<menu class="row end">
+<button id="saveEditUserBtn" type="submit" value="default" class="btn">Save Changes</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="createUserModal" class="modal">
+<form method="dialog" class="card">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Create User</h2>
+<label class="label">Full name
+<input id="userName" class="input" placeholder="Full name" required />
+</label>
+<label class="label">Username
+<input id="userUsername" class="input" placeholder="Username" required />
+</label>
+<label class="label">Password
+<input id="userPassword" type="password" class="input" placeholder="Password" required />
+</label>
+<label class="label" style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+<input id="userChangePassword" type="checkbox" style="width:auto; margin:0;" />
+<span style="font-weight:normal;">Change password on next logon</span>
+</label>
+<label class="label">Email
+<input id="userEmail" class="input" placeholder="Email address" required />
+</label>
+<label class="label">Position
+<input id="userPosition" class="input" placeholder="e.g., Senior Admin, Developer" />
+</label>
+<label class="label">Squad
+<input id="userSquad" class="input" placeholder="e.g., DevOps, QA Team" />
+</label>
+<label class="label">Role
+<select id="userRole" class="input">
+<option>Super Admin</option>
+<option>Admin</option>
+<option>Manager</option>
+<option>Operator</option>
+<option>Viewer</option>
+</select>
+</label>
+<menu class="row end">
+<button id="createUserBtn" type="submit" value="default" class="btn">Create User</button>
+</menu>
+</form>
+</dialog>
+
+<!-- Credential Modals -->
+<dialog id="credentialModal" class="modal">
+<form method="dialog" class="card">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Add Credential</h2>
+<label class="label">Credential Name
+<input id="credName" class="input" placeholder="e.g., Admin Account, API Key" required />
+</label>
+<label class="label">Type
+<select id="credType" class="input">
+<option>Username/Password</option>
+<option>Windows Credentials</option>
+<option>API Key</option>
+<option>OAuth Token</option>
+<option>SSH Key</option>
+<option>Certificate</option>
+<option>Other</option>
+</select>
+</label>
+<label class="label">Username
+<input id="credUsername" class="input" placeholder="Username or key identifier" />
+</label>
+<label class="label">Password / Secret
+<input id="credPassword" type="password" class="input" placeholder="Password, token, or secret" />
+</label>
+<label class="label">Description
+<input id="credDescription" class="input" placeholder="Optional description" />
+</label>
+<menu class="row end">
+<button id="saveCredBtn" type="submit" value="default" class="btn">Save</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="editCredentialModal" class="modal">
+<form method="dialog" class="card">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Edit Credential</h2>
+<input type="hidden" id="editCredId" />
+<label class="label">Credential Name
+<input id="editCredName" class="input" placeholder="e.g., Admin Account, API Key" required />
+</label>
+<label class="label">Type
+<select id="editCredType" class="input">
+<option>Username/Password</option>
+<option>Windows Credentials</option>
+<option>API Key</option>
+<option>OAuth Token</option>
+<option>SSH Key</option>
+<option>Certificate</option>
+<option>Other</option>
+</select>
+</label>
+<label class="label">Username
+<input id="editCredUsername" class="input" placeholder="Username or key identifier" />
+</label>
+<label class="label">Password / Secret
+<input id="editCredPassword" type="password" class="input" placeholder="Leave empty to keep current" />
+</label>
+<label class="label">Description
+<input id="editCredDescription" class="input" placeholder="Optional description" />
+</label>
+<menu class="row end">
+<button id="saveEditCredBtn" type="submit" value="default" class="btn">Save Changes</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="deleteCredentialModal" class="modal">
+<form method="dialog" class="card">
+<h2>Delete Credential</h2>
+<p>Are you sure you want to delete this credential? This action cannot be undone.</p>
+<menu class="row end">
+<button value="cancel" class="btn btn-ghost">Cancel</button>
+<button id="confirmDeleteCredBtn" type="submit" value="default" class="btn btn-danger">Delete</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="clearAuditModal" class="modal">
+<form method="dialog" class="card" style="max-width:500px;">
+<div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
+<div style="width:48px; height:48px; border-radius:12px; background:rgba(239,68,68,0.1); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+<line x1="12" y1="9" x2="12" y2="13"></line>
+<line x1="12" y1="17" x2="12.01" y2="17"></line>
+</svg>
+</div>
+<div style="flex:1;">
+<h2 style="margin:0 0 8px 0;">Clear Audit History?</h2>
+<p style="margin:0; color:var(--muted); font-size:14px;">This will permanently delete all audit log entries. This action cannot be undone.</p>
+</div>
+</div>
+<menu class="row end">
+<button value="cancel" class="btn btn-ghost">Cancel</button>
+<button id="confirmClearAuditBtn" type="submit" value="default" class="btn btn-danger">Clear All History</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="buildModal" class="modal">
+<form method="dialog" class="card">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Create Build</h2>
+<label class="label">Build Name
+<input id="buildName" class="input" placeholder="e.g., Deploy Frontend, Run Tests" required />
+</label>
+<label class="label">PowerShell Script
+<textarea id="buildScript" class="input" placeholder="Enter PowerShell script to execute on target server..." required style="font-family:monospace; min-height:150px; resize:vertical;"></textarea>
+<small style="color:var(--muted); font-size:12px;">This script will be executed on the target server via PowerShell remoting</small>
+</label>
+<label class="label">Target Server
+<select id="buildServer" class="input" required>
+<option value="">-- Select Server --</option>
+</select>
+</label>
+<label class="label">Override Target IP/Hostname (Optional)
+<input id="buildTargetOverride" class="input" placeholder="e.g., 192.168.1.100 or SERVERNAME" />
+<small style="color:var(--muted); font-size:12px;">Leave empty to use server's configured IP. Or enter custom IP/hostname to override.</small>
+</label>
+<menu class="row end">
+<button id="saveBuildBtn" type="submit" value="default" class="btn">Create Build</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="editBuildModal" class="modal">
+<form method="dialog" class="card">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Edit Build</h2>
+<input type="hidden" id="editBuildId" />
+<label class="label">Build Name
+<input id="editBuildName" class="input" placeholder="e.g., Deploy Frontend, Run Tests" required />
+</label>
+<label class="label">PowerShell Script
+<textarea id="editBuildScript" class="input" placeholder="Enter PowerShell script to execute on target server..." required style="font-family:monospace; min-height:150px; resize:vertical;"></textarea>
+<small style="color:var(--muted); font-size:12px;">This script will be executed on the target server via PowerShell remoting</small>
+</label>
+<label class="label">Target Server
+<select id="editBuildServer" class="input" required>
+<option value="">-- Select Server --</option>
+</select>
+</label>
+<label class="label">Override Target IP/Hostname (Optional)
+<input id="editBuildTargetOverride" class="input" placeholder="e.g., 192.168.1.100 or SERVERNAME" />
+<small style="color:var(--muted); font-size:12px;">Leave empty to use server's configured IP. Or enter custom IP/hostname to override.</small>
+</label>
+<menu class="row end">
+<button id="saveEditBuildBtn" type="submit" value="default" class="btn">Save Changes</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="deleteBuildModal" class="modal">
+<form method="dialog" class="card" style="max-width:500px;">
+<div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
+<div style="width:48px; height:48px; border-radius:12px; background:rgba(239,68,68,0.1); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+<line x1="12" y1="9" x2="12" y2="13"></line>
+<line x1="12" y1="17" x2="12.01" y2="17"></line>
+</svg>
+</div>
+<div style="flex:1;">
+<h2 style="margin:0 0 8px 0;">Delete Build?</h2>
+<p id="deleteBuildName" style="margin:0; color:var(--muted); font-size:14px;">Are you sure you want to delete this build? This action cannot be undone.</p>
+</div>
+</div>
+<menu class="row end">
+<button value="cancel" class="btn btn-ghost">Cancel</button>
+<button id="confirmDeleteBuildBtn" type="submit" value="confirm" class="btn btn-danger">Delete Build</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="buildStartedModal" class="modal">
+<form method="dialog" class="card" style="max-width:500px; overflow:hidden;">
+<div style="position:absolute; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg, #6366f1 0%, #8b5cf6 25%, #ec4899 50%, #8b5cf6 75%, #6366f1 100%); background-size:200% 100%; animation:shimmer 3s linear infinite;"></div>
+<div style="display:flex; align-items:center; gap:16px; margin:20px 0;">
+<div style="width:56px; height:56px; border-radius:16px; background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); display:flex; align-items:center; justify-content:center; flex-shrink:0; position:relative;">
+<div style="position:absolute; inset:0; border-radius:16px; background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); opacity:0.5; animation:pulse 2s ease-in-out infinite;"></div>
+<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:relative; z-index:1;">
+<polygon points="5 3 19 12 5 21 5 3"></polygon>
+</svg>
+</div>
+<div style="flex:1;">
+<h2 style="margin:0 0 8px 0; font-size:20px;">Build Started!</h2>
+<p id="buildStartedMessage" style="margin:0; color:var(--muted); font-size:14px; line-height:1.5;">Your build is now executing...</p>
+</div>
+</div>
+<div style="background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.2); border-radius:8px; padding:12px; margin-bottom:20px;">
+<div style="display:flex; gap:16px; align-items:center;">
+<div style="flex:1;">
+<div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Script</div>
+<div id="buildStartedScript" style="font-family:monospace; font-size:13px; color:#6366f1; font-weight:500;"></div>
+</div>
+<div style="flex:1;">
+<div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Server</div>
+<div id="buildStartedServer" style="font-size:13px; color:var(--text); font-weight:500;"></div>
+</div>
+</div>
+</div>
+<menu class="row end" style="margin:0;">
+<button type="submit" value="default" class="btn" style="background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color:white; border:none;">Got it!</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="messagesModal" class="modal">
+<form method="dialog" class="card" style="max-width:900px; height:600px; display:flex; flex-direction:column; padding:0;">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close" style="position:absolute; top:12px; right:12px; z-index:10;">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<div style="padding:20px; border-bottom:1px solid var(--border);">
+<h2 style="margin:0;">Messages</h2>
+</div>
+<div style="display:flex; flex:1; overflow:hidden;">
+<!-- Conversations List -->
+<div id="conversationsList" style="width:280px; border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden;">
+<!-- Tabs for Direct Messages and Channels -->
+<div style="display:flex; border-bottom:1px solid var(--border);">
+<button type="button" id="directMessagesTab" class="tab-btn active" style="flex:1; padding:12px; border:none; background:transparent; cursor:pointer; border-bottom:2px solid var(--primary); font-weight:600; color:var(--primary);">
+Direct Messages
+</button>
+<button type="button" id="channelsTab" class="tab-btn" style="flex:1; padding:12px; border:none; background:transparent; cursor:pointer; border-bottom:2px solid transparent; font-weight:600; color:var(--muted);">
+Channels
+</button>
+</div>
+<div style="padding:12px; border-bottom:1px solid var(--border);">
+<input id="searchUsers" class="input" placeholder="Search..." style="width:100%;" />
+<button type="button" id="createChannelBtn" class="btn" style="width:100%; margin-top:8px; display:none; font-size:12px; padding:8px;">+ Create Channel</button>
+</div>
+<div id="conversationsContainer" style="flex:1; overflow-y:auto; padding:8px;">
+<!-- Conversations will be populated here -->
+</div>
+<div id="channelsContainer" style="flex:1; overflow-y:auto; padding:8px; display:none;">
+<!-- Channels will be populated here -->
+</div>
+</div>
+<!-- Chat Area -->
+<div id="chatArea" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+<div id="noChatSelected" style="flex:1; display:flex; align-items:center; justify-content:center; color:var(--muted); flex-direction:column; gap:12px;">
+<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+</svg>
+<p>Select a conversation to start messaging</p>
+</div>
+<!-- Chat Header -->
+<div id="chatHeader" style="padding:16px; border-bottom:1px solid var(--border); display:none;">
+<div style="display:flex; align-items:center; gap:12px;">
+<div style="width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); display:flex; align-items:center; justify-content:center; color:white; font-weight:600; font-size:16px;" id="chatUserAvatar">
+</div>
+<div style="flex:1;">
+<div id="chatUserName" style="font-weight:600; font-size:14px;"></div>
+<div id="chatUserStatus" style="font-size:12px; color:var(--muted);"></div>
+</div>
+</div>
+</div>
+<!-- Messages Container -->
+<div id="messagesContainer" style="flex:1; overflow-y:auto; padding:16px; display:none;">
+<!-- Messages will be populated here -->
+</div>
+<!-- Message Input -->
+<div id="messageInput" style="padding:16px; border-top:1px solid var(--border); display:none;">
+<div id="typingIndicator" style="display:none; font-size:12px; color:var(--muted); margin-bottom:8px; height:16px;">
+<span id="typingUsername"></span> is typing...
+</div>
+<div style="display:flex; gap:8px;">
+<textarea id="messageTextarea" class="input" placeholder="Type a message..." rows="2" style="flex:1; resize:none; font-family:inherit;"></textarea>
+<button type="button" id="sendMessageBtn" class="btn" style="align-self:flex-end;">Send</button>
+</div>
+</div>
+</div>
+</div>
+</form>
+</dialog>
+
+<!-- Create Channel Modal -->
+<dialog id="createChannelDialog" class="modal">
+<form method="dialog" class="card" style="max-width:500px;">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Create Channel</h2>
+<label class="label">Channel Name
+<input id="channelName" class="input" placeholder="e.g., General, Announcements" required />
+</label>
+<label class="label">Description (Optional)
+<textarea id="channelDescription" class="input" rows="2" placeholder="What is this channel about?"></textarea>
+</label>
+<label class="label">Add Members
+<div id="channelMembersList" style="max-height:200px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:8px; margin-top:8px;">
+<!-- Member checkboxes will be populated here -->
+</div>
+</label>
+<div style="display:flex; gap:12px; margin-top:16px;">
+<button type="button" id="createChannelSubmit" class="btn">Create Channel</button>
+<button type="submit" value="cancel" class="btn-secondary">Cancel</button>
+</div>
+</form>
+</dialog>
+
+<dialog id="serverModal" class="modal">
+<form method="dialog" class="card">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Add Server</h2>
+<label class="label">Display Name
+<input id="serverDisplayName" class="input" placeholder="e.g., Web Server 01" required />
+</label>
+<label class="label">Hostname
+<input id="serverHostname" class="input" placeholder="e.g., web-server-01.local" required />
+</label>
+<label class="label">IP Address
+<input id="serverIp" class="input" placeholder="e.g., 192.168.1.100" required />
+</label>
+<label class="label">Server Type
+<select id="serverType" class="input" required>
+<option value="">-- Select Type --</option>
+<option value="Back End">Back End</option>
+<option value="Front End">Front End</option>
+<option value="Web Server">Web Server</option>
+<option value="Win Server">Win Server</option>
+</select>
+</label>
+<label class="label">Group
+<select id="serverGroup" class="input">
+<option value="">-- Select Group --</option>
+<option value="Production">Production</option>
+<option value="Stage">Stage</option>
+<option value="Test">Test</option>
+<option value="Dev">Dev</option>
+</select>
+</label>
+<menu class="row end">
+<button id="saveServerBtn" type="submit" value="default" class="btn">Add Server</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="editServerModal" class="modal">
+<form method="dialog" class="card">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Edit Server</h2>
+<input type="hidden" id="editServerId" />
+<label class="label">Display Name
+<input id="editServerDisplayName" class="input" placeholder="e.g., Web Server 01" required />
+</label>
+<label class="label">Hostname
+<input id="editServerHostname" class="input" placeholder="e.g., web-server-01.local" required />
+</label>
+<label class="label">IP Address
+<input id="editServerIp" class="input" placeholder="e.g., 192.168.1.100" required />
+</label>
+<label class="label">Server Type
+<select id="editServerType" class="input" required>
+<option value="">-- Select Type --</option>
+<option value="Back End">Back End</option>
+<option value="Front End">Front End</option>
+<option value="Web Server">Web Server</option>
+<option value="Win Server">Win Server</option>
+</select>
+</label>
+<label class="label">Group
+<select id="editServerGroup" class="input">
+<option value="">-- Select Group --</option>
+<option value="Production">Production</option>
+<option value="Stage">Stage</option>
+<option value="Test">Test</option>
+<option value="Dev">Dev</option>
+</select>
+</label>
+<label class="label">Credential
+<select id="editServerCredential" class="input">
+<option value="">-- Select Credential --</option>
+</select>
+<span style="font-size:12px; color:var(--muted); margin-top:4px; display:block;">Select saved credential for RDP connection</span>
+</label>
+<menu class="row end">
+<button id="saveEditServerBtn" type="submit" value="default" class="btn">Save Changes</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="deleteServerModal" class="modal">
+<form method="dialog" class="card" style="max-width:500px;">
+<div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
+<div style="width:48px; height:48px; border-radius:12px; background:rgba(239,68,68,0.1); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+<line x1="12" y1="9" x2="12" y2="13"></line>
+<line x1="12" y1="17" x2="12.01" y2="17"></line>
+</svg>
+</div>
+<div style="flex:1;">
+<h2 style="margin:0 0 8px 0;">Delete Server?</h2>
+<p style="margin:0; color:var(--muted); font-size:14px;">Are you sure you want to delete this server? This action cannot be undone.</p>
+</div>
+</div>
+<menu class="row end">
+<button value="cancel" class="btn btn-ghost">Cancel</button>
+<button id="confirmDeleteServerBtn" type="submit" value="default" class="btn btn-danger">Delete Server</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="scriptModal" class="modal">
+<form method="dialog" class="card">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Upload PowerShell Script</h2>
+<label class="label">Script Name
+<input id="scriptName" class="input" placeholder="e.g., Deploy Application" required />
+</label>
+<label class="label">Description
+<input id="scriptDescription" class="input" placeholder="Optional description" />
+</label>
+<label class="label">PowerShell Script File
+<input id="scriptFile" type="file" class="input" accept=".ps1" required style="padding:8px;" />
+</label>
+<div id="scriptFilePreview" style="display:none; margin-top:12px; padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
+<div style="font-size:12px; color:var(--muted); margin-bottom:8px;">File Preview:</div>
+<div id="scriptFileContent" style="font-family:monospace; font-size:12px; max-height:200px; overflow-y:auto; white-space:pre-wrap; word-break:break-all;"></div>
+</div>
+<menu class="row end">
+<button id="saveScriptBtn" type="submit" value="default" class="btn">Upload Script</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="editScriptModal" class="modal">
+<form method="dialog" class="card">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2>Edit Script</h2>
+<input type="hidden" id="editScriptId" />
+<label class="label">Script Name
+<input id="editScriptName" class="input" placeholder="e.g., Deploy Application" required />
+</label>
+<label class="label">Description
+<input id="editScriptDescription" class="input" placeholder="Optional description" />
+</label>
+<label class="label">PowerShell Script File (optional - leave empty to keep current)
+<input id="editScriptFile" type="file" class="input" accept=".ps1" style="padding:8px;" />
+</label>
+<div id="editScriptFilePreview" style="display:none; margin-top:12px; padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
+<div style="font-size:12px; color:var(--muted); margin-bottom:8px;">File Preview:</div>
+<div id="editScriptFileContent" style="font-family:monospace; font-size:12px; max-height:200px; overflow-y:auto; white-space:pre-wrap; word-break:break-all;"></div>
+</div>
+<menu class="row end">
+<button id="saveEditScriptBtn" type="submit" value="default" class="btn">Save Changes</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="deleteScriptModal" class="modal">
+<form method="dialog" class="card" style="max-width:500px;">
+<div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
+<div style="width:48px; height:48px; border-radius:12px; background:rgba(239,68,68,0.1); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+<line x1="12" y1="9" x2="12" y2="13"></line>
+<line x1="12" y1="17" x2="12.01" y2="17"></line>
+</svg>
+</div>
+<div style="flex:1;">
+<h2 style="margin:0 0 8px 0;">Delete Script?</h2>
+<p id="deleteScriptName" style="margin:0; color:var(--muted); font-size:14px;">Are you sure you want to delete this script? This action cannot be undone.</p>
+</div>
+</div>
+<menu class="row end">
+<button value="cancel" class="btn btn-ghost">Cancel</button>
+<button id="confirmDeleteScriptBtn" type="submit" value="default" class="btn btn-danger">Delete Script</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="viewScriptModal" class="modal">
+<form method="dialog" class="card" style="max-width:800px;">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+<h2 id="viewScriptTitle">Script Name</h2>
+<p id="viewScriptDescription" style="color:var(--muted); margin-bottom:16px;"></p>
+<div style="background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:16px;">
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+<span style="font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Script Content</span>
+<button type="button" id="copyScriptBtn" class="btn btn-ghost" style="font-size:12px; padding:4px 8px;">Copy</button>
+</div>
+<pre id="viewScriptContent" style="margin:0; font-family:monospace; font-size:12px; max-height:400px; overflow-y:auto; white-space:pre-wrap; word-break:break-all;"></pre>
+</div>
+<menu class="row end">
+<button type="submit" value="default" class="btn">Close</button>
+</menu>
+</form>
+</dialog>
+
+<!-- Database Setup Modals -->
+<dialog id="dbInitProgressModal" class="modal">
+<form method="dialog" class="card" style="max-width:700px;">
+<h2>Initializing Database Schema</h2>
+<p class="muted" style="margin-bottom:16px;">Please wait while we create the database schema...</p>
+
+<div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+  <div style="flex:1; height:8px; background:var(--bg-secondary); border-radius:4px; overflow:hidden;">
+    <div id="dbInitProgressBar" style="width:0%; height:100%; background:linear-gradient(135deg, #10b981 0%, #059669 100%); transition:width 0.3s ease;"></div>
+  </div>
+  <div id="dbInitProgressPercent" style="font-size:14px; font-weight:600; color:var(--muted); min-width:45px; text-align:right;">0%</div>
+</div>
+
+<div id="dbInitProgressList" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; max-height:200px; overflow-y:auto;">
+  <!-- Progress items will be added here -->
+</div>
+
+<menu class="row end">
+  <button id="closeDbInitProgressBtn" type="submit" value="default" class="btn" disabled>Close</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="dbMigrateModal" class="modal">
+<form method="dialog" class="card" style="max-width:600px;">
+<div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
+  <div style="width:56px; height:56px; border-radius:16px; background:linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <polyline points="19 12 12 19 5 12"></polyline>
+    </svg>
+  </div>
+  <div style="flex:1;">
+    <h2 style="margin:0 0 8px 0;">Migrate Data to Database</h2>
+    <p style="margin:0; color:var(--muted); font-size:14px;">Transfer all data from localStorage to SQL Server database.</p>
+  </div>
+</div>
+
+<div style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.2); border-radius:8px; padding:16px; margin-bottom:20px;">
+  <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:16px;">
+    <div>
+      <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Users</div>
+      <div id="migrateCountUsers" style="font-size:24px; font-weight:700; color:#3b82f6;">0</div>
+    </div>
+    <div>
+      <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Environments</div>
+      <div id="migrateCountEnvs" style="font-size:24px; font-weight:700; color:#3b82f6;">0</div>
+    </div>
+    <div>
+      <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Servers</div>
+      <div id="migrateCountServers" style="font-size:24px; font-weight:700; color:#3b82f6;">0</div>
+    </div>
+    <div>
+      <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Scripts</div>
+      <div id="migrateCountScripts" style="font-size:24px; font-weight:700; color:#3b82f6;">0</div>
+    </div>
+    <div>
+      <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Builds</div>
+      <div id="migrateCountBuilds" style="font-size:24px; font-weight:700; color:#3b82f6;">0</div>
+    </div>
+    <div>
+      <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Total Records</div>
+      <div id="migrateCountTotal" style="font-size:24px; font-weight:700; color:#10b981;">0</div>
+    </div>
+  </div>
+</div>
+
+<div style="background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:8px; padding:12px; margin-bottom:20px;">
+  <div style="display:flex; align-items:start; gap:8px;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:2px;">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+      <line x1="12" y1="9" x2="12" y2="13"></line>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </svg>
+    <div style="flex:1;">
+      <div style="font-weight:600; margin-bottom:4px; color:#f59e0b;">Warning</div>
+      <div style="font-size:13px; color:var(--muted);">This operation will insert all localStorage data into the database. Make sure the database schema is initialized first.</div>
+    </div>
+  </div>
+</div>
+
+<menu class="row end">
+  <button value="cancel" class="btn btn-ghost">Cancel</button>
+  <button id="confirmMigrateBtn" type="button" class="btn" style="background:linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color:white; border:none;">Start Migration</button>
+</menu>
+</form>
+</dialog>
+
+<!-- AI Chat Assistant -->
+<div id="aiChatWidget" class="ai-chat-widget">
+  <div class="ai-chat-header">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+      </svg>
+      <span style="font-weight: 600;">Քեռի AI</span>
+    </div>
+    <button id="closeChatBtn" class="ai-chat-close">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+  </div>
+  <div id="aiChatMessages" class="ai-chat-messages">
+    <div class="ai-message">
+      <div class="ai-message-avatar">
+        <img src="media/qeri.png" alt="Քեռի AI" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+      </div>
+      <div class="ai-message-content">
+        <p>Hi! I'm <strong>Քեռի AI</strong>, your DevOps assistant. I can do everything in OrbisHub!</p>
+        <p><strong>Try asking me:</strong></p>
+        <ul>
+          <li>"Create environment named Prod at https://example.com"</li>
+          <li>"List all servers"</li>
+          <li>"Delete user John"</li>
+          <li>"How many environments do I have?"</li>
+          <li>"Help" - to see all commands</li>
+        </ul>
+        <p>Just ask naturally and I'll understand! 😊</p>
+      </div>
+    </div>
+  </div>
+  <div class="ai-chat-input-container">
+    <input type="text" id="aiChatInput" class="ai-chat-input" placeholder="Type your message...">
+    <button id="aiChatSend" class="ai-chat-send">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="22" y1="2" x2="11" y2="13"></line>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<button id="aiChatToggle" class="ai-chat-toggle">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+  </svg>
+</button>
+
+<!-- Modern UI Enhancement: Toast Container (auto-created by JS) -->
+<!-- Modern UI Enhancement: Command Palette (auto-created by JS) -->
+
+<!-- System Configuration Modal -->
+<dialog id="systemConfigModal" class="modal">
+<form method="dialog" class="card" style="max-width:900px; width:90vw;">
+<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+
+<div style="display:flex; align-items:center; gap:16px; margin-bottom:24px;">
+  <div style="width:64px; height:64px; border-radius:20px; background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+      <path d="M3 5v14c0 3 4.5 4 9 4s9-1 9-4V5"></path>
+    </svg>
+  </div>
+  <div style="flex:1;">
+    <h2 style="margin:0 0 8px 0;">Database Configuration</h2>
+    <p style="margin:0; color:var(--muted); font-size:14px;">Connect to your SQL Server database</p>
+  </div>
+</div>
+
+<!-- Configuration Status Card -->
+<div style="margin-bottom:24px;">
+  <!-- Database Status -->
+  <div class="config-card" id="databaseConfigCard" style="border:2px solid rgba(239,68,68,0.3); background:rgba(239,68,68,0.05); border-radius:12px; padding:20px;">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+      <div class="config-status-icon config-status-icon--error">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+          <path d="M3 5v14c0 3 4.5 4 9 4s9-1 9-4V5"></path>
+          <line x1="15" y1="9" x2="9" y2="15"></line>
+          <line x1="9" y1="9" x2="15" y2="15"></line>
+        </svg>
+      </div>
+      <div style="flex:1;">
+        <h3 style="margin:0 0 4px 0; font-size:16px;">SQL Server Database</h3>
+        <p style="margin:0; font-size:12px; color:var(--muted);" id="databaseStatusText">Not Connected</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Setup Instructions -->
+<div style="max-height:500px; overflow-y:auto; padding-right:8px;">
+  
+  <!-- Database Setup -->
+  <div id="databaseSetupSection">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid var(--border);">
+      <div style="width:40px; height:40px; border-radius:12px; background:linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); display:flex; align-items:center; justify-content:center; color:white; font-weight:700; font-size:18px;">📊</div>
+      <h3 style="margin:0; font-size:18px;">SQL Server Database Connection</h3>
+    </div>
+
+    <div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:20px; margin-bottom:16px;">
+      <h4 style="margin:0 0 16px 0; font-size:14px; color:#3b82f6;">� Connect to SQL Server</h4>
+      <p style="margin:0 0 16px 0; font-size:13px; color:var(--muted);">Enter your SQL Server connection details below:</p>
+      
+      <div style="display:grid; gap:16px;">
+        <label class="label" style="margin:0;">
+          Server
+          <input type="text" id="dbConfigServer" class="input" placeholder="localhost or 192.168.1.100" value="localhost" />
+        </label>
+        
+        <label class="label" style="margin:0;">
+          Database Name
+          <input type="text" id="dbConfigDatabase" class="input" placeholder="OrbisHub" value="OrbisHub" />
+        </label>
+        
+        <label class="label" style="margin:0;">
+          Authentication
+          <select id="dbConfigAuthType" class="input" style="padding:10px;">
+            <option value="windows">Windows Authentication</option>
+            <option value="sql">SQL Server Authentication</option>
+          </select>
+        </label>
+        
+        <div id="sqlAuthFields" style="display:none; grid-column:1/-1;">
+          <div style="display:grid; gap:16px;">
+            <label class="label" style="margin:0;">
+              Username
+              <input type="text" id="dbConfigUser" class="input" placeholder="sa" />
+            </label>
+            
+            <label class="label" style="margin:0;">
+              Password
+              <input type="password" id="dbConfigPassword" class="input" placeholder="Your SQL password" />
+            </label>
+          </div>
+        </div>
+        
+        <label style="display:flex; align-items:center; gap:8px; margin:0; cursor:pointer;">
+          <input type="checkbox" id="dbConfigEncrypt" checked style="width:16px; height:16px; cursor:pointer;" />
+          <span style="font-size:13px; color:var(--text);">Encrypt connection</span>
+        </label>
+        
+        <label style="display:flex; align-items:center; gap:8px; margin:0; cursor:pointer;">
+          <input type="checkbox" id="dbConfigTrustCert" checked style="width:16px; height:16px; cursor:pointer;" />
+          <span style="font-size:13px; color:var(--text);">Trust server certificate</span>
+        </label>
+      </div>
+      
+      <div style="display:flex; gap:12px; margin-top:20px;">
+        <button type="button" class="btn btn-primary" id="testDbConnectionBtn" style="flex:1;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          Test Connection
+        </button>
+        <button type="button" class="btn btn-success" id="saveDbConfigBtn" style="flex:1; background:linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+            <polyline points="7 3 7 8 15 8"></polyline>
+          </svg>
+          Save Config
+        </button>
+        <button type="button" class="btn btn-primary" id="createDatabaseBtn" style="flex:1; background:linear-gradient(135deg, #10b981 0%, #059669 100%);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;">
+            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+            <path d="M3 5v14c0 3 4.5 4 9 4s9-1 9-4V5"></path>
+          </svg>
+          Create Database
+        </button>
+      </div>
+      
+      <div id="dbConnectionResult" style="margin-top:16px; padding:12px; border-radius:6px; display:none; font-size:13px;">
+        <!-- Result message will be shown here -->
+      </div>
+    </div>
+
+    <div style="background:linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(29,78,216,0.05) 100%); border:1px solid rgba(59,130,246,0.3); border-radius:8px; padding:16px;">
+      <h4 style="margin:0 0 12px 0; font-size:14px; color:#3b82f6;">💡 Need SQL Server?</h4>
+      <p style="margin:0 0 8px 0; font-size:13px; color:var(--muted);">If you don't have SQL Server installed:</p>
+      <ul style="margin:0; padding-left:20px; font-size:13px; color:var(--muted);">
+        <li style="margin-bottom:6px;"><strong>SQL Server Express</strong> - Free, lightweight version</li>
+        <li style="margin-bottom:0;"><strong>SQL Server Developer</strong> - Full features, free for dev/test</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+
+<!-- Quick Actions -->
+<div style="border-top:2px solid var(--border); padding-top:20px; margin-top:24px; display:flex; gap:12px; justify-content:flex-end;">
+  <button type="button" class="btn btn-ghost" onclick="window.open('https://www.microsoft.com/sql-server/sql-server-downloads', '_blank')">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;">
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+      <polyline points="15 3 21 3 21 9"></polyline>
+      <line x1="10" y1="14" x2="21" y2="3"></line>
+    </svg>
+    Download SQL Server
+  </button>
+  <button type="submit" value="close" class="btn btn-primary">Done</button>
+</div>
+
+</form>
+</dialog>
+
+<!-- Socket.IO removed for desktop app -->
+<script src="app.js"></script><script src="app-main.js"></script>
+</body>
+</html>
+
