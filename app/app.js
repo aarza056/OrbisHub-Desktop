@@ -534,14 +534,33 @@ async function handleElectronAPI(url, options) {
                     if (!currentUserId || !otherUserId) {
                         result = { success: false, error: 'Missing user ids' };
                     } else {
-                        const q = await window.electronAPI.dbQuery(
-                            `SELECT Id, SenderId, RecipientId, Content, SentAt, [Read] FROM Messages
-                             WHERE (SenderId = @param0 AND RecipientId = @param1)
-                                OR (SenderId = @param1 AND RecipientId = @param0)
-                             ORDER BY SentAt ASC`,
-                            [{ value: currentUserId }, { value: otherUserId }]
-                        );
-                        result = q.success ? q.data : [];
+                        // Normalize IDs to strings to avoid type/whitespace mismatches
+                        const curId = String(currentUserId).trim()
+                        const othId = String(otherUserId).trim()
+
+                        let q
+                        if (curId === othId) {
+                            // Self-DM: include messages to self and any legacy self-notes with NULL recipient
+                            console.log('[MessagesAPI] Fetch self-DM', { userId: curId })
+                            q = await window.electronAPI.dbQuery(
+                                `SELECT Id, SenderId, RecipientId, Content, SentAt, [Read] FROM Messages
+                                 WHERE SenderId = @param0 AND (RecipientId = @param0 OR RecipientId IS NULL)
+                                 ORDER BY SentAt ASC`,
+                                [{ value: curId }]
+                            )
+                        } else {
+                            console.log('[MessagesAPI] Fetch DM pair', { currentUserId: curId, otherUserId: othId })
+                            q = await window.electronAPI.dbQuery(
+                                `SELECT Id, SenderId, RecipientId, Content, SentAt, [Read] FROM Messages
+                                 WHERE (SenderId = @param0 AND RecipientId = @param1)
+                                    OR (SenderId = @param1 AND RecipientId = @param0)
+                                 ORDER BY SentAt ASC`,
+                                [{ value: curId }, { value: othId }]
+                            )
+                        }
+                        const rows = q.success && Array.isArray(q.data) ? q.data : []
+                        console.log('[MessagesAPI] Rows returned:', { count: rows.length })
+                        result = rows;
                     }
                 } else if (endpoint === 'messages/read' && options.method === 'PUT') {
                     await ensureMessagesTable()

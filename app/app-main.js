@@ -5492,6 +5492,12 @@ async function showView(name, updateUrl = true) {
         window.history.pushState({ view: actual }, '', url)
     }
     
+    // Stop polling when leaving Messages view
+    if (actual !== 'messages') {
+        stopConversationPolling()
+        stopUnreadPolling()
+    }
+
     // Auto-refresh data from database when switching views
     try {
         console.log(`🔄 Auto-refreshing data for view: ${actual}`)
@@ -5562,6 +5568,12 @@ async function showView(name, updateUrl = true) {
                 // Load messaging view with users and conversations
                 await initializeMessagingView()
                 console.log('✅ Messaging view initialized')
+                // Start unread polling and conversation polling if already selected
+                startUnreadPolling()
+                try { loadUnreadCount() } catch {}
+                if (window.currentChatUserId) {
+                    startConversationPolling(window.currentChatUserId)
+                }
                 break
         }
     } catch (error) {
@@ -5637,6 +5649,12 @@ function handleUrlAction(view, action, id) {
         }
     }, 100)
 }
+
+// Clean up polling timers on unload
+window.addEventListener('beforeunload', () => {
+    stopConversationPolling()
+    stopUnreadPolling()
+})
 
 // Wire navigation buttons to views
 document.querySelectorAll('.nav__btn').forEach(btn => {
@@ -8582,6 +8600,11 @@ let currentChatUserId = null
 let onlineUsers = new Set()
 let typingTimeout = null
 let messagingInitialized = false
+// Polling timers for "realtime" updates without Socket.IO
+let conversationPoller = null
+let conversationPollUserId = null
+let conversationPollInFlight = false
+let unreadPoller = null
 
 // Helper function to get current user ID
 function getCurrentUserId() {
@@ -8734,6 +8757,49 @@ function openMessagesModal() {
     if (modal) {
         modal.showModal()
         loadConversations()
+    }
+}
+
+// Start polling unread counts
+function startUnreadPolling(intervalMs = 5000) {
+    stopUnreadPolling()
+    unreadPoller = setInterval(() => {
+        try { loadUnreadCount() } catch {}
+    }, intervalMs)
+}
+
+function stopUnreadPolling() {
+    if (unreadPoller) {
+        clearInterval(unreadPoller)
+        unreadPoller = null
+    }
+}
+
+// Start polling an active conversation
+function startConversationPolling(userId, intervalMs = 3000) {
+    if (!userId) return
+    if (conversationPollUserId === userId && conversationPoller) return
+    stopConversationPolling()
+    conversationPollUserId = userId
+    conversationPoller = setInterval(async () => {
+        if (conversationPollInFlight) return
+        conversationPollInFlight = true
+        try {
+            await loadMessagesForNewView(userId, { preserveWhenEmpty: true })
+            await markMessagesAsRead(userId)
+        } catch (e) {
+            // ignore transient errors
+        } finally {
+            conversationPollInFlight = false
+        }
+    }, intervalMs)
+}
+
+function stopConversationPolling() {
+    if (conversationPoller) {
+        clearInterval(conversationPoller)
+        conversationPoller = null
+        conversationPollUserId = null
     }
 }
 
@@ -8972,7 +9038,7 @@ async function initializeMessagingView() {
             const users = result.data.users || []
             
             // Filter out current user (check both id and Id fields)
-            const otherUsers = users.filter(u => {
+            let otherUsers = users.filter(u => {
                 const userId = u.id || u.Id
                 return userId !== currentUserId
             })
@@ -8980,8 +9046,21 @@ async function initializeMessagingView() {
             console.log(`📨 Current user ID: ${currentUserId}`)
             console.log(`📨 Total users: ${users.length}, Other users: ${otherUsers.length}`)
             
+            // If no other users exist, allow "Notes to self" conversation for testing
+            if (otherUsers.length === 0) {
+                otherUsers = [{ id: currentUserId, name: 'You (self)', username: 'self', isActive: true }]
+            }
+            
             // Render users in Direct Messages list
             renderDirectMessagesList(otherUsers)
+            
+            // Auto-open first conversation to avoid empty state
+            if (otherUsers.length > 0) {
+                openConversation(otherUsers[0])
+            } else {
+                // No recipients, ensure send UI is disabled
+                updateSendButtonState(false)
+            }
             
             console.log(`✅ Loaded ${otherUsers.length} users for messaging`)
         }
@@ -9008,9 +9087,14 @@ function renderDirectMessagesList(users) {
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                 </svg>
                 <p>No users available</p>
-                <small>Add users to start messaging</small>
+                <small>Add a user in Users / Permissions</small>
+                <div style="margin-top:12px;">
+                    <button id="messagesGoToUsersBtn" class="btn btn-ghost">Go to Users</button>
+                </div>
             </div>
         `
+        const goBtn = document.getElementById('messagesGoToUsersBtn')
+        if (goBtn) goBtn.addEventListener('click', () => showView('admin-users'))
         return
     }
     
@@ -9062,6 +9146,8 @@ function getUserInitials(name) {
 
 // Open a conversation with a user
 async function openConversation(user, e) {
+    // Set recipient immediately so send works even before load completes
+    window.currentChatUserId = user.id || user.Id
     // Update active state
     document.querySelectorAll('.conversation-item').forEach(item => {
         item.classList.remove('active')
@@ -9086,13 +9172,23 @@ async function openConversation(user, e) {
         if (user.isActive) statusDot.classList.add('online')
     }
     
-    // Load messages with this user
-    await loadMessagesForNewView(user.id)
+    // Enable send UI immediately, then load conversation
+    updateSendButtonState(true)
+    const session = getSession()
+    const currentUserId = session?.id || session?.Id || null
+    // Preserve optimistic UI when opening self-DM to avoid flicker/clears
+    const preserve = currentUserId && (String(user.id || user.Id) === String(currentUserId))
+    await loadMessagesForNewView(user.id || user.Id, { preserveWhenEmpty: preserve })
+    // Start polling for this conversation and mark as read
+    startConversationPolling(user.id || user.Id)
+    await markMessagesAsRead(user.id || user.Id)
+    loadUnreadCount()
 }
 
 // Load messages for the new view
-async function loadMessagesForNewView(userId) {
+async function loadMessagesForNewView(userId, opts = {}) {
     try {
+        const preserveWhenEmpty = !!opts.preserveWhenEmpty
         const session = getSession()
         const currentUserId = session?.id || session?.Id || null
         
@@ -9102,16 +9198,23 @@ async function loadMessagesForNewView(userId) {
         }
         
         const response = await fetch(`${API_BASE_URL}/api/messages/${currentUserId}?otherUserId=${userId}`)
+        console.log('[MessagesUI] Fetching messages', { currentUserId, otherUserId: userId })
         let messages = await response.json()
         if (!Array.isArray(messages)) {
             messages = Array.isArray(messages?.data) ? messages.data : []
         }
+        console.log('[MessagesUI] Messages returned', { count: messages.length })
         
         const container = document.getElementById('messagesChatBody')
         if (!container) return
-        
+
+        if (messages.length === 0 && preserveWhenEmpty) {
+            // Avoid clearing the optimistic UI; just bail out
+            return
+        }
+
         container.innerHTML = ''
-        
+
         // Group messages by date and render
         renderMessagesGrouped(messages, container, currentUserId)
         
@@ -9265,6 +9368,9 @@ function setupMessagingEventListeners() {
             const newHeight = Math.min(textarea.scrollHeight, 120)
             textarea.style.height = newHeight + 'px'
         })
+        
+        // Initialize disabled state until a conversation is selected
+        updateSendButtonState(!!window.currentChatUserId)
     }
     
     // New message button
@@ -9277,12 +9383,30 @@ function setupMessagingEventListeners() {
     }
 }
 
+// Enable/disable send button and input based on conversation selection
+function updateSendButtonState(enabled) {
+    const sendBtn = document.getElementById('messagesSendBtn')
+    const textarea = document.getElementById('messagesTextarea')
+    if (sendBtn) {
+        sendBtn.disabled = !enabled
+        sendBtn.title = enabled ? 'Send message' : 'Select a conversation first'
+    }
+    if (textarea) {
+        textarea.disabled = !enabled
+        textarea.placeholder = enabled ? 'Type a message...' : 'Select a conversation to start messaging'
+    }
+}
+
 // Send message from new view
 async function sendMessageFromNewView() {
     const textarea = document.getElementById('messagesTextarea')
-    const content = textarea?.value.trim()
+    const content = textarea?.value?.trim()
     
-    if (!content || !window.currentChatUserId) return
+    if (!window.currentChatUserId) {
+        showToast('Select a conversation first')
+        return
+    }
+    if (!content) return
     
     const session = getSession()
     const currentUserId = session?.id || session?.Id || null
@@ -9317,22 +9441,18 @@ async function sendMessageFromNewView() {
             textarea.value = ''
             textarea.style.height = 'auto'
             
-            // Add message to UI immediately (for sender)
+            // Optimistically append to UI, then refresh from DB
             const container = document.getElementById('messagesChatBody')
             if (container) {
-                // Check if we should group with previous message
                 const lastGroup = container.querySelector('.message-group:last-child')
                 const shouldGroup = lastGroup && lastGroup.classList.contains('own')
-                
                 if (shouldGroup) {
-                    // Add to existing group
                     const lastContent = lastGroup.querySelector('.message-group-content')
                     const newBubble = document.createElement('div')
                     newBubble.className = 'message-bubble'
-                    newBubble.textContent = content
+                    newBubble.innerHTML = escapeHtml(content)
                     lastContent.appendChild(newBubble)
                 } else {
-                    // Create new group
                     const messageGroup = document.createElement('div')
                     messageGroup.className = 'message-group own'
                     messageGroup.innerHTML = `
@@ -9347,10 +9467,15 @@ async function sendMessageFromNewView() {
                     `
                     container.appendChild(messageGroup)
                 }
-                
-                // Scroll to bottom
                 container.scrollTop = container.scrollHeight
             }
+            // Then refresh from DB to keep UI consistent, but don’t wipe optimistic UI if empty
+            if (window.currentChatUserId) {
+                await new Promise(r => setTimeout(r, 300))
+                await loadMessagesForNewView(window.currentChatUserId, { preserveWhenEmpty: true })
+            }
+            // Update unread badge for sender view as well
+            loadUnreadCount()
         } else {
             console.error('❌ Server returned error:', result)
             showToast('Failed to send message')
@@ -9511,7 +9636,8 @@ async function loadUnreadCount() {
         const response = await fetch(`${API_BASE_URL}/api/messages/unread/${userId}`)
         const data = await response.json()
         
-        const badge = document.getElementById('unreadMessagesBadge')
+        // Topbar badge id is 'navUnreadBadge'
+        const badge = document.getElementById('navUnreadBadge')
         if (!badge) return
         
         if (data.unreadCount > 0) {
