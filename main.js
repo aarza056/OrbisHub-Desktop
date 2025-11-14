@@ -186,6 +186,26 @@ ipcMain.handle('rdp-connect', async (event, { server, credential, rdpContent }) 
     }
 });
 
+// Test server connectivity (RDP port 3389 by default)
+ipcMain.handle('test-server', async (event, { ipAddress, serverName, port = 3389 }) => {
+    try {
+        const isWindows = process.platform === 'win32';
+        const cmd = isWindows
+            ? `powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Test-NetConnection -ComputerName '${ipAddress}' -Port ${port} -InformationLevel Quiet -WarningAction SilentlyContinue; if ($r) { 'True' } else { 'False' } } catch { 'False' }"`
+            : `nc -z -w 2 ${ipAddress} ${port} && echo True || echo False`;
+
+        return await new Promise((resolve) => {
+            exec(cmd, { timeout: 7000 }, (error, stdout) => {
+                const out = (stdout || '').toString().trim();
+                const reachable = /true/i.test(out);
+                resolve({ success: true, reachable, message: reachable ? 'Reachable' : 'Unreachable', debug: { stdout: out } });
+            });
+        });
+    } catch (error) {
+        return { success: false, reachable: false, error: error.message };
+    }
+});
+
 // Database Configuration
 ipcMain.handle('db-get-config', async () => {
     const config = loadDbConfig();

@@ -129,14 +129,25 @@ async function handleElectronAPI(url, options) {
                                     color: e.color || '#3b82f6'
                                 };
                             }) : [],
-                            credentials: credentials.success && credentials.data ? credentials.data.map(c => ({
-                                id: c.id,
-                                name: c.name,
-                                username: c.username,
-                                password: c.password,
-                                domain: c.domain || '',
-                                description: c.description || ''
-                            })) : [],
+                            credentials: credentials.success && credentials.data ? credentials.data.map(c => {
+                                let extra = {};
+                                try {
+                                    if (typeof c.description === 'string' && c.description.trim().startsWith('{')) {
+                                        extra = JSON.parse(c.description);
+                                    }
+                                } catch (err) {
+                                    // ignore parse errors
+                                }
+                                return {
+                                    id: c.id,
+                                    name: c.name,
+                                    username: c.username,
+                                    password: c.password,
+                                    domain: c.domain || '',
+                                    type: extra.type || 'Username/Password',
+                                    description: (typeof c.description === 'string' && !c.description.trim().startsWith('{')) ? (c.description || '') : (extra.note || '')
+                                };
+                            }) : [],
                             scripts: scripts.success && scripts.data ? scripts.data.map(s => ({
                                 id: s.id,
                                 name: s.name,
@@ -161,6 +172,14 @@ async function handleElectronAPI(url, options) {
                     };
                 } catch (error) {
                     result = { success: false, error: error.message };
+                }
+                break;
+            
+            case 'test-server':
+                if (window.electronAPI && window.electronAPI.testServer) {
+                    result = await window.electronAPI.testServer(body.ipAddress, body.serverName, body.port || 3389);
+                } else {
+                    result = { success: true, reachable: true, message: 'Assumed reachable (no backend)' };
                 }
                 break;
                 
@@ -226,6 +245,7 @@ async function handleElectronAPI(url, options) {
                     // Sync credentials
                     if (credentials && credentials.length > 0) {
                         for (const cred of credentials) {
+                            const descJson = JSON.stringify({ type: cred.type || 'Username/Password', note: cred.description || '' });
                             await window.electronAPI.dbExecute(
                                 `IF EXISTS (SELECT 1 FROM Credentials WHERE id = @param0)
                                     UPDATE Credentials SET name = @param1, username = @param2, password = @param3, domain = @param4, description = @param5 WHERE id = @param0
@@ -237,7 +257,7 @@ async function handleElectronAPI(url, options) {
                                     { value: cred.username },
                                     { value: cred.password },
                                     { value: cred.domain || '' },
-                                    { value: cred.description || '' }
+                                    { value: descJson }
                                 ]
                             );
                         }

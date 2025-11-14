@@ -17,6 +17,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     dbQuery: (query, params) => ipcRenderer.invoke('db-query', query, params),
     dbExecute: (query, params) => ipcRenderer.invoke('db-execute', query, params),
     
+    // Server utilities
+    testServer: (ipAddress, serverName, port = 3389) => 
+        ipcRenderer.invoke('test-server', { ipAddress, serverName, port }),
+    
     // System info
     getLocalIP: () => ipcRenderer.invoke('get-local-ip'),
     

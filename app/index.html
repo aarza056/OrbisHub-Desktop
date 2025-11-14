@@ -957,6 +957,105 @@
   <div id="credentialList" class="grid"></div>
 </section>
 
+<!-- Credentials: Add Modal -->
+<dialog id="credentialModal" class="modal">
+  <form method="dialog" class="card">
+    <button type="submit" value="cancel" class="modal-close-btn" title="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+    <h2>Add Credential</h2>
+    <label class="label">Name
+      <input id="credName" class="input" placeholder="e.g., Prod RDP" required />
+    </label>
+    <label class="label">Type
+      <select id="credType" class="input">
+        <option value="Username/Password">Username/Password</option>
+      </select>
+    </label>
+    <label class="label">Username
+      <input id="credUsername" class="input" placeholder="DOMAIN\\user or user" />
+    </label>
+    <label class="label">Password
+      <input id="credPassword" type="password" class="input" placeholder="••••••••" />
+    </label>
+    <label class="label">Description
+      <input id="credDescription" class="input" placeholder="Optional" />
+    </label>
+    <menu class="row end">
+      <button id="saveCredBtn" type="submit" value="default" class="btn">Save Credential</button>
+    </menu>
+  </form>
+  </dialog>
+
+<!-- Credentials: Edit Modal -->
+<dialog id="editCredentialModal" class="modal">
+  <form method="dialog" class="card">
+    <button type="submit" value="cancel" class="modal-close-btn" title="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+    <h2>Edit Credential</h2>
+    <input type="hidden" id="editCredId" />
+    <label class="label">Name
+      <input id="editCredName" class="input" required />
+    </label>
+    <label class="label">Type
+      <select id="editCredType" class="input">
+        <option value="Username/Password">Username/Password</option>
+      </select>
+    </label>
+    <label class="label">Username
+      <input id="editCredUsername" class="input" />
+    </label>
+    <label class="label">Password (leave blank to keep)
+      <input id="editCredPassword" type="password" class="input" placeholder="••••••••" />
+    </label>
+    <label class="label">Description
+      <input id="editCredDescription" class="input" />
+    </label>
+    <menu class="row end">
+      <button id="saveEditCredBtn" type="submit" value="default" class="btn">Save Changes</button>
+    </menu>
+  </form>
+  </dialog>
+
+<!-- Credentials: Delete Confirmation Modal -->
+<dialog id="deleteCredentialModal" class="modal">
+  <form method="dialog" class="card" style="max-width:560px;">
+    <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px;">
+      <div style="width:48px; height:48px; border-radius:12px; background:rgba(239,68,68,0.1); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+      </div>
+      <div style="flex:1;">
+        <h2 style="margin:0 0 4px 0;">Delete Credential?</h2>
+        <p class="muted" style="margin:0; font-size:14px;">This will unassign the credential from all servers and environments.</p>
+      </div>
+    </div>
+    <div style="background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:16px;">
+      <div style="font-size:13px; color:var(--muted); margin-bottom:8px;">Credential</div>
+      <div style="font-weight:600;" id="deleteCredName">-</div>
+      <div style="display:flex; gap:16px; margin-top:12px; font-size:13px;">
+        <div>Servers using: <strong id="deleteCredUsageServers">0</strong></div>
+        <div>Environments using: <strong id="deleteCredUsageEnvs">0</strong></div>
+      </div>
+      <div id="deleteCredUsageDetails" style="margin-top:8px; max-height:140px; overflow:auto; font-size:12px; color:var(--muted);"></div>
+    </div>
+    <menu class="row end">
+      <button value="cancel" class="btn btn-ghost">Cancel</button>
+      <button id="confirmDeleteCredBtn" type="submit" value="default" class="btn btn-danger">Delete Credential</button>
+    </menu>
+  </form>
+  </dialog>
+
 <!-- Admin Audit Logs -->
 <section id="view-admin-audit" class="view">
   <div class="view__header">

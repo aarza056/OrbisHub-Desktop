@@ -1734,8 +1734,8 @@ function renderIntegrations(filter = '') {
             el.querySelectorAll('button[data-action]').forEach(b => b.addEventListener('click', (ev) => {
                 const id = b.dataset.id
                 const action = b.dataset.action
-                // [Removed - database-only architecture]
-                const integration = db2.integrations.find(x => x.id === id)
+                const db = store.readSync()
+                const integration = (db.integrations || []).find(x => x.id === id)
                 if (integration) onIntegrationAction(integration, action, b)
             }))
             
@@ -2019,9 +2019,9 @@ async function renderCredentials(filter = '') {
             el.querySelectorAll('button[data-action]').forEach(b => b.addEventListener('click', (ev) => {
                 const id = b.dataset.id
                 const action = b.dataset.action
-                // [Removed - database-only architecture]
-                const credential = db2.credentials.find(x => x.id === id)
-                if (credential) onCredentialAction(credential, action)
+                const db = store.readSync()
+                const cred = (db.credentials || []).find(x => x.id === id)
+                if (cred) onCredentialAction(cred, action)
             }))
             
             credListEl.appendChild(el)
@@ -2033,6 +2033,28 @@ function onCredentialAction(credential, action) {
         openEditCredential(credential)
     } else if (action === 'delete') {
         credentialToDelete = credential
+        const db = store.readSync()
+        const serversUsing = (db.servers || []).filter(s => s.credentialId === credential.id)
+        const envsUsing = (db.environments || []).filter(e => e.deployerId === credential.id)
+
+        const nameEl = document.getElementById('deleteCredName')
+        const sCount = document.getElementById('deleteCredUsageServers')
+        const eCount = document.getElementById('deleteCredUsageEnvs')
+        const details = document.getElementById('deleteCredUsageDetails')
+
+        if (nameEl) nameEl.textContent = credential.name || '(unnamed)'
+        if (sCount) sCount.textContent = String(serversUsing.length)
+        if (eCount) eCount.textContent = String(envsUsing.length)
+        if (details) {
+            if (serversUsing.length === 0 && envsUsing.length === 0) {
+                details.innerHTML = '<em>No current assignments.</em>'
+            } else {
+                const serverItems = serversUsing.map(s => `<li>Server: ${s.displayName || s.name || s.hostname || s.ipAddress}</li>`).join('')
+                const envItems = envsUsing.map(env => `<li>Environment: ${env.name} (deployer)</li>`).join('')
+                details.innerHTML = `<ul style="margin:0 0 8px 16px;">${serverItems}${envItems}</ul>`
+            }
+        }
+
         try {
             deleteCredentialModal.showModal()
         } catch (e) {
@@ -2988,7 +3010,7 @@ if (envForm) {
                 url, 
                 type, 
                 health: 'ok',
-                deployerCredentialId: deployerId || null,
+                deployerId: deployerId || null,
                 mappedServers: []
             }
             
@@ -3694,7 +3716,54 @@ if (confirmDeleteCredBtn) {
                 
                 console.log('🗑️ Deleting credential:', credName, 'ID:', credId)
                 
-                // Delete from database FIRST
+                // 1) Unassign credential from servers and environments first (to satisfy FK constraints)
+                const updatedServers = []
+                const updatedEnvs = []
+                if (Array.isArray(db.servers)) {
+                    db.servers.forEach(s => {
+                        if (s.credentialId === credId) {
+                            s.credentialId = null
+                            updatedServers.push({ ...s })
+                        }
+                    })
+                }
+                if (Array.isArray(db.environments)) {
+                    db.environments.forEach(env => {
+                        if (env.deployerId === credId) {
+                            env.deployerId = null
+                            updatedEnvs.push({ ...env })
+                        }
+                    })
+                }
+
+                // If in use, persist the reference clear before deleting the row
+                if (updatedServers.length > 0 || updatedEnvs.length > 0) {
+                    try {
+                        console.log('🔄 Clearing credential references in DB...', { servers: updatedServers.length, environments: updatedEnvs.length })
+                        const syncRes = await fetch(`${API_BASE_URL}/api/sync-data`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                servers: updatedServers,
+                                environments: updatedEnvs
+                            })
+                        })
+                        const syncJson = await syncRes.json()
+                        if (!syncJson.success) {
+                            console.error('❌ Could not clear references before delete:', syncJson.error)
+                            alert('Failed to clear references before delete. Please try again.')
+                            closeDeleteCredentialModal()
+                            return
+                        }
+                    } catch (syncErr) {
+                        console.error('❌ Failed to clear references before delete:', syncErr)
+                        alert('Failed to clear references before delete: ' + (syncErr?.message || syncErr))
+                        closeDeleteCredentialModal()
+                        return
+                    }
+                }
+
+                // 2) Now delete the credential row
                 console.log('📡 Calling deleteFromDatabase...')
                 try {
                     const result = await store.deleteFromDatabase('credential', credId)
@@ -3714,10 +3783,10 @@ if (confirmDeleteCredBtn) {
                     closeDeleteCredentialModal()
                     return // Stop if database delete failed
                 }
-                
-                
+
+                // 3) Update local store after DB delete
                 db.credentials.splice(idx, 1)
-                store.write(db, true) // Skip sync - we already deleted from DB
+                store.write(db, true) // Skip sync - DB already updated
                 
                 // Credential deleted from database
                 
@@ -3727,9 +3796,9 @@ if (confirmDeleteCredBtn) {
                     const reloadResponse = await fetch(`${API_BASE_URL}/api/load-data`)
                     const reloadData = await reloadResponse.json()
                     if (reloadData.success && reloadData.data && reloadData.data.credentials) {
-                        // [Removed - database-only architecture]
-                        freshDb.credentials = reloadData.data.credentials
-                        store.write(freshDb, true) // Skip sync - we just loaded from DB
+                        const dbReload = store.readSync()
+                        dbReload.credentials = reloadData.data.credentials
+                        store.write(dbReload, true)
                         console.log('✅ Credentials reloaded from database')
                     }
                 } catch (reloadError) {
@@ -3741,6 +3810,9 @@ if (confirmDeleteCredBtn) {
                 
                 // Re-render from database
                 await renderCredentials()
+                renderServers()
+                renderEnvs(document.getElementById('search')?.value || '')
+                populateDeployerDropdowns()
             }
         }
         closeDeleteCredentialModal()
