@@ -42,6 +42,15 @@ function createWindow() {
 
     mainWindow.loadFile('app/index.html');
 
+    // Open DevTools with F12 or Ctrl+Shift+I (for debugging in production)
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+        if (input.type === 'keyDown' && 
+            ((input.key === 'F12') || 
+             (input.control && input.shift && input.key === 'I'))) {
+            mainWindow.webContents.toggleDevTools();
+        }
+    });
+
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
     });
@@ -1079,23 +1088,39 @@ function initializeAutoUpdater() {
     autoUpdater.autoDownload = false; // Don't auto-download, let user decide
     autoUpdater.autoInstallOnAppQuit = true;
     
+    // Enable detailed logging
+    autoUpdater.logger = require('electron-log');
+    autoUpdater.logger.transports.file.level = 'info';
+    
+    console.log('🔄 Auto-updater initialized');
+    console.log('📦 Current version:', app.getVersion());
+    console.log('🔍 Update feed URL:', `https://github.com/aarza056/OrbisHub-Desktop/releases`);
+    
     // Check for updates on startup (after 3 seconds)
     setTimeout(() => {
-        autoUpdater.checkForUpdates();
+        console.log('⏰ Starting update check...');
+        autoUpdater.checkForUpdates().catch(err => {
+            console.error('❌ Update check failed:', err);
+        });
     }, 3000);
     
     // Check for updates every 4 hours
     setInterval(() => {
-        autoUpdater.checkForUpdates();
+        console.log('⏰ Periodic update check...');
+        autoUpdater.checkForUpdates().catch(err => {
+            console.error('❌ Update check failed:', err);
+        });
     }, 4 * 60 * 60 * 1000);
     
     // Update events
     autoUpdater.on('checking-for-update', () => {
-        console.log('Checking for updates...');
+        console.log('🔍 Checking for updates...');
     });
     
     autoUpdater.on('update-available', (info) => {
-        console.log('Update available:', info.version);
+        console.log('✅ Update available:', info.version);
+        console.log('📋 Release date:', info.releaseDate);
+        console.log('📝 Release notes:', info.releaseNotes);
         mainWindow.webContents.send('update-available', {
             version: info.version,
             releaseDate: info.releaseDate,
@@ -1104,7 +1129,10 @@ function initializeAutoUpdater() {
     });
     
     autoUpdater.on('update-not-available', (info) => {
-        console.log('No updates available');
+        console.log('ℹ️ No updates available. Current version is the latest:', info.version);
+        mainWindow.webContents.send('update-not-available', {
+            version: info.version
+        });
     });
     
     autoUpdater.on('error', (err) => {

@@ -53,6 +53,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onUpdateAvailable: (callback) => {
         ipcRenderer.on('update-available', (event, data) => callback(data));
     },
+    onUpdateNotAvailable: (callback) => {
+        ipcRenderer.on('update-not-available', (event, data) => callback(data));
+    },
     onUpdateDownloadProgress: (callback) => {
         ipcRenderer.on('update-download-progress', (event, data) => callback(data));
     },

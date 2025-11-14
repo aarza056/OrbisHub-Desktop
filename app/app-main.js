@@ -10902,11 +10902,29 @@ function initializeAutoUpdater() {
     const updateProgressFill = document.getElementById('updateProgressFill')
     const updateProgressText = document.getElementById('updateProgressText')
     
+    // Update status button elements
+    const updateStatusBtn = document.getElementById('updateStatusBtn')
+    const updateStatusText = document.getElementById('updateStatusText')
+    const updateStatusBadge = document.getElementById('updateStatusBadge')
+    
     let currentUpdateInfo = null
+    let isUpdateDownloaded = false
+    
+    // Set initial status
+    updateStatusText.textContent = 'Checking...'
     
     // Listen for update available
     window.electronAPI.onUpdateAvailable((info) => {
         currentUpdateInfo = info
+        
+        // Update button status
+        updateStatusBtn.classList.remove('is-uptodate')
+        updateStatusBtn.classList.add('is-update-available')
+        updateStatusText.textContent = 'Update Available'
+        updateStatusBadge.textContent = '+1'
+        updateStatusBadge.style.display = 'inline-flex'
+        
+        // Show notification
         updateTitle.textContent = `Update Available: v${info.version}`
         updateMessage.textContent = 'A new version is ready to download'
         updateNotification.style.display = 'block'
@@ -10915,16 +10933,34 @@ function initializeAutoUpdater() {
         updateProgressBar.style.display = 'none'
     })
     
+    // Listen for no updates
+    window.electronAPI.onUpdateNotAvailable((info) => {
+        updateStatusBtn.classList.add('is-uptodate')
+        updateStatusBtn.classList.remove('is-update-available')
+        updateStatusText.textContent = 'Up to date'
+        updateStatusBadge.textContent = '✓'
+        updateStatusBadge.style.display = 'inline-flex'
+    })
+    
     // Listen for download progress
     window.electronAPI.onUpdateDownloadProgress((progress) => {
         updateProgressBar.style.display = 'block'
         updateProgressFill.style.width = `${progress.percent.toFixed(0)}%`
         updateProgressText.textContent = `${progress.percent.toFixed(0)}%`
         updateMessage.textContent = `Downloading update... (${formatBytes(progress.transferred)} / ${formatBytes(progress.total)})`
+        
+        // Update button status
+        updateStatusText.textContent = 'Downloading...'
     })
     
     // Listen for update downloaded
     window.electronAPI.onUpdateDownloaded((info) => {
+        isUpdateDownloaded = true
+        
+        // Update button status
+        updateStatusText.textContent = 'Ready to Install'
+        updateStatusBadge.textContent = '!'
+        
         updateTitle.textContent = 'Update Ready'
         updateMessage.textContent = `Version ${info.version} has been downloaded`
         updateProgressBar.style.display = 'none'
@@ -10934,12 +10970,42 @@ function initializeAutoUpdater() {
     
     // Listen for update errors
     window.electronAPI.onUpdateError((error) => {
-        updateTitle.textContent = 'Update Error'
-        updateMessage.textContent = error.message
-        updateDownloadBtn.style.display = 'inline-block'
-        updateDownloadBtn.textContent = 'Retry'
-        updateProgressBar.style.display = 'none'
+        console.error('Update error:', error)
+        
+        // If no updates, show up to date
+        if (error.message.includes('No published versions') || error.message.includes('404')) {
+            updateStatusBtn.classList.add('is-uptodate')
+            updateStatusBtn.classList.remove('is-update-available')
+            updateStatusText.textContent = 'Up to date'
+            updateStatusBadge.textContent = '✓'
+            updateStatusBadge.style.display = 'inline-flex'
+        } else {
+            updateStatusText.textContent = 'Check Failed'
+            updateTitle.textContent = 'Update Error'
+            updateMessage.textContent = error.message
+            updateDownloadBtn.style.display = 'inline-block'
+            updateDownloadBtn.textContent = 'Retry'
+            updateProgressBar.style.display = 'none'
+        }
     })
+    
+    // Update status button click handler
+    if (updateStatusBtn) {
+        updateStatusBtn.addEventListener('click', () => {
+            if (isUpdateDownloaded) {
+                // Install update
+                window.electronAPI.installUpdate()
+            } else if (currentUpdateInfo) {
+                // Show update notification
+                updateNotification.style.display = 'block'
+            } else {
+                // Manual check for updates
+                updateStatusText.textContent = 'Checking...'
+                updateStatusBadge.style.display = 'none'
+                window.electronAPI.checkForUpdates()
+            }
+        })
+    }
     
     // Dismiss button
     if (updateDismissBtn) {
