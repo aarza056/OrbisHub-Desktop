@@ -36,6 +36,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // File download
     downloadFile: (params) => ipcRenderer.invoke('download-file', params),
     
+    // Message notifications
+    startMessagePolling: (userId) => ipcRenderer.invoke('start-message-polling', userId),
+    stopMessagePolling: () => ipcRenderer.invoke('stop-message-polling'),
+    markMessagesRead: (currentUserId, otherUserId) => 
+        ipcRenderer.invoke('mark-messages-read', { currentUserId, otherUserId }),
+    onNewUnreadMessages: (callback) => {
+        ipcRenderer.on('new-unread-messages', (event, data) => callback(data));
+    },
+    
     // App info
     isElectron: true,
     platform: process.platform

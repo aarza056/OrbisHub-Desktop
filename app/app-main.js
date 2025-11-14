@@ -5871,6 +5871,12 @@ async function showApp() {
     // Initialize messaging system after DOM is ready
     // initMessaging() // Disabled - requires Socket.IO backend server
     
+    // Initialize real-time message notifications
+    initializeMessageNotifications()
+    
+    // Load initial unread count
+    loadUnreadCount()
+    
     // Check database connection status initially
     checkSystemConfiguration(false)
     
@@ -8669,8 +8675,15 @@ function initMessaging() {
             return
         }
         
-        // Update unread count
+        // Update unread count with animation
         loadUnreadCount()
+        
+        // Play notification sound (optional)
+        try {
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBi2Ezvnkh0AIEGGv7OOfWBALTqbj77ZjHAU3kNXxxnklByd5yOzgjUMJElux5+mlUQ8KRZ3d8L9uIQUrgMv1')
+            audio.volume = 0.3
+            audio.play().catch(() => {}) // Ignore if autoplay is blocked
+        } catch (e) {}
         
         // Check if we're in the new messages view
         const newViewContainer = document.getElementById('messagesChatBody')
@@ -9257,6 +9270,9 @@ async function loadMessagesForNewView(userId, opts = {}) {
         
         // Store current chat user
         window.currentChatUserId = userId
+        
+        // Mark messages as read
+        markConversationAsRead(userId)
         
     } catch (error) {
         console.error('[MessagesUI] Error loading messages:', error)
@@ -9918,14 +9934,23 @@ async function markMessagesAsRead(otherUserId) {
         const userId = getCurrentUserId()
         if (!userId) return
         
-        await fetch(`${API_BASE_URL}/api/messages/read`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                userId: userId,
-                otherUserId: otherUserId
+        // Use Electron IPC if available for instant update
+        if (window.electronAPI && window.electronAPI.markMessagesRead) {
+            await window.electronAPI.markMessagesRead(userId, otherUserId)
+        } else {
+            // Fallback to API
+            await fetch(`${API_BASE_URL}/api/messages/read`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: userId,
+                    otherUserId: otherUserId
+                })
             })
-        })
+        }
+        
+        // Update unread count
+        setTimeout(() => loadUnreadCount(), 300)
     } catch (error) {
         console.error('Error marking messages as read:', error)
     }
@@ -9940,15 +9965,16 @@ async function loadUnreadCount() {
         const response = await fetch(`${API_BASE_URL}/api/messages/unread/${userId}`)
         const data = await response.json()
         
-        // Topbar badge id is 'navUnreadBadge'
         const badge = document.getElementById('navUnreadBadge')
         if (!badge) return
         
         if (data.unreadCount > 0) {
             badge.textContent = data.unreadCount
-            badge.style.display = 'flex'
+            badge.style.display = 'inline-flex'
+            badge.style.animation = 'badge-pulse 2s ease-in-out infinite'
         } else {
             badge.style.display = 'none'
+            badge.style.animation = 'none'
         }
     } catch (error) {
         console.error('Error loading unread count:', error)
@@ -9979,6 +10005,58 @@ function showToast(message, type = 'info') {
         toast.style.animation = 'slideOut 0.3s ease'
         setTimeout(() => toast.remove(), 300)
     }, 3000)
+}
+
+// ==================== REAL-TIME MESSAGE NOTIFICATIONS ====================
+
+function initializeMessageNotifications() {
+    const session = getSession()
+    const userId = session?.id || session?.Id
+    
+    if (!userId || !window.electronAPI || !window.electronAPI.startMessagePolling) {
+        return
+    }
+    
+    // Start polling in main process
+    window.electronAPI.startMessagePolling(userId)
+    
+    // Listen for new message notifications from main process
+    window.electronAPI.onNewUnreadMessages((data) => {
+        // Update badge with new count
+        const badge = document.getElementById('navUnreadBadge')
+        if (badge && data.count > 0) {
+            badge.textContent = data.count
+            badge.style.display = 'inline-flex'
+            badge.style.animation = 'badge-pulse 2s ease-in-out infinite'
+            
+            // Play notification sound
+            try {
+                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBi2Ezvnkh0AIEGGv7OOfWBALTqbj77ZjHAU3kNXxxnklByd5yOzgjUMJElux5+mlUQ8KRZ3d8L9uIQUrgMv1')
+                audio.volume = 0.3
+                audio.play().catch(() => {})
+            } catch (e) {}
+        } else if (badge && data.count === 0) {
+            badge.style.display = 'none'
+            badge.style.animation = 'none'
+        }
+    })
+}
+
+// Mark messages as read when viewing a conversation
+async function markConversationAsRead(otherUserId) {
+    const session = getSession()
+    const currentUserId = session?.id || session?.Id
+    
+    if (!currentUserId || !otherUserId || !window.electronAPI || !window.electronAPI.markMessagesRead) {
+        return
+    }
+    
+    try {
+        await window.electronAPI.markMessagesRead(currentUserId, otherUserId)
+        setTimeout(() => loadUnreadCount(), 500)
+    } catch (error) {
+        console.error('Error marking messages as read:', error)
+    }
 }
 
 // ==================== CHANNELS FUNCTIONALITY ====================

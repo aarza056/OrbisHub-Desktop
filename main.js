@@ -15,6 +15,8 @@ let tray;
 let dbPool = null;
 let poolConnectPromise = null;
 let dbConfig = null;
+let messageCheckInterval = null;
+let lastCheckedMessageIds = new Set();
 
 // Config file paths (support legacy location under product name)
 const userDataDir = app.getPath('userData');
@@ -960,6 +962,114 @@ ipcMain.handle('download-file', async (event, { messageId, fileName }) => {
     }
 });
 
+// ==================== REAL-TIME MESSAGE NOTIFICATIONS ====================
+
+// Start checking for new unread messages periodically
+function startMessageNotificationPolling() {
+    if (messageCheckInterval) {
+        clearInterval(messageCheckInterval);
+    }
+    
+    // Check every 2 seconds for new messages
+    messageCheckInterval = setInterval(async () => {
+        try {
+            if (!dbPool || !mainWindow) return;
+            
+            // Query for unread messages that we haven't seen yet
+            const result = await dbPool.request().query(`
+                SELECT TOP 10 Id, SenderId, RecipientId, Content, SentAt, HasAttachment
+                FROM [dbo].[Messages]
+                WHERE [Read] = 0
+                ORDER BY SentAt DESC
+            `);
+            
+            if (result.recordset && result.recordset.length > 0) {
+                // Check for new messages we haven't notified about
+                const newMessages = result.recordset.filter(msg => !lastCheckedMessageIds.has(msg.Id));
+                
+                if (newMessages.length > 0) {
+                    console.log(`📬 Found ${newMessages.length} new unread message(s)`);
+                    
+                    // Add to checked set
+                    newMessages.forEach(msg => lastCheckedMessageIds.add(msg.Id));
+                    
+                    // Send notification to renderer
+                    mainWindow.webContents.send('new-unread-messages', {
+                        count: result.recordset.length,
+                        newMessages: newMessages
+                    });
+                }
+            } else {
+                // No unread messages, clear the checked set
+                lastCheckedMessageIds.clear();
+            }
+        } catch (error) {
+            console.error('Error checking for new messages:', error);
+        }
+    }, 2000); // Check every 2 seconds
+}
+
+// Stop message polling
+function stopMessageNotificationPolling() {
+    if (messageCheckInterval) {
+        clearInterval(messageCheckInterval);
+        messageCheckInterval = null;
+    }
+}
+
+// Start polling when renderer requests it
+ipcMain.handle('start-message-polling', async (event, userId) => {
+    console.log('🔔 Starting message notification polling for user:', userId);
+    startMessageNotificationPolling();
+    return { success: true };
+});
+
+// Stop polling
+ipcMain.handle('stop-message-polling', async () => {
+    console.log('🔕 Stopping message notification polling');
+    stopMessageNotificationPolling();
+    return { success: true };
+});
+
+// Mark messages as read
+ipcMain.handle('mark-messages-read', async (event, { currentUserId, otherUserId }) => {
+    try {
+        if (!dbPool) {
+            return { success: false, error: 'Database not connected' };
+        }
+        
+        // Mark all messages from otherUserId to currentUserId as read
+        await dbPool.request()
+            .input('currentUserId', sql.NVarChar, currentUserId)
+            .input('otherUserId', sql.NVarChar, otherUserId)
+            .query(`
+                UPDATE [dbo].[Messages]
+                SET [Read] = 1
+                WHERE LOWER(LTRIM(RTRIM(RecipientId))) = LOWER(LTRIM(RTRIM(@currentUserId)))
+                  AND LOWER(LTRIM(RTRIM(SenderId))) = LOWER(LTRIM(RTRIM(@otherUserId)))
+                  AND [Read] = 0
+            `);
+        
+        // Remove these message IDs from our checked set so we can track new ones
+        const messages = await dbPool.request()
+            .input('currentUserId', sql.NVarChar, currentUserId)
+            .input('otherUserId', sql.NVarChar, otherUserId)
+            .query(`
+                SELECT Id FROM [dbo].[Messages]
+                WHERE LOWER(LTRIM(RTRIM(RecipientId))) = LOWER(LTRIM(RTRIM(@currentUserId)))
+                  AND LOWER(LTRIM(RTRIM(SenderId))) = LOWER(LTRIM(RTRIM(@otherUserId)))
+            `);
+        
+        messages.recordset.forEach(msg => lastCheckedMessageIds.delete(msg.Id));
+        
+        console.log(`✅ Marked messages as read: ${currentUserId} <- ${otherUserId}`);
+        return { success: true };
+    } catch (error) {
+        console.error('Error marking messages as read:', error);
+        return { success: false, error: error.message };
+    }
+});
+
 // App lifecycle
 app.whenReady().then(async () => {
     await clearChromiumCaches();
@@ -980,6 +1090,8 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', async () => {
+    stopMessageNotificationPolling();
+    
     if (dbPool) {
         try {
             await dbPool.close();
