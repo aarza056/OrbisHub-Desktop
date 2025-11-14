@@ -1229,14 +1229,46 @@ simulate(job.id, durationMs)
 
 
 // Render servers (uses environments data)
-function renderServers() {
+function renderServers(filters = {}) {
 	const serversList = document.getElementById('serversList')
 	if (!serversList) return
 	const db = store.readSync()
-	const servers = db.servers || []
+	let servers = db.servers || []
+	
+	// Apply filters
+	const searchQuery = filters.search?.toLowerCase().trim() || ''
+	const environmentId = filters.environmentId || ''
+	const status = filters.status || ''
+	
+	if (searchQuery) {
+		servers = servers.filter(server => {
+			const matchesName = server.displayName?.toLowerCase().includes(searchQuery)
+			const matchesHostname = server.hostname?.toLowerCase().includes(searchQuery)
+			const matchesIP = server.ipAddress?.toLowerCase().includes(searchQuery)
+			const matchesGroup = server.serverGroup?.toLowerCase().includes(searchQuery)
+			return matchesName || matchesHostname || matchesIP || matchesGroup
+		})
+	}
+	
+	if (environmentId) {
+		servers = servers.filter(server => server.environmentId === environmentId)
+	}
+	
+	if (status) {
+		servers = servers.filter(server => {
+			if (status === 'active') return server.health === 'ok'
+			if (status === 'inactive') return server.health !== 'ok'
+			if (status === 'maintenance') return server.maintenance === true
+			return true
+		})
+	}
 	
 	if (servers.length === 0) {
-		serversList.innerHTML = '<p class="muted" style="text-align:center; padding:40px; grid-column: 1/-1;">No servers configured yet. Click "+ Add Server" to create one.</p>'
+		const hasFilters = searchQuery || environmentId || status
+		const message = hasFilters 
+			? 'No servers match the current filters.' 
+			: 'No servers configured yet. Click "+ Add Server" to create one.'
+		serversList.innerHTML = `<p class="muted" style="text-align:center; padding:40px; grid-column: 1/-1;">${message}</p>`
 		return
 	}
 	
@@ -2947,6 +2979,18 @@ if (addServerBtn) {
 				modal.setAttribute('open', '') 
 			}
 		}
+	})
+}
+
+// Server search event listener
+const serverSearchInput = document.getElementById('serverSearchInput')
+
+if (serverSearchInput) {
+	serverSearchInput.addEventListener('input', () => {
+		const filters = {
+			search: serverSearchInput.value || ''
+		}
+		renderServers(filters)
 	})
 }
 
