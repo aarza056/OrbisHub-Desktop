@@ -109,12 +109,26 @@ async function handleElectronAPI(url, options) {
                                     health: extraData.health || 'ok'
                                 };
                             }) : [],
-                            environments: environments.success && environments.data ? environments.data.map(e => ({
-                                id: e.id,
-                                name: e.name,
-                                description: e.description || '',
-                                color: e.color || '#3b82f6'
-                            })) : [],
+                            environments: environments.success && environments.data ? environments.data.map(e => {
+                                let extra = {};
+                                try {
+                                    if (typeof e.description === 'string' && e.description.trim().startsWith('{')) {
+                                        extra = JSON.parse(e.description);
+                                    }
+                                } catch (err) {
+                                    // ignore parse errors and treat as plain description
+                                }
+                                return {
+                                    id: e.id,
+                                    name: e.name,
+                                    url: extra.url || extra.envUrl || '',
+                                    type: extra.type || extra.envType || '',
+                                    deployerId: extra.deployerId || null,
+                                    mappedServers: Array.isArray(extra.mappedServers) ? extra.mappedServers : [],
+                                    description: (typeof e.description === 'string' && !e.description.trim().startsWith('{')) ? (e.description || '') : (extra.note || ''),
+                                    color: e.color || '#3b82f6'
+                                };
+                            }) : [],
                             credentials: credentials.success && credentials.data ? credentials.data.map(c => ({
                                 id: c.id,
                                 name: c.name,
@@ -185,6 +199,15 @@ async function handleElectronAPI(url, options) {
                     // Sync environments
                     if (environments && environments.length > 0) {
                         for (const env of environments) {
+                            const extra = {
+                                url: env.url || '',
+                                type: env.type || '',
+                                deployerId: env.deployerId || null,
+                                mappedServers: Array.isArray(env.mappedServers) ? env.mappedServers : [],
+                                note: env.description || ''
+                            };
+                            const packedDescription = JSON.stringify(extra);
+
                             await window.electronAPI.dbExecute(
                                 `IF EXISTS (SELECT 1 FROM Environments WHERE id = @param0)
                                     UPDATE Environments SET name = @param1, description = @param2, color = @param3 WHERE id = @param0
@@ -193,8 +216,8 @@ async function handleElectronAPI(url, options) {
                                 [
                                     { value: env.id },
                                     { value: env.name },
-                                    { value: env.description },
-                                    { value: env.color }
+                                    { value: packedDescription },
+                                    { value: env.color || '#3b82f6' }
                                 ]
                             );
                         }
