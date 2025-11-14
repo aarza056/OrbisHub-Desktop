@@ -2658,6 +2658,31 @@
 </form>
 </dialog>
 
+<!-- Update Notification Modal -->
+<div id="updateNotification" class="update-notification" style="display: none;">
+  <div class="update-notification__content">
+    <div class="update-notification__icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        <path d="M12 8v4l3 3"></path>
+      </svg>
+    </div>
+    <div class="update-notification__body">
+      <h3 id="updateNotificationTitle">Update Available</h3>
+      <p id="updateNotificationMessage">A new version is available</p>
+      <div id="updateProgressBar" class="update-progress" style="display: none;">
+        <div id="updateProgressFill" class="update-progress__fill"></div>
+        <span id="updateProgressText" class="update-progress__text">0%</span>
+      </div>
+    </div>
+    <div class="update-notification__actions">
+      <button id="updateDismissBtn" class="btn btn-sm btn-ghost">Later</button>
+      <button id="updateDownloadBtn" class="btn btn-sm">Download</button>
+      <button id="updateInstallBtn" class="btn btn-sm" style="display: none;">Restart & Install</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
 

@@ -10885,3 +10885,109 @@ async function createDefaultAdmin() {
     }
 }
 
+// ============================================
+// AUTO-UPDATE SYSTEM
+// ============================================
+
+function initializeAutoUpdater() {
+    if (!window.electronAPI) return
+    
+    const updateNotification = document.getElementById('updateNotification')
+    const updateTitle = document.getElementById('updateNotificationTitle')
+    const updateMessage = document.getElementById('updateNotificationMessage')
+    const updateDismissBtn = document.getElementById('updateDismissBtn')
+    const updateDownloadBtn = document.getElementById('updateDownloadBtn')
+    const updateInstallBtn = document.getElementById('updateInstallBtn')
+    const updateProgressBar = document.getElementById('updateProgressBar')
+    const updateProgressFill = document.getElementById('updateProgressFill')
+    const updateProgressText = document.getElementById('updateProgressText')
+    
+    let currentUpdateInfo = null
+    
+    // Listen for update available
+    window.electronAPI.onUpdateAvailable((info) => {
+        currentUpdateInfo = info
+        updateTitle.textContent = `Update Available: v${info.version}`
+        updateMessage.textContent = 'A new version is ready to download'
+        updateNotification.style.display = 'block'
+        updateDownloadBtn.style.display = 'inline-block'
+        updateInstallBtn.style.display = 'none'
+        updateProgressBar.style.display = 'none'
+    })
+    
+    // Listen for download progress
+    window.electronAPI.onUpdateDownloadProgress((progress) => {
+        updateProgressBar.style.display = 'block'
+        updateProgressFill.style.width = `${progress.percent.toFixed(0)}%`
+        updateProgressText.textContent = `${progress.percent.toFixed(0)}%`
+        updateMessage.textContent = `Downloading update... (${formatBytes(progress.transferred)} / ${formatBytes(progress.total)})`
+    })
+    
+    // Listen for update downloaded
+    window.electronAPI.onUpdateDownloaded((info) => {
+        updateTitle.textContent = 'Update Ready'
+        updateMessage.textContent = `Version ${info.version} has been downloaded`
+        updateProgressBar.style.display = 'none'
+        updateDownloadBtn.style.display = 'none'
+        updateInstallBtn.style.display = 'inline-block'
+    })
+    
+    // Listen for update errors
+    window.electronAPI.onUpdateError((error) => {
+        updateTitle.textContent = 'Update Error'
+        updateMessage.textContent = error.message
+        updateDownloadBtn.style.display = 'inline-block'
+        updateDownloadBtn.textContent = 'Retry'
+        updateProgressBar.style.display = 'none'
+    })
+    
+    // Dismiss button
+    if (updateDismissBtn) {
+        updateDismissBtn.addEventListener('click', () => {
+            updateNotification.style.display = 'none'
+        })
+    }
+    
+    // Download button
+    if (updateDownloadBtn) {
+        updateDownloadBtn.addEventListener('click', async () => {
+            updateDownloadBtn.disabled = true
+            updateDownloadBtn.textContent = 'Downloading...'
+            
+            try {
+                await window.electronAPI.downloadUpdate()
+            } catch (error) {
+                console.error('Download failed:', error)
+                updateDownloadBtn.disabled = false
+                updateDownloadBtn.textContent = 'Download'
+            }
+        })
+    }
+    
+    // Install button
+    if (updateInstallBtn) {
+        updateInstallBtn.addEventListener('click', () => {
+            window.electronAPI.installUpdate()
+        })
+    }
+    
+    // Display current version in footer
+    window.electronAPI.getAppVersion().then(version => {
+        console.log(`🚀 OrbisHub Desktop v${version}`)
+    })
+}
+
+// Helper function to format bytes
+function formatBytes(bytes, decimals = 2) {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const dm = decimals < 0 ? 0 : decimals
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
+}
+
+// Initialize auto-updater when app loads
+if (window.electronAPI) {
+    initializeAutoUpdater()
+}

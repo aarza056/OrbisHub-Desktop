@@ -4931,3 +4931,89 @@ SETUP WIZARD
     max-width: 80%;
   }
 }
+
+/* ============================================
+   UPDATE NOTIFICATION STYLES
+   ============================================ */
+.update-notification {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 10000;
+  animation: slideInUp 0.3s ease-out;
+}
+
+.update-notification__content {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 400px;
+  max-width: 500px;
+}
+
+.update-notification__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary) 0%, #6b8aff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.update-notification__body {
+  flex: 1;
+}
+
+.update-notification__body h3 {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.update-notification__body p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.update-notification__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.update-progress {
+  margin-top: 12px;
+  background: var(--bg);
+  border-radius: 8px;
+  height: 24px;
+  overflow: hidden;
+  position: relative;
+}
+
+.update-progress__fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary) 0%, #6b8aff 100%);
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+.update-progress__text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+}

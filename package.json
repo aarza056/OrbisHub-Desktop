@@ -12,8 +12,17 @@
   "build": {
     "appId": "com.orbis.desktop",
     "productName": "OrbisHub Desktop",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "aarza056",
+        "repo": "OrbisHub-Desktop"
+      }
+    ],
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "assets/icon.ico"
     },
     "nsis": {
@@ -24,6 +33,7 @@
     }
   },
   "dependencies": {
+    "electron-updater": "^6.6.2",
     "mssql": "^10.0.2"
   },
   "devDependencies": {

@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, shell } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -1069,11 +1070,100 @@ ipcMain.handle('mark-messages-read', async (event, { currentUserId, otherUserId 
     }
 });
 
+// ============================================
+// AUTO-UPDATER SYSTEM
+// ============================================
+
+function initializeAutoUpdater() {
+    // Configure auto-updater
+    autoUpdater.autoDownload = false; // Don't auto-download, let user decide
+    autoUpdater.autoInstallOnAppQuit = true;
+    
+    // Check for updates on startup (after 3 seconds)
+    setTimeout(() => {
+        autoUpdater.checkForUpdates();
+    }, 3000);
+    
+    // Check for updates every 4 hours
+    setInterval(() => {
+        autoUpdater.checkForUpdates();
+    }, 4 * 60 * 60 * 1000);
+    
+    // Update events
+    autoUpdater.on('checking-for-update', () => {
+        console.log('Checking for updates...');
+    });
+    
+    autoUpdater.on('update-available', (info) => {
+        console.log('Update available:', info.version);
+        mainWindow.webContents.send('update-available', {
+            version: info.version,
+            releaseDate: info.releaseDate,
+            releaseNotes: info.releaseNotes
+        });
+    });
+    
+    autoUpdater.on('update-not-available', (info) => {
+        console.log('No updates available');
+    });
+    
+    autoUpdater.on('error', (err) => {
+        console.error('Update error:', err);
+        mainWindow.webContents.send('update-error', { message: err.message });
+    });
+    
+    autoUpdater.on('download-progress', (progressObj) => {
+        mainWindow.webContents.send('update-download-progress', {
+            percent: progressObj.percent,
+            transferred: progressObj.transferred,
+            total: progressObj.total,
+            bytesPerSecond: progressObj.bytesPerSecond
+        });
+    });
+    
+    autoUpdater.on('update-downloaded', (info) => {
+        console.log('Update downloaded:', info.version);
+        mainWindow.webContents.send('update-downloaded', {
+            version: info.version
+        });
+    });
+}
+
+// IPC handlers for updates
+ipcMain.handle('check-for-updates', async () => {
+    try {
+        const result = await autoUpdater.checkForUpdates();
+        return { success: true, updateInfo: result?.updateInfo };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('download-update', async () => {
+    try {
+        await autoUpdater.downloadUpdate();
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('install-update', () => {
+    autoUpdater.quitAndInstall(false, true);
+});
+
+ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
+});
+
 // App lifecycle
 app.whenReady().then(async () => {
     await clearChromiumCaches();
     createWindow();
     createTray();
+    
+    // Initialize auto-updater
+    initializeAutoUpdater();
     
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
