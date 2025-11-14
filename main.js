@@ -1062,7 +1062,6 @@ ipcMain.handle('mark-messages-read', async (event, { currentUserId, otherUserId 
         
         messages.recordset.forEach(msg => lastCheckedMessageIds.delete(msg.Id));
         
-        console.log(`✅ Marked messages as read: ${currentUserId} <- ${otherUserId}`);
         return { success: true };
     } catch (error) {
         console.error('Error marking messages as read:', error);
