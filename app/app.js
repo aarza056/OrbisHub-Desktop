@@ -20,6 +20,35 @@ window.fetch = function(url, options) {
     return originalFetch(url, options);
 };
 
+// Ensure Messages table exists (auto-migrate on first use)
+async function ensureMessagesTable() {
+    try {
+        const exists = await window.electronAPI.dbQuery(
+            "SELECT 1 AS ok FROM sysobjects WHERE name='Messages' AND xtype='U'",
+            []
+        )
+        if (exists.success && Array.isArray(exists.data) && exists.data.length > 0) {
+            return true
+        }
+        const create = await window.electronAPI.dbExecute(
+            `CREATE TABLE Messages (
+                Id NVARCHAR(50) PRIMARY KEY,
+                SenderId NVARCHAR(50) NOT NULL,
+                RecipientId NVARCHAR(50) NULL,
+                ChannelId NVARCHAR(50) NULL,
+                Content NVARCHAR(MAX) NOT NULL,
+                SentAt DATETIME DEFAULT GETDATE(),
+                [Read] BIT DEFAULT 0
+            )`,
+            []
+        )
+        return !!create.success
+    } catch (e) {
+        console.error('ensureMessagesTable failed:', e)
+        return false
+    }
+}
+
 async function handleElectronAPI(url, options) {
     const endpoint = url.split('/api/')[1];
     const body = options && options.body ? JSON.parse(options.body) : {};
@@ -389,6 +418,43 @@ async function handleElectronAPI(url, options) {
                     result = { success: false, error: error.message };
                 }
                 break;
+            
+            // Messaging: create direct message
+            case 'messages': {
+                if (options.method === 'POST') {
+                    await ensureMessagesTable()
+                    const { senderId, recipientId, content } = body;
+                    const msgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+                    const insert = await window.electronAPI.dbExecute(
+                        `INSERT INTO Messages (Id, SenderId, RecipientId, Content, SentAt, [Read]) VALUES (@param0, @param1, @param2, @param3, GETDATE(), 0)`,
+                        [
+                            { value: msgId },
+                            { value: senderId },
+                            { value: recipientId },
+                            { value: content }
+                        ]
+                    );
+                    if (insert.success) {
+                        result = { success: true, message: { Id: msgId, SenderId: senderId, RecipientId: recipientId, Content: content, SentAt: new Date().toISOString(), Read: 0 } };
+                    } else {
+                        result = { success: false, error: insert.error || 'Insert failed' };
+                    }
+                } else {
+                    result = { success: false, error: 'Unsupported method' };
+                }
+                break;
+            }
+            
+            // Users list (for messaging member pickers)
+            case 'users': {
+                if (options.method === 'GET') {
+                    const q = await window.electronAPI.dbQuery(`SELECT id AS Id, username AS Username, name AS FullName, email AS Email FROM Users`, []);
+                    result = q.success ? q.data : [];
+                } else {
+                    result = { success: false, error: 'Unsupported method' };
+                }
+                break;
+            }
                 
             case 'delete-record':
                 // Delete record from database
@@ -448,8 +514,46 @@ async function handleElectronAPI(url, options) {
                 break;
                 
             default:
-                // Return a mock Response object
-                result = { success: false, error: 'Endpoint not implemented' };
+                // Dynamic endpoint handling
+                if (endpoint.startsWith('messages/unread/')) {
+                    await ensureMessagesTable()
+                    const userId = endpoint.substring('messages/unread/'.length);
+                    const q = await window.electronAPI.dbQuery(
+                        `SELECT COUNT(*) AS cnt FROM Messages WHERE RecipientId = @param0 AND [Read] = 0`,
+                        [{ value: userId }]
+                    );
+                    const count = q.success && q.data && q.data[0] ? (q.data[0].cnt || 0) : 0;
+                    result = { success: true, unreadCount: count };
+                } else if (endpoint.startsWith('messages/') && options.method === 'GET') {
+                    await ensureMessagesTable()
+                    // GET /api/messages/{currentUserId}?otherUserId=...
+                    const pathPart = endpoint.split('?')[0];
+                    const currentUserId = pathPart.substring('messages/'.length);
+                    const qs = new URLSearchParams(url.split('?')[1] || '');
+                    const otherUserId = qs.get('otherUserId');
+                    if (!currentUserId || !otherUserId) {
+                        result = { success: false, error: 'Missing user ids' };
+                    } else {
+                        const q = await window.electronAPI.dbQuery(
+                            `SELECT Id, SenderId, RecipientId, Content, SentAt, [Read] FROM Messages
+                             WHERE (SenderId = @param0 AND RecipientId = @param1)
+                                OR (SenderId = @param1 AND RecipientId = @param0)
+                             ORDER BY SentAt ASC`,
+                            [{ value: currentUserId }, { value: otherUserId }]
+                        );
+                        result = q.success ? q.data : [];
+                    }
+                } else if (endpoint === 'messages/read' && options.method === 'PUT') {
+                    await ensureMessagesTable()
+                    const { userId, otherUserId } = body;
+                    const upd = await window.electronAPI.dbExecute(
+                        `UPDATE Messages SET [Read] = 1 WHERE RecipientId = @param0 AND SenderId = @param1 AND [Read] = 0`,
+                        [{ value: userId }, { value: otherUserId }]
+                    );
+                    result = { success: !!upd.success, rowsAffected: upd.rowsAffected };
+                } else {
+                    result = { success: false, error: 'Endpoint not implemented' };
+                }
         }
         
         // Return a mock Response object

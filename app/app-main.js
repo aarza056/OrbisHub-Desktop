@@ -7233,6 +7233,7 @@ function showNotification(message, type = 'info') {
 function initAIChat() {
     const aiChatWidget = document.getElementById('aiChatWidget')
     const aiChatToggle = document.getElementById('aiChatToggle')
+    const assistantTopBtn = document.getElementById('assistantTopBtn')
     const closeChatBtn = document.getElementById('closeChatBtn')
     const aiChatInput = document.getElementById('aiChatInput')
     const aiChatSend = document.getElementById('aiChatSend')
@@ -7260,6 +7261,14 @@ function initAIChat() {
         })
     } else {
         console.error('❌ aiChatToggle button not found')
+    }
+
+    // Topbar Assistant button opens the chat
+    if (assistantTopBtn) {
+        assistantTopBtn.addEventListener('click', () => {
+            aiChatWidget.classList.add('is-open')
+            aiChatInput && aiChatInput.focus()
+        })
     }
 
     if (closeChatBtn) {
@@ -9033,8 +9042,8 @@ function renderDirectMessagesList(users) {
         `
         
         // Click handler to open conversation
-        conversationItem.addEventListener('click', () => {
-            openConversation(user)
+        conversationItem.addEventListener('click', (e) => {
+            openConversation(user, e)
         })
         
         container.appendChild(conversationItem)
@@ -9052,12 +9061,14 @@ function getUserInitials(name) {
 }
 
 // Open a conversation with a user
-async function openConversation(user) {
+async function openConversation(user, e) {
     // Update active state
     document.querySelectorAll('.conversation-item').forEach(item => {
         item.classList.remove('active')
     })
-    event.currentTarget?.classList.add('active')
+    if (e && e.currentTarget) {
+        e.currentTarget.classList.add('active')
+    }
     
     // Hide empty state, show chat
     document.getElementById('messagesEmptyState').style.display = 'none'
@@ -9091,7 +9102,10 @@ async function loadMessagesForNewView(userId) {
         }
         
         const response = await fetch(`${API_BASE_URL}/api/messages/${currentUserId}?otherUserId=${userId}`)
-        const messages = await response.json()
+        let messages = await response.json()
+        if (!Array.isArray(messages)) {
+            messages = Array.isArray(messages?.data) ? messages.data : []
+        }
         
         const container = document.getElementById('messagesChatBody')
         if (!container) return
@@ -9114,6 +9128,9 @@ async function loadMessagesForNewView(userId) {
 
 // Render messages with grouping
 function renderMessagesGrouped(messages, container, currentUserId) {
+    if (!Array.isArray(messages)) {
+        messages = Array.isArray(messages?.data) ? messages.data : []
+    }
     if (messages.length === 0) {
         container.innerHTML = `
             <div style="text-align:center; padding:40px; color:var(--muted);">
@@ -9366,7 +9383,10 @@ async function loadMessages(userId) {
         if (!currentUserId) return
         
         const response = await fetch(`${API_BASE_URL}/api/messages/${currentUserId}?otherUserId=${userId}`)
-        const messages = await response.json()
+        let messages = await response.json()
+        if (!Array.isArray(messages)) {
+            messages = Array.isArray(messages?.data) ? messages.data : []
+        }
         
         const container = document.getElementById('messagesContainer')
         if (!container) return

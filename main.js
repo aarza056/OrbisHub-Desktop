@@ -559,6 +559,21 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
         `);
         migrations.push('AuditLogs table created');
         
+        // Messages table (for direct and channel messages)
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Messages' AND xtype='U')
+            CREATE TABLE Messages (
+                Id NVARCHAR(50) PRIMARY KEY,
+                SenderId NVARCHAR(50) NOT NULL,
+                RecipientId NVARCHAR(50) NULL,
+                ChannelId NVARCHAR(50) NULL,
+                Content NVARCHAR(MAX) NOT NULL,
+                SentAt DATETIME DEFAULT GETDATE(),
+                [Read] BIT DEFAULT 0
+            )
+        `);
+        migrations.push('Messages table created');
+        
         await pool.close();
         
         return { 
