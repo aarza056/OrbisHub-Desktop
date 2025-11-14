@@ -30,6 +30,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // External links
     openExternal: (url) => ipcRenderer.invoke('open-external', url),
     
+    // File selection
+    selectFile: () => ipcRenderer.invoke('select-file'),
+    
+    // File download
+    downloadFile: (params) => ipcRenderer.invoke('download-file', params),
+    
     // App info
     isElectron: true,
     platform: process.platform

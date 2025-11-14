@@ -470,7 +470,12 @@ ipcMain.handle('db-execute', async (event, query, params = []) => {
         
         // Add parameters
         params.forEach((param, index) => {
-            request.input(`param${index}`, param.value);
+            let value = param.value;
+            // Convert array to Buffer if it looks like binary data
+            if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'number') {
+                value = Buffer.from(value);
+            }
+            request.input(`param${index}`, value);
         });
         
         const result = await request.query(query);
@@ -652,11 +657,45 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
                     ChannelId NVARCHAR(50) NULL,
                     Content NVARCHAR(MAX) NOT NULL,
                     SentAt DATETIME DEFAULT GETDATE(),
-                    [Read] BIT DEFAULT 0
+                    [Read] BIT DEFAULT 0,
+                    HasAttachment BIT DEFAULT 0,
+                    AttachmentName NVARCHAR(255) NULL,
+                    AttachmentSize INT NULL,
+                    AttachmentType NVARCHAR(100) NULL,
+                    AttachmentData VARBINARY(MAX) NULL
                 )
             END
         `);
         migrations.push('Messages table created');
+        
+        // Add attachment columns if they don't exist
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[Messages]') AND name = 'HasAttachment')
+            BEGIN
+                ALTER TABLE [dbo].[Messages] ADD HasAttachment BIT DEFAULT 0
+            END
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[Messages]') AND name = 'AttachmentName')
+            BEGIN
+                ALTER TABLE [dbo].[Messages] ADD AttachmentName NVARCHAR(255) NULL
+            END
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[Messages]') AND name = 'AttachmentSize')
+            BEGIN
+                ALTER TABLE [dbo].[Messages] ADD AttachmentSize INT NULL
+            END
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[Messages]') AND name = 'AttachmentType')
+            BEGIN
+                ALTER TABLE [dbo].[Messages] ADD AttachmentType NVARCHAR(100) NULL
+            END
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[Messages]') AND name = 'AttachmentData')
+            BEGIN
+                ALTER TABLE [dbo].[Messages] ADD AttachmentData VARBINARY(MAX) NULL
+            END
+        `);
+        migrations.push('Messages table updated with attachment columns');
         
         await pool.close();
         
@@ -825,6 +864,98 @@ ipcMain.handle('open-external', async (event, url) => {
         return { success: true };
     } catch (error) {
         console.error('Failed to open external URL:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// File selection dialog
+ipcMain.handle('select-file', async (event) => {
+    try {
+        const { dialog } = require('electron');
+        const result = await dialog.showOpenDialog(mainWindow, {
+            properties: ['openFile'],
+            filters: [
+                { name: 'All Files', extensions: ['*'] },
+                { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'] },
+                { name: 'Documents', extensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'] },
+                { name: 'Archives', extensions: ['zip', 'rar', '7z', 'tar', 'gz'] }
+            ]
+        });
+        
+        if (result.canceled || result.filePaths.length === 0) {
+            return { canceled: true };
+        }
+        
+        const filePath = result.filePaths[0];
+        const fileName = path.basename(filePath);
+        const stats = fs.statSync(filePath);
+        const fileSize = stats.size;
+        
+        // Read file as buffer for database storage
+        const fileBuffer = fs.readFileSync(filePath);
+        
+        return {
+            canceled: false,
+            filePath: filePath,
+            fileName: fileName,
+            fileSize: fileSize,
+            fileBuffer: fileBuffer,
+            fileType: path.extname(fileName)
+        };
+    } catch (error) {
+        console.error('File selection error:', error);
+        return { canceled: true, error: error.message };
+    }
+});
+
+// File download handler
+ipcMain.handle('download-file', async (event, { messageId, fileName }) => {
+    try {
+        const { dialog } = require('electron');
+        
+        // Get file from database
+        const pool = await getDbPool();
+        const result = await pool.request()
+            .input('messageId', sql.NVarChar, messageId)
+            .query('SELECT AttachmentData, AttachmentName, HasAttachment FROM [dbo].[Messages] WHERE Id = @messageId');
+        
+        if (!result.recordset || result.recordset.length === 0) {
+            return { success: false, error: 'Message not found in database' };
+        }
+        
+        if (!result.recordset[0].HasAttachment) {
+            return { success: false, error: 'Message has no attachment' };
+        }
+        
+        const fileData = result.recordset[0].AttachmentData;
+        const dbFileName = result.recordset[0].AttachmentName || fileName;
+        
+        if (!fileData) {
+            return { success: false, error: 'File data is empty' };
+        }
+        
+        // Show save dialog
+        const saveResult = await dialog.showSaveDialog(mainWindow, {
+            defaultPath: path.join(app.getPath('downloads'), dbFileName),
+            filters: [
+                { name: 'All Files', extensions: ['*'] }
+            ]
+        });
+        
+        if (saveResult.canceled) {
+            return { success: false, canceled: true };
+        }
+        
+        // Write file from database to selected location
+        fs.writeFileSync(saveResult.filePath, fileData);
+        
+        return { 
+            success: true, 
+            filePath: saveResult.filePath,
+            message: 'File downloaded successfully'
+        };
+    } catch (error) {
+        console.error('File download error:', error);
         return { success: false, error: error.message };
     }
 });

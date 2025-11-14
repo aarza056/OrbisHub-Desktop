@@ -5747,6 +5747,20 @@ if (userMenuBtn && userMenuDropdown) {
     }
 }
 
+// Event delegation for file attachment downloads
+document.addEventListener('click', (e) => {
+    const fileAttachment = e.target.closest('.file-attachment')
+    if (fileAttachment) {
+        // Use dataset to access data attributes (converts data-message-id to messageId)
+        const messageId = fileAttachment.dataset.messageId
+        const fileName = fileAttachment.dataset.fileName
+        
+        if (messageId && fileName) {
+            downloadFile(messageId, fileName)
+        }
+    }
+})
+
 // Login system
 const loginScreen = document.getElementById('loginScreen')
 const appSidebar = document.getElementById('appSidebar')
@@ -9299,7 +9313,7 @@ function renderMessagesGrouped(messages, container, currentUserId) {
                     <span class="message-group-header-time">${formatMessageTime(message.SentAt)}</span>
                 </div>
                 <div class="message-bubble">
-                    ${escapeHtml(message.Content)}
+                    ${formatMessageContent(message.Content, message)}
                 </div>
             </div>
         `
@@ -9333,6 +9347,108 @@ function escapeHtml(text) {
     const div = document.createElement('div')
     div.textContent = text
     return div.innerHTML
+}
+
+// Format message content (handle file attachments)
+function formatMessageContent(content, message) {
+    if (!content) return ''
+    
+    // Check if message has attachment
+    if (message && message.HasAttachment && message.AttachmentName) {
+        const rawFileName = message.AttachmentName
+        const fileName = escapeHtml(rawFileName)
+        const fileSize = message.AttachmentSize || 0
+        
+        // Format file size
+        const sizeKB = (fileSize / 1024).toFixed(2)
+        const sizeMB = (fileSize / 1024 / 1024).toFixed(2)
+        const displaySize = fileSize > 1024 * 1024 ? `${sizeMB} MB` : `${sizeKB} KB`
+        
+        // Get file extension for icon
+        const ext = rawFileName.split('.').pop().toLowerCase()
+        let icon = '📄'
+        if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'].includes(ext)) icon = '🖼️'
+        else if (['pdf'].includes(ext)) icon = '📕'
+        else if (['doc', 'docx'].includes(ext)) icon = '📘'
+        else if (['xls', 'xlsx'].includes(ext)) icon = '📊'
+        else if (['ppt', 'pptx'].includes(ext)) icon = '📙'
+        else if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) icon = '📦'
+        else if (['mp3', 'wav', 'flac', 'm4a'].includes(ext)) icon = '🎵'
+        else if (['mp4', 'avi', 'mkv', 'mov'].includes(ext)) icon = '🎬'
+        
+        // Escape for data attributes (just handle quotes)
+        const dataMessageId = String(message.Id).replace(/"/g, '&quot;')
+        const dataFileName = String(rawFileName).replace(/"/g, '&quot;')
+        
+        return `
+            <div class="file-attachment" data-message-id="${dataMessageId}" data-file-name="${dataFileName}" style="display: flex; align-items: center; gap: 12px; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 8px; cursor: pointer;">
+                <div style="font-size: 32px;">${icon}</div>
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${fileName}</div>
+                    <div style="font-size: 12px; opacity: 0.7;">${displaySize}</div>
+                </div>
+                <div style="opacity: 0.5;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                </div>
+            </div>
+        `
+    }
+    
+    // Check if it's old format file attachment message (legacy support)
+    const fileMatch = content.match(/^📎\s+(.+?)\s+\((.+?)\)\n\[File:\s+(.+?)\]$/s)
+    if (fileMatch) {
+        const fileName = escapeHtml(fileMatch[1])
+        const fileSize = escapeHtml(fileMatch[2])
+        const filePath = escapeHtml(fileMatch[3])
+        
+        // Get file extension for icon
+        const ext = fileName.split('.').pop().toLowerCase()
+        let icon = '📄'
+        if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'].includes(ext)) icon = '🖼️'
+        else if (['pdf'].includes(ext)) icon = '📕'
+        else if (['doc', 'docx'].includes(ext)) icon = '📘'
+        else if (['xls', 'xlsx'].includes(ext)) icon = '📊'
+        else if (['ppt', 'pptx'].includes(ext)) icon = '📙'
+        else if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) icon = '📦'
+        else if (['mp3', 'wav', 'flac', 'm4a'].includes(ext)) icon = '🎵'
+        else if (['mp4', 'avi', 'mkv', 'mov'].includes(ext)) icon = '🎬'
+        
+        return `
+            <div style="display: flex; align-items: center; gap: 12px; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 8px;">
+                <div style="font-size: 32px;">${icon}</div>
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${fileName}</div>
+                    <div style="font-size: 12px; opacity: 0.7;">${fileSize} (Legacy - file not in database)</div>
+                </div>
+            </div>
+        `
+    }
+    
+    // Regular text message
+    return escapeHtml(content).replace(/\n/g, '<br>')
+}
+
+// Download file function (global for onclick handlers)
+window.downloadFile = async function(messageId, fileName) {
+    try {
+        if (window.electronAPI && window.electronAPI.downloadFile) {
+            const result = await window.electronAPI.downloadFile({ messageId, fileName })
+            if (result.success) {
+                showToast(`Downloaded: ${fileName}`, 'info')
+            } else {
+                showToast('Download failed: ' + result.error, 'error')
+            }
+        } else {
+            showToast('Download only available in desktop app', 'error')
+        }
+    } catch (error) {
+        console.error('Download error:', error)
+        showToast('Download failed', 'error')
+    }
 }
 
 // Setup event listeners for messaging
@@ -9393,6 +9509,88 @@ function setupMessagingEventListeners() {
         updateSendButtonState(!!window.currentChatUserId)
     }
     
+    // Attach file button
+    const attachButtons = document.querySelectorAll('.messages-input-wrapper .icon-btn[title="Attach file"]')
+    attachButtons.forEach(btn => {
+        btn.addEventListener('click', async () => {
+            if (!window.currentChatUserId) {
+                showToast('Select a conversation first')
+                return
+            }
+            
+            // Open file picker using Electron API
+            if (window.electronAPI && window.electronAPI.selectFile) {
+                try {
+                    const result = await window.electronAPI.selectFile()
+                    if (result.canceled || !result.filePath) return
+                    
+                    // Check file size (3MB limit)
+                    const maxSize = 3 * 1024 * 1024 // 3MB in bytes
+                    if (result.fileSize > maxSize) {
+                        showToast('File too large. Maximum size is 3MB', 'error')
+                        return
+                    }
+                    
+                    const session = getSession()
+                    const currentUserId = session?.id || session?.Id || null
+                    
+                    if (!currentUserId) {
+                        showToast('Session error. Please log in again.', 'error')
+                        return
+                    }
+                    
+                    // Show uploading toast
+                    showToast('Uploading file...', 'info')
+                    
+                    // Send file data to database via API
+                    const messageContent = `📎 File: ${result.fileName}`
+                    
+                    const response = await fetch(`${API_BASE_URL}/api/messages`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            senderId: currentUserId,
+                            recipientId: window.currentChatUserId,
+                            content: messageContent,
+                            hasAttachment: true,
+                            attachmentName: result.fileName,
+                            attachmentSize: result.fileSize,
+                            attachmentType: result.fileType,
+                            attachmentData: Array.from(result.fileBuffer) // Convert buffer to array for JSON
+                        })
+                    })
+                    
+                    const apiResult = await response.json()
+                    
+                    if (apiResult.success) {
+                        // Refresh messages to show the attachment
+                        await loadMessagesForNewView(window.currentChatUserId, { preserveWhenEmpty: false })
+                        showToast(`File uploaded: ${result.fileName}`, 'info')
+                    } else {
+                        showToast('Failed to upload file: ' + apiResult.error, 'error')
+                    }
+                } catch (error) {
+                    console.error('File upload error:', error)
+                    showToast('Failed to upload file', 'error')
+                }
+            } else {
+                showToast('File attachments only available in desktop app', 'info')
+            }
+        })
+    })
+    
+    // Emoji picker button
+    const emojiButtons = document.querySelectorAll('.messages-input-wrapper .icon-btn[title="Add emoji"]')
+    emojiButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (!window.currentChatUserId) {
+                showToast('Select a conversation first')
+                return
+            }
+            showEmojiPicker(btn)
+        })
+    })
+    
     // New message button
     const newMessageBtn = document.getElementById('newMessageBtn')
     if (newMessageBtn) {
@@ -9400,6 +9598,92 @@ function setupMessagingEventListeners() {
             // Could open a modal to select user
             alert('Select a user from the list to start a conversation')
         })
+    }
+}
+
+// Simple emoji picker
+function showEmojiPicker(button) {
+    // Check if picker already exists
+    let existingPicker = document.querySelector('.emoji-picker')
+    if (existingPicker) {
+        existingPicker.remove()
+        return
+    }
+    
+    const emojis = ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', 
+                    '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
+                    '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩',
+                    '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣',
+                    '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬',
+                    '👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👏', '🙌',
+                    '👋', '🤚', '🖐️', '✋', '🖖', '👊', '✊', '🤛', '🤜', '💪',
+                    '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔',
+                    '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '🔥', '✨',
+                    '⭐', '🌟', '💫', '⚡', '☀️', '🌙', '☁️', '🌈', '🎉', '🎊']
+    
+    const picker = document.createElement('div')
+    picker.className = 'emoji-picker'
+    picker.style.cssText = `
+        position: absolute;
+        bottom: 60px;
+        left: 10px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+        display: grid;
+        grid-template-columns: repeat(10, 1fr);
+        gap: 4px;
+        max-width: 400px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 1000;
+    `
+    
+    emojis.forEach(emoji => {
+        const btn = document.createElement('button')
+        btn.textContent = emoji
+        btn.style.cssText = `
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: transparent;
+            font-size: 20px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: background 0.2s;
+        `
+        btn.addEventListener('mouseenter', () => {
+            btn.style.background = 'var(--bg)'
+        })
+        btn.addEventListener('mouseleave', () => {
+            btn.style.background = 'transparent'
+        })
+        btn.addEventListener('click', () => {
+            const textarea = document.getElementById('messagesTextarea')
+            if (textarea) {
+                textarea.value += emoji
+                textarea.focus()
+            }
+            picker.remove()
+        })
+        picker.appendChild(btn)
+    })
+    
+    // Close picker when clicking outside
+    setTimeout(() => {
+        document.addEventListener('click', function closePickerHandler(e) {
+            if (!picker.contains(e.target) && e.target !== button) {
+                picker.remove()
+                document.removeEventListener('click', closePickerHandler)
+            }
+        })
+    }, 0)
+    
+    // Add to messages view
+    const messagesInputWrapper = document.querySelector('.messages-input-wrapper')
+    if (messagesInputWrapper) {
+        messagesInputWrapper.style.position = 'relative'
+        messagesInputWrapper.appendChild(picker)
     }
 }
 

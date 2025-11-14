@@ -475,22 +475,43 @@ async function handleElectronAPI(url, options = {}) {
             case 'messages': {
                 if (method === 'POST') {
                     await ensureMessagesTable()
-                    const { senderId, recipientId, content } = body;
+                    const { senderId, recipientId, content, hasAttachment, attachmentName, attachmentSize, attachmentType, attachmentData } = body;
                     const sId = String(senderId || '').trim()
                     const rId = recipientId != null ? String(recipientId).trim() : null
-                    console.log('[MessagesAPI] Insert DM', { senderId: sId, recipientId: rId })
                     const msgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
                     await ensureMessagesTable();
                     const tbl = MESSAGES_TABLE || '[dbo].Messages'
-                    const insert = await window.electronAPI.dbExecute(
-                        `INSERT INTO ${tbl} (Id, SenderId, RecipientId, Content, SentAt, [Read]) VALUES (@param0, @param1, @param2, @param3, GETDATE(), 0)`,
-                        [
-                            { value: msgId },
-                            { value: sId },
-                            { value: rId },
-                            { value: content }
-                        ]
-                    );
+                    
+                    let insert;
+                    if (hasAttachment && attachmentData) {
+                        // Array will be converted to Buffer in main process
+                        insert = await window.electronAPI.dbExecute(
+                            `INSERT INTO ${tbl} (Id, SenderId, RecipientId, Content, SentAt, [Read], HasAttachment, AttachmentName, AttachmentSize, AttachmentType, AttachmentData) 
+                             VALUES (@param0, @param1, @param2, @param3, GETDATE(), 0, @param4, @param5, @param6, @param7, @param8)`,
+                            [
+                                { value: msgId },
+                                { value: sId },
+                                { value: rId },
+                                { value: content },
+                                { value: 1 },
+                                { value: attachmentName },
+                                { value: attachmentSize },
+                                { value: attachmentType },
+                                { value: attachmentData }
+                            ]
+                        );
+                    } else {
+                        insert = await window.electronAPI.dbExecute(
+                            `INSERT INTO ${tbl} (Id, SenderId, RecipientId, Content, SentAt, [Read], HasAttachment) VALUES (@param0, @param1, @param2, @param3, GETDATE(), 0, 0)`,
+                            [
+                                { value: msgId },
+                                { value: sId },
+                                { value: rId },
+                                { value: content }
+                            ]
+                        );
+                    }
+                    
                     if (insert.success) {
                         result = { success: true, message: { Id: msgId, SenderId: sId, RecipientId: rId, Content: content, SentAt: new Date().toISOString(), Read: 0 } };
                     } else {
@@ -606,6 +627,10 @@ async function handleElectronAPI(url, options = {}) {
                             // JOIN with Users table to get sender name
                             q = await window.electronAPI.dbQuery(
                                 `SELECT m.Id, m.SenderId, m.RecipientId, m.Content, m.SentAt, m.[Read],
+                                        ISNULL(m.HasAttachment, 0) AS HasAttachment, 
+                                        m.AttachmentName, 
+                                        m.AttachmentSize, 
+                                        m.AttachmentType,
                                         u.name AS SenderName, u.username AS SenderUsername
                                  FROM ${tbl} m
                                  LEFT JOIN Users u ON LOWER(LTRIM(RTRIM(m.SenderId))) = LOWER(LTRIM(RTRIM(u.id)))
@@ -622,6 +647,10 @@ async function handleElectronAPI(url, options = {}) {
                             if (!(q.success && Array.isArray(q.data) && q.data.length > 0)) {
                                 const q2 = await window.electronAPI.dbQuery(
                                     `SELECT m.Id, m.SenderId, m.RecipientId, m.Content, m.SentAt, m.[Read],
+                                            ISNULL(m.HasAttachment, 0) AS HasAttachment,
+                                            m.AttachmentName,
+                                            m.AttachmentSize,
+                                            m.AttachmentType,
                                             u.name AS SenderName, u.username AS SenderUsername
                                      FROM ${tbl} m
                                      LEFT JOIN Users u ON LOWER(LTRIM(RTRIM(m.SenderId))) = LOWER(LTRIM(RTRIM(u.id)))
@@ -642,6 +671,10 @@ async function handleElectronAPI(url, options = {}) {
                             // Try simpler query first without complex string matching
                             q = await window.electronAPI.dbQuery(
                                 `SELECT m.Id, m.SenderId, m.RecipientId, m.Content, m.SentAt, m.[Read],
+                                        ISNULL(m.HasAttachment, 0) AS HasAttachment,
+                                        m.AttachmentName,
+                                        m.AttachmentSize,
+                                        m.AttachmentType,
                                         u.name AS SenderName, u.username AS SenderUsername
                                  FROM ${tbl} m
                                  LEFT JOIN Users u ON m.SenderId = u.id
@@ -655,6 +688,10 @@ async function handleElectronAPI(url, options = {}) {
                             if (!q.success || !q.data || q.data.length === 0) {
                                 q = await window.electronAPI.dbQuery(
                                     `SELECT m.Id, m.SenderId, m.RecipientId, m.Content, m.SentAt, m.[Read],
+                                            ISNULL(m.HasAttachment, 0) AS HasAttachment,
+                                            m.AttachmentName,
+                                            m.AttachmentSize,
+                                            m.AttachmentType,
                                             u.name AS SenderName, u.username AS SenderUsername
                                      FROM ${tbl} m
                                      LEFT JOIN Users u ON LOWER(LTRIM(RTRIM(m.SenderId))) = LOWER(LTRIM(RTRIM(u.id)))
