@@ -24,6 +24,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     testServer: (ipAddress, serverName, port = 3389) => 
         ipcRenderer.invoke('test-server', { ipAddress, serverName, port }),
     
+    // PowerShell remote execution
+    executePowerShellRemote: (host, script, username, password, domain) =>
+        ipcRenderer.invoke('execute-powershell-remote', { host, script, username, password, domain }),
+    
     // System info
     getLocalIP: () => ipcRenderer.invoke('get-local-ip'),
     

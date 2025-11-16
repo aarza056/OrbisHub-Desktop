@@ -145,6 +145,7 @@ async function handleElectronAPI(url, options = {}) {
                     const credentials = await window.electronAPI.dbQuery('SELECT * FROM Credentials', []);
                     const scripts = await window.electronAPI.dbQuery('SELECT * FROM Scripts', []);
                     const builds = await window.electronAPI.dbQuery('SELECT * FROM Builds', []);
+                    const pipelines = await window.electronAPI.dbQuery('SELECT * FROM Pipelines', []);
                     const auditLogs = await window.electronAPI.dbQuery('SELECT TOP 1000 * FROM AuditLogs ORDER BY [timestamp] DESC', []);
                     
                     result = {
@@ -244,12 +245,31 @@ async function handleElectronAPI(url, options = {}) {
                             builds: builds.success && builds.data ? builds.data.map(b => ({
                                 id: b.id,
                                 name: b.name,
-                                version: b.version || '',
-                                environmentId: b.environment_id,
-                                status: b.status || 'pending',
-                                log: b.log || '',
+                                script: b.script || '',
+                                serverId: b.serverId || b.server_id,
+                                targetOverride: b.targetOverride || b.target_override || null,
+                                isRunning: b.isRunning || false,
+                                runStartTime: b.runStartTime,
+                                currentProgress: b.currentProgress || 0,
+                                lastRun: b.lastRun,
+                                lastRunBy: b.lastRunBy,
+                                lastSuccess: b.lastSuccess,
+                                lastSuccessBy: b.lastSuccessBy,
+                                lastSuccessElapsed: b.lastSuccessElapsed,
+                                lastFail: b.lastFail,
+                                lastFailBy: b.lastFailBy,
+                                lastFailElapsed: b.lastFailElapsed,
                                 created_at: b.created_at,
                                 updated_at: b.updated_at
+                            })) : [],
+                            pipelines: pipelines.success && pipelines.data ? pipelines.data.map(p => ({
+                                id: p.id,
+                                name: p.name,
+                                description: p.description || '',
+                                enabled: p.enabled !== false,
+                                created_by: p.created_by,
+                                created_at: p.created_at,
+                                updated_at: p.updated_at
                             })) : [],
                             auditLogs: auditLogs.success && auditLogs.data ? auditLogs.data.map(a => ({
                                 id: a.id,
@@ -413,16 +433,15 @@ async function handleElectronAPI(url, options = {}) {
                         for (const build of builds) {
                             await window.electronAPI.dbExecute(
                                 `IF EXISTS (SELECT 1 FROM Builds WHERE id = @param0)
-                                    UPDATE Builds SET name = @param1, version = @param2, environment_id = @param3, status = @param4, log = @param5, updated_at = GETDATE() WHERE id = @param0
+                                    UPDATE Builds SET name = @param1, script = @param2, serverId = @param3, targetOverride = @param4, updated_at = GETDATE() WHERE id = @param0
                                 ELSE
-                                    INSERT INTO Builds (id, name, version, environment_id, status, log, created_at, updated_at) VALUES (@param0, @param1, @param2, @param3, @param4, @param5, GETDATE(), GETDATE())`,
+                                    INSERT INTO Builds (id, name, script, serverId, targetOverride, created_at, updated_at) VALUES (@param0, @param1, @param2, @param3, @param4, GETDATE(), GETDATE())`,
                                 [
                                     { value: build.id },
                                     { value: build.name },
-                                    { value: build.version || '' },
-                                    { value: build.environmentId },
-                                    { value: build.status || 'pending' },
-                                    { value: build.log || '' }
+                                    { value: build.script || '' },
+                                    { value: build.serverId || null },
+                                    { value: build.targetOverride || null }
                                 ]
                             );
                         }
@@ -714,6 +733,130 @@ async function handleElectronAPI(url, options = {}) {
                         [{ value: userId }, { value: otherUserId }]
                     );
                     result = { success: !!upd.success, rowsAffected: upd.rowsAffected };
+                } else if (endpoint === 'run-build') {
+                    // Execute PowerShell build script on remote server
+                    const { buildId, userId } = body;
+                    
+                    try {
+                        // Load build data from database
+                        const buildQuery = await window.electronAPI.dbQuery(
+                            'SELECT * FROM Builds WHERE id = @param0',
+                            [{ value: buildId }]
+                        );
+                        
+                        if (!buildQuery.success || !buildQuery.data || buildQuery.data.length === 0) {
+                            result = { success: false, error: 'Build not found' };
+                        } else {
+                            const build = buildQuery.data[0];
+                            
+                            // Load server data
+                            const serverQuery = await window.electronAPI.dbQuery(
+                                'SELECT * FROM Servers WHERE id = @param0',
+                                [{ value: build.serverId }]
+                            );
+                            
+                            if (!serverQuery.success || !serverQuery.data || serverQuery.data.length === 0) {
+                                result = { success: false, error: 'Server not found' };
+                            } else {
+                                const server = serverQuery.data[0];
+                                
+                                // Parse server description for extra data
+                                let serverData = {
+                                    ipAddress: server.host,
+                                    port: server.port || 5985
+                                };
+                                try {
+                                    if (server.description && server.description.startsWith('{')) {
+                                        const extraData = JSON.parse(server.description);
+                                        serverData.ipAddress = extraData.ipAddress || server.host;
+                                    }
+                                } catch (e) {}
+                                
+                                // Use targetOverride if provided
+                                const targetHost = build.targetOverride || serverData.ipAddress;
+                                
+                                // Load credential data if server has credentialId
+                                let credential = null;
+                                if (server.credential_id) {
+                                    const credQuery = await window.electronAPI.dbQuery(
+                                        'SELECT * FROM Credentials WHERE id = @param0',
+                                        [{ value: server.credential_id }]
+                                    );
+                                    
+                                    if (credQuery.success && credQuery.data && credQuery.data.length > 0) {
+                                        credential = credQuery.data[0];
+                                    }
+                                }
+                                
+                                if (!credential) {
+                                    result = { 
+                                        success: false, 
+                                        error: 'No credentials configured for this server. Please assign credentials in the server settings.' 
+                                    };
+                                } else {
+                                    // Execute PowerShell script on remote server
+                                    console.log('🚀 Executing build on', targetHost, 'with credentials:', credential.username);
+                                    
+                                    // Replace variables in script
+                                    let processedScript = build.script || '';
+                                    const serverName = server.name || 'Unknown';
+                                    const serverIp = serverData.ipAddress;
+                                    
+                                    processedScript = processedScript
+                                        .replace(/\{\{SERVER_NAME\}\}/g, serverName)
+                                        .replace(/\{\{SERVER_IP\}\}/g, serverIp)
+                                        .replace(/\{\{SERVER_HOST\}\}/g, targetHost)
+                                        .replace(/\{\{BUILD_NAME\}\}/g, build.name || 'Build')
+                                        .replace(/\{\{USER\}\}/g, userId || 'System');
+                                    
+                                    const startTime = Date.now();
+                                    console.log('🚀 Executing PowerShell on:', targetHost, 'User:', credential.username, 'Domain:', credential.domain || '(none)');
+                                    console.log('📜 Script preview:', processedScript.substring(0, 200) + '...');
+                                    
+                                    const executionResult = await window.electronAPI.executePowerShellRemote(
+                                        targetHost,
+                                        processedScript,
+                                        credential.username,
+                                        credential.password,
+                                        credential.domain || null
+                                    );
+                                    const elapsedMs = Date.now() - startTime;
+                                    
+                                    console.log('📊 Build execution result:', JSON.stringify(executionResult, null, 2));
+                                    
+                                    if (!executionResult) {
+                                        result = {
+                                            success: false,
+                                            error: 'PowerShell execution returned null/undefined. Check if executePowerShellRemote is properly implemented.'
+                                        };
+                                    } else {
+                                        const combinedOutput = [executionResult.output, executionResult.error]
+                                            .filter(Boolean)
+                                            .join('\n')
+                                            .trim();
+
+                                        const errorText = executionResult.success ? null : (executionResult.error || executionResult.output || `Build failed: exitCode=${executionResult.exitCode}, no output captured`);
+
+                                        result = {
+                                            success: true,
+                                            buildSuccess: !!executionResult.success,
+                                            output: combinedOutput || '(no output)',
+                                            exitCode: Number.isInteger(executionResult.exitCode) ? executionResult.exitCode : (executionResult.success ? 0 : 1),
+                                            timestamp: Date.now(),
+                                            elapsedMs: elapsedMs,
+                                            error: errorText
+                                        };
+                                    }
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error('❌ Build execution error:', error);
+                        result = { 
+                            success: false, 
+                            error: `Build execution failed: ${error.message}` 
+                        };
+                    }
                 } else {
                     result = { success: false, error: 'Endpoint not implemented' };
                 }

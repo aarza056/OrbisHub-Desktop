@@ -1,6 +1,8 @@
 // Simple router between views
 // Updated: 2025-11-10 - Login system v2
 
+console.log('📦 app-main.js loaded')
+
 // Desktop app - no API server needed, using Electron IPC directly
 // Empty API_BASE_URL since app.js intercepts all /api/ calls
 const API_BASE_URL = ''
@@ -161,18 +163,24 @@ const store = {
     },
 
     // Database-only write
-    async write(db) {
+    async write(db, skipSync = false) {
+        if (skipSync) {
+            memoryCache = db
+            return true
+        }
+        
         await this.syncToDatabase(db).catch(err => {
             console.error('Database sync failed:', err.message)
             throw err
         })
+        memoryCache = db
         return true
     },
 
     async syncToDatabase(db) {
         const isConnected = await this.checkDatabaseConnection()
         if (!isConnected) {
-            throw new Error('Database not connected')
+            throw new Error('❌ Database not connected. Please configure database connection in Settings.')
         }
 
         try {
@@ -225,7 +233,7 @@ const store = {
     async deleteFromDatabase(entityType, id) {
         const isConnected = await this.checkDatabaseConnection()
         if (!isConnected) {
-            throw new Error('Database not connected')
+            throw new Error('❌ Database not connected. Please configure database connection in Settings.')
         }
 
         console.log(`🗑️ Attempting to delete ${entityType} with ID: ${id}`)
@@ -388,6 +396,34 @@ function populateServerDropdowns() {
         })
     } catch (error) {
         console.error('Error populating server dropdowns:', error)
+    }
+}
+
+// Populate script dropdowns
+async function populateScriptDropdowns() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/load-data`);
+        const result = await response.json();
+        
+        if (!result.success || !result.data || !result.data.scripts) {
+            console.warn('No scripts available');
+            return;
+        }
+        
+        const scripts = result.data.scripts;
+        const stepScriptId = document.getElementById('stepScriptId');
+        
+        if (stepScriptId) {
+            stepScriptId.innerHTML = '<option value="">-- Select Script --</option>';
+            scripts.forEach(script => {
+                const option = document.createElement('option');
+                option.value = script.id;
+                option.textContent = script.name;
+                stepScriptId.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error populating script dropdowns:', error);
     }
 }
 
@@ -2324,7 +2360,7 @@ async function renderBuilds() {
             <div style="display:flex; gap:24px; padding-top:12px; border-top:1px solid var(--border);">
                 <div style="flex:1;">
                     <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Script</div>
-                    <div style="font-family:monospace; font-size:13px;">${build.script}</div>
+                    <div style="font-family:monospace; font-size:13px;">${build.script || 'No script defined'}</div>
                 </div>
                 <div style="flex:1;">
                     <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Server</div>
@@ -2400,6 +2436,12 @@ function runBuild(build) {
         startedAt: Date.now(), 
         progress: 0 
     }
+    
+    // Ensure jobs array exists
+    if (!db.jobs) {
+        db.jobs = []
+    }
+    
     db.jobs.push(job)
     store.write(db)
     
@@ -2460,15 +2502,20 @@ function runBuild(build) {
             await renderBuilds()
             renderJobs()
             
-            // Show result notification
+            // Show result notification and detailed output
             if (result.buildSuccess) {
                 showNotification(`Build "${build.name}" completed successfully!`, 'success')
-                if (result.output) {
-                    console.log(`Build output:\n${result.output}`)
-                }
+                console.log(`✅ Build output:\n${result.output}`)
+                
+                // Show output modal for successful builds
+                showBuildOutputModal(build.name, result.output, true, result.elapsedMs)
             } else {
-                showNotification(`Build "${build.name}" failed: ${result.error}`, 'error')
-                console.error(`Build error:\n${result.error}`)
+                const errText = result.error || result.output || 'Unknown error';
+                showNotification(`Build "${build.name}" failed`, 'error')
+                console.error('❌ Build error:', errText, '\n📊 Full result:', result)
+                
+                // Show detailed error modal
+                showBuildOutputModal(build.name, errText, false, result.elapsedMs)
             }
         } else {
             console.error('❌ Build execution failed:', result.error)
@@ -2591,9 +2638,76 @@ function showBuildStartedModal(buildName, script, serverName) {
     }, 3000)
 }
 
+function showBuildOutputModal(buildName, output, success, elapsedMs) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('buildOutputModal')
+    if (!modal) {
+        modal = document.createElement('dialog')
+        modal.id = 'buildOutputModal'
+        modal.className = 'modal'
+        modal.innerHTML = `
+            <div class="modal__content" style="max-width: 800px; max-height: 80vh;">
+                <h2 style="margin: 0 0 16px 0; display: flex; align-items: center; gap: 12px;">
+                    <span id="buildOutputIcon"></span>
+                    <span id="buildOutputTitle"></span>
+                </h2>
+                <div id="buildOutputMeta" style="margin-bottom: 16px; color: var(--muted); font-size: 14px;"></div>
+                <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; max-height: 400px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word;">
+                    <code id="buildOutputContent"></code>
+                </div>
+                <div style="display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end;">
+                    <button class="btn" onclick="navigator.clipboard.writeText(document.getElementById('buildOutputContent').textContent); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Output', 1000)">Copy Output</button>
+                    <button class="btn btn-primary" onclick="document.getElementById('buildOutputModal').close()">Close</button>
+                </div>
+            </div>
+        `
+        document.body.appendChild(modal)
+    }
+    
+    const icon = modal.querySelector('#buildOutputIcon')
+    const title = modal.querySelector('#buildOutputTitle')
+    const meta = modal.querySelector('#buildOutputMeta')
+    const content = modal.querySelector('#buildOutputContent')
+    
+    const duration = elapsedMs ? formatDuration(elapsedMs) : 'Unknown'
+    
+    if (success) {
+        icon.innerHTML = '✅'
+        title.textContent = `Build "${buildName}" Succeeded`
+        title.style.color = '#10b981'
+        meta.textContent = `Completed in ${duration}`
+    } else {
+        icon.innerHTML = '❌'
+        title.textContent = `Build "${buildName}" Failed`
+        title.style.color = '#ef4444'
+        meta.textContent = `Failed after ${duration}`
+    }
+    
+    content.textContent = output || '(no output)'
+    
+    try {
+        modal.showModal()
+    } catch (e) {
+        modal.setAttribute('open', '')
+    }
+}
+
+// Helper function for formatting duration (if not already defined)
+function formatDuration(ms) {
+    if (!ms) return '0s'
+    const seconds = Math.floor(ms / 1000)
+    const minutes = Math.floor(seconds / 60)
+    const hours = Math.floor(minutes / 60)
+    
+    if (hours > 0) return `${hours}h ${minutes % 60}m ${seconds % 60}s`
+    if (minutes > 0) return `${minutes}m ${seconds % 60}s`
+    return `${seconds}s`
+}
+
 let buildToDelete = null
 
 function openDeleteBuild(build) {
+    window.buildToDelete = build
     buildToDelete = build
     const nameElement = document.getElementById('deleteBuildName')
     if (nameElement) {
@@ -2610,6 +2724,8 @@ function openDeleteBuild(build) {
 }
 
 function openEditBuild(build) {
+    console.log('📝 Opening edit modal for build:', build)
+    
     // Update URL to reflect current action
     const url = new URL(window.location)
     url.searchParams.set('view', 'builds')
@@ -2619,14 +2735,18 @@ function openEditBuild(build) {
     
     document.getElementById('editBuildId').value = build.id
     document.getElementById('editBuildName').value = build.name
-    document.getElementById('editBuildScript').value = build.script
+    document.getElementById('editBuildScript').value = build.script || ''
     document.getElementById('editBuildTargetOverride').value = build.targetOverride || ''
+    
+    console.log('📝 Set editBuildScript value to:', build.script)
     
     // Populate server dropdown first, then set the value
     populateServerDropdowns()
     
     // Set server value after dropdown is populated
     document.getElementById('editBuildServer').value = build.serverId
+    
+    console.log('📝 Set editBuildServer value to:', build.serverId)
     
     const modal = document.getElementById('editBuildModal')
     if (modal) {
@@ -3828,7 +3948,7 @@ if (credentialSearchInput) {
 const buildModal = document.getElementById('buildModal')
 const editBuildModal = document.getElementById('editBuildModal')
 const deleteBuildModal = document.getElementById('deleteBuildModal')
-const addBuildBtn = document.getElementById('addBuildBtn')
+// addBuildBtn event listener is in initBuildModal() function called after DOMContentLoaded
 
 function closeBuildModal() {
     // Clear URL parameters
@@ -3868,135 +3988,11 @@ function closeDeleteBuildModal() {
     try { deleteBuildModal.removeAttribute('open') } catch (e) {}
 }
 
-// Build button event listener moved to DOMContentLoaded section
+// Build button event listener moved to initBuildModal() function called after DOMContentLoaded
 
-// Add build modal handlers
-if (buildModal) {
-    const cancelBtn = buildModal.querySelector('button[value="cancel"]')
-    if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeBuildModal() })
-    
-    buildModal.addEventListener('click', (e) => { if (e.target === buildModal) closeBuildModal() })
-}
-
-// Create build
-const saveBuildBtn = document.getElementById('saveBuildBtn')
-if (saveBuildBtn) {
-    saveBuildBtn.addEventListener('click', async (e) => {
-        e.preventDefault()
-        console.log('💾 Creating new build...')
-        const name = document.getElementById('buildName').value.trim()
-        const script = document.getElementById('buildScript').value
-        const serverId = document.getElementById('buildServer').value
-        const targetOverride = document.getElementById('buildTargetOverride').value.trim()
-        
-        if (!name || !script || !serverId) {
-            console.log('❌ Missing required fields')
-            return
-        }
-        
-        const db = store.readSync()
-        db.builds = db.builds || []
-        db.builds.push({
-            id: uid(),
-            name,
-            script,
-            serverId,
-            targetOverride: targetOverride || null
-        })
-        
-        // Sync to database first
-        await store.syncToDatabase(db)
-        console.log('✅ Build synced to database')
-        
-        
-        store.write(db, true) // skipSync since we just synced
-        // Build saved to database
-        
-        // Audit log
-        const server = db.servers?.find(s => s.id === serverId)
-        const serverName = server ? (server.displayName || server.name || 'Unknown') : 'Unknown'
-        await logAudit('create', 'build', name, { script, server: serverName, targetOverride })
-        console.log('✅ Audit log created')
-        
-        console.log('🔄 Re-rendering builds from database...')
-        await renderBuilds()
-        console.log('✅ Builds re-rendered')
-        closeBuildModal()
-    })
-}
-
-// Edit build modal
-if (editBuildModal) {
-    const cancelBtn = editBuildModal.querySelector('button[value="cancel"]')
-    if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeEditBuildModal() })
-    
-    editBuildModal.addEventListener('click', (e) => { if (e.target === editBuildModal) closeEditBuildModal() })
-}
-
-// Save edited build
-const saveEditBuildBtn = document.getElementById('saveEditBuildBtn')
-if (saveEditBuildBtn) {
-    saveEditBuildBtn.addEventListener('click', async (e) => {
-        e.preventDefault()
-        console.log('✏️ Editing build...')
-        const id = document.getElementById('editBuildId').value
-        const name = document.getElementById('editBuildName').value.trim()
-        const script = document.getElementById('editBuildScript').value
-        const serverId = document.getElementById('editBuildServer').value
-        const targetOverride = document.getElementById('editBuildTargetOverride').value.trim()
-        
-        if (!id || !name || !script || !serverId) {
-            console.log('❌ Missing required fields for edit')
-            return
-        }
-        
-        const db = store.readSync()
-        const build = db.builds.find(x => x.id === id)
-        if (build) {
-            const oldValues = {
-                name: build.name,
-                script: build.script,
-                serverId: build.serverId,
-                targetOverride: build.targetOverride
-            }
-            
-            build.name = name
-            build.script = script
-            build.serverId = serverId
-            build.targetOverride = targetOverride || null
-            
-            // Sync to database first
-            await store.syncToDatabase(db)
-            console.log('✅ Build synced to database')
-            
-            
-            store.write(db, true) // skipSync since we just synced
-            // Build updated in database
-            
-            // Audit log with old and new values
-            await logAudit('update', 'build', name, { 
-                old: oldValues,
-                new: { name, script, serverId, targetOverride }
-            })
-            console.log('✅ Audit log created')
-            
-            console.log('🔄 Re-rendering builds from database...')
-            await renderBuilds()
-            console.log('✅ Builds re-rendered')
-        } else {
-            console.log('❌ Build not found with id:', id)
-        }
-        closeEditBuildModal()
-    })
-}
-
-// Delete build modal
-if (deleteBuildModal) {
-    const cancelBtn = deleteBuildModal.querySelector('button[value="cancel"]')
-    if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeDeleteBuildModal() })
-    
-    deleteBuildModal.addEventListener('click', (e) => { if (e.target === deleteBuildModal) closeDeleteBuildModal() })
-}
+// Create build - moved to initBuildModal()
+// Edit build - moved to initBuildModal()
+// Delete build modal - moved to initBuildModal()
 
 // Build started modal
 const buildStartedModal = document.getElementById('buildStartedModal')
@@ -4013,54 +4009,7 @@ if (buildStartedModal) {
 }
 
 // Confirm delete build
-const confirmDeleteBuildBtn = document.getElementById('confirmDeleteBuildBtn')
-if (confirmDeleteBuildBtn) {
-    confirmDeleteBuildBtn.addEventListener('click', async (e) => {
-        e.preventDefault()
-        console.log('🗑️ Deleting build...')
-        if (buildToDelete) {
-            const buildName = buildToDelete.name
-            const buildId = buildToDelete.id
-            console.log('Deleting build:', buildName, 'with id:', buildId)
-            
-            // Delete from database first
-            try {
-                console.log('Sending delete request to database...')
-                const response = await fetch(`${API_BASE_URL}/api/delete-record`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        entityType: 'builds',
-                        id: buildId
-                    })
-                })
-                const result = await response.json()
-                console.log('Delete response:', result)
-            } catch (error) {
-                console.error('❌ Failed to delete build from database:', error)
-            }
-            
-            
-            const db = store.readSync()
-            const idx = db.builds.findIndex(x => x.id === buildId)
-            if (idx >= 0) {
-                db.builds.splice(idx, 1)
-                store.write(db, true) // skipSync since we already deleted from DB
-                // Build removed from database
-            }
-            
-            // Audit log
-            await logAudit('delete', 'build', buildName, {})
-            console.log('✅ Audit log created')
-            
-            // Re-render from database
-            console.log('🔄 Re-rendering builds from database...')
-            await renderBuilds()
-            console.log('✅ Builds re-rendered')
-        }
-        closeDeleteBuildModal()
-    })
-}
+// Confirm delete build - moved to initBuildModal()
 
 
 // ========== SERVER MODALS ==========
@@ -5595,6 +5544,12 @@ async function showView(name, updateUrl = true) {
                 console.log('✅ Builds refreshed from database')
                 break
                 
+            case 'pipelines':
+                // Load fresh pipelines from database
+                await renderPipelines()
+                console.log('✅ Pipelines refreshed from database')
+                break
+                
             case 'environments':
                 // Load fresh environment data from database
                 const envsResponse = await fetch(`${API_BASE_URL}/api/load-data`)
@@ -6714,9 +6669,13 @@ function initAuth() {
     }
 }
 
+console.log('🔍 About to check document.readyState:', document.readyState)
+
 // Call initialization when DOM is ready
 if (document.readyState === 'loading') {
+    console.log('⏳ DOM is loading, waiting for DOMContentLoaded...')
     document.addEventListener('DOMContentLoaded', () => {
+        console.log('✅ DOMContentLoaded fired!')
         // Log storage usage on startup
         const usage = getStorageUsage()
         console.log(`Storage usage: ${usage.sizeMB}MB / ${usage.limitMB}MB (${usage.percentUsed}%)`)
@@ -6724,34 +6683,331 @@ if (document.readyState === 'loading') {
             console.warn('Storage is over 80% full. Consider cleaning up old data.')
         }
         
-        initAuth()
-        initBuildModal()
-        initRefreshButtons()
-        initStatusMonitoring()
-        initializeAuditPagination()
+        console.log('🚀 Initializing components...')
+        
+        try {
+            console.log('1️⃣ Calling initAuth()...')
+            initAuth()
+            console.log('✅ initAuth() completed')
+        } catch (e) {
+            console.error('❌ initAuth() failed:', e)
+        }
+        
+        try {
+            console.log('2️⃣ Calling initBuildModal()...')
+            initBuildModal()
+            console.log('✅ initBuildModal() completed')
+        } catch (e) {
+            console.error('❌ initBuildModal() failed:', e)
+        }
+        
+        try {
+            console.log('3️⃣ Calling initRefreshButtons()...')
+            initRefreshButtons()
+            console.log('✅ initRefreshButtons() completed')
+        } catch (e) {
+            console.error('❌ initRefreshButtons() failed:', e)
+        }
+        
+        try {
+            console.log('4️⃣ Calling initStatusMonitoring()...')
+            initStatusMonitoring()
+            console.log('✅ initStatusMonitoring() completed')
+        } catch (e) {
+            console.error('❌ initStatusMonitoring() failed:', e)
+        }
+        
+        try {
+            console.log('5️⃣ Calling initializeAuditPagination()...')
+            initializeAuditPagination()
+            console.log('✅ initializeAuditPagination() completed')
+        } catch (e) {
+            console.error('❌ initializeAuditPagination() failed:', e)
+        }
+        
+        console.log('✅ All components initialized')
     })
 } else {
-    initAuth()
-    initBuildModal()
-    initRefreshButtons()
-    initStatusMonitoring()
-    initializeAuditPagination()
+    console.log('✅ DOM already loaded, initializing immediately...')
+    
+    try {
+        console.log('1️⃣ Calling initAuth()...')
+        initAuth()
+        console.log('✅ initAuth() completed')
+    } catch (e) {
+        console.error('❌ initAuth() failed:', e)
+    }
+    
+    try {
+        console.log('2️⃣ Calling initBuildModal()...')
+        initBuildModal()
+        console.log('✅ initBuildModal() completed')
+    } catch (e) {
+        console.error('❌ initBuildModal() failed:', e)
+    }
+    
+    try {
+        console.log('3️⃣ Calling initRefreshButtons()...')
+        initRefreshButtons()
+        console.log('✅ initRefreshButtons() completed')
+    } catch (e) {
+        console.error('❌ initRefreshButtons() failed:', e)
+    }
+    
+    try {
+        console.log('4️⃣ Calling initStatusMonitoring()...')
+        initStatusMonitoring()
+        console.log('✅ initStatusMonitoring() completed')
+    } catch (e) {
+        console.error('❌ initStatusMonitoring() failed:', e)
+    }
+    
+    try {
+        console.log('5️⃣ Calling initializeAuditPagination()...')
+        initializeAuditPagination()
+        console.log('✅ initializeAuditPagination() completed')
+    } catch (e) {
+        console.error('❌ initializeAuditPagination() failed:', e)
+    }
+    
+    console.log('✅ All components initialized')
 }
 
 // Initialize build modal event listeners after DOM is ready
 function initBuildModal() {
     const addBuildBtn = document.getElementById('addBuildBtn')
     const buildModal = document.getElementById('buildModal')
+    const editBuildModal = document.getElementById('editBuildModal')
+    const deleteBuildModal = document.getElementById('deleteBuildModal')
+    const saveBuildBtn = document.getElementById('saveBuildBtn')
+    const saveEditBuildBtn = document.getElementById('saveEditBuildBtn')
     
+    console.log('🔧 Initializing build modal...')
+    console.log('addBuildBtn:', addBuildBtn)
+    console.log('buildModal:', buildModal)
+    
+    // Add Build Button
     if (addBuildBtn && buildModal) {
+        console.log('✅ Build button and modal found, adding click listener')
         addBuildBtn.addEventListener('click', () => {
+            console.log('🖱️ Create Build button clicked!')
             populateServerDropdowns()
             try {
                 buildModal.showModal()
+                console.log('✅ Build modal opened')
             } catch (e) {
+                console.error('❌ Error opening build modal:', e)
                 buildModal.setAttribute('open', '')
             }
         })
+    } else {
+        console.error('❌ Build button or modal not found!')
+        console.error('Missing elements:', {
+            addBuildBtn: !addBuildBtn,
+            buildModal: !buildModal
+        })
+    }
+    
+    // Build Modal Event Listeners
+    if (buildModal) {
+        const cancelBtn = buildModal.querySelector('button[value="cancel"]')
+        if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeBuildModal() })
+        buildModal.addEventListener('click', (e) => { if (e.target === buildModal) closeBuildModal() })
+    }
+    
+    // Save Build Button
+    if (saveBuildBtn) {
+        saveBuildBtn.addEventListener('click', async (e) => {
+            e.preventDefault()
+            console.log('💾 Creating new build...')
+            const name = document.getElementById('buildName').value.trim()
+            const scriptElement = document.getElementById('buildScript')
+            const script = scriptElement ? scriptElement.value.trim() : ''
+            const serverElement = document.getElementById('buildServer')
+            const serverId = serverElement ? serverElement.value : ''
+            const targetOverride = document.getElementById('buildTargetOverride').value.trim()
+            
+            console.log('Build values:', { name, script, serverId, targetOverride })
+            
+            if (!name || !script || !serverId) {
+                console.log('❌ Missing required fields')
+                alert('Please fill in all required fields: Name, Script, and Server')
+                return
+            }
+            
+            const db = store.readSync()
+            db.builds = db.builds || []
+            const newBuild = {
+                id: uid(),
+                name: name,
+                script: script,
+                serverId: serverId,
+                targetOverride: targetOverride || null
+            }
+            console.log('New build object:', newBuild)
+            db.builds.push(newBuild)
+            
+            await store.syncToDatabase(db)
+            console.log('✅ Build synced to database')
+            
+            store.write(db, true)
+            
+            const server = db.servers?.find(s => s.id === serverId)
+            const serverName = server ? (server.displayName || server.name || 'Unknown') : 'Unknown'
+            await logAudit('create', 'build', name, { script, server: serverName, targetOverride })
+            console.log('✅ Audit log created')
+            
+            console.log('🔄 Re-rendering builds from database...')
+            await renderBuilds()
+            console.log('✅ Builds re-rendered')
+            closeBuildModal()
+        })
+    }
+    
+    // Edit Build Modal Event Listeners
+    if (editBuildModal) {
+        const cancelBtn = editBuildModal.querySelector('button[value="cancel"]')
+        if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeEditBuildModal() })
+        editBuildModal.addEventListener('click', (e) => { if (e.target === editBuildModal) closeEditBuildModal() })
+    }
+    
+    // Save Edit Build Button
+    if (saveEditBuildBtn) {
+        console.log('✅ Save Edit Build button found, adding click listener')
+        saveEditBuildBtn.addEventListener('click', async (e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            console.log('✏️ Editing build...')
+            const id = document.getElementById('editBuildId').value
+            const name = document.getElementById('editBuildName').value.trim()
+            const scriptElement = document.getElementById('editBuildScript')
+            const script = scriptElement ? scriptElement.value.trim() : ''
+            const serverElement = document.getElementById('editBuildServer')
+            const serverId = serverElement ? serverElement.value : ''
+            const targetOverride = document.getElementById('editBuildTargetOverride').value.trim()
+            
+            console.log('Edit build values:', { id, name, script, serverId, targetOverride })
+            
+            if (!id || !name || !script || !serverId) {
+                console.log('❌ Missing required fields for edit')
+                alert('Please fill in all required fields: Name, Script, and Server')
+                return
+            }
+            
+            const db = store.readSync()
+            const build = db.builds.find(x => x.id === id)
+            if (build) {
+                const oldValues = {
+                    name: build.name,
+                    script: build.script,
+                    serverId: build.serverId,
+                    targetOverride: build.targetOverride
+                }
+                
+                build.name = name
+                build.script = script
+                build.serverId = serverId
+                build.targetOverride = targetOverride || null
+                
+                console.log('Updated build object:', build)
+                
+                await store.syncToDatabase(db)
+                console.log('✅ Build synced to database')
+                
+                store.write(db, true)
+                
+                await logAudit('update', 'build', name, { 
+                    old: oldValues,
+                    new: { name, script, serverId, targetOverride }
+                })
+                console.log('✅ Audit log created')
+                
+                console.log('🔄 Re-rendering builds from database...')
+                await renderBuilds()
+                console.log('✅ Builds re-rendered')
+                
+                closeEditBuildModal()
+            } else {
+                console.log('❌ Build not found with id:', id)
+                alert('Build not found')
+            }
+        })
+    } else {
+        console.error('❌ Save Edit Build button not found!')
+    }
+    
+    // Delete Build Modal Event Listeners
+    if (deleteBuildModal) {
+        const cancelBtn = deleteBuildModal.querySelector('button[value="cancel"]')
+        if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeDeleteBuildModal() })
+        deleteBuildModal.addEventListener('click', (e) => { if (e.target === deleteBuildModal) closeDeleteBuildModal() })
+    }
+    
+    // Confirm Delete Build Button
+    const confirmDeleteBuildBtn = document.getElementById('confirmDeleteBuildBtn')
+    if (confirmDeleteBuildBtn) {
+        console.log('✅ Confirm Delete Build button found, adding click listener')
+        confirmDeleteBuildBtn.addEventListener('click', async (e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            console.log('🗑️ Deleting build...')
+            
+            const buildToDelete = window.buildToDelete
+            if (buildToDelete) {
+                const buildName = buildToDelete.name
+                const buildId = buildToDelete.id
+                console.log('Deleting build:', buildName, 'with id:', buildId)
+                
+                // Delete from database first
+                try {
+                    console.log('Sending delete request to database...')
+                    const response = await fetch(`${API_BASE_URL}/api/delete-record`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            entityType: 'build',
+                            id: buildId
+                        })
+                    })
+                    const result = await response.json()
+                    console.log('Delete response:', result)
+                    
+                    if (!result.success) {
+                        console.error('❌ Database delete failed:', result.error)
+                        alert('Failed to delete build from database: ' + (result.error || 'Unknown error'))
+                        return
+                    }
+                } catch (error) {
+                    console.error('❌ Failed to delete build from database:', error)
+                    alert('Failed to delete build: ' + error.message)
+                    return
+                }
+                
+                
+                const db = store.readSync()
+                const idx = db.builds.findIndex(x => x.id === buildId)
+                if (idx >= 0) {
+                    db.builds.splice(idx, 1)
+                    store.write(db, true)
+                }
+                
+                // Audit log
+                await logAudit('delete', 'build', buildName, {})
+                console.log('✅ Audit log created')
+                
+                // Re-render from database
+                console.log('🔄 Re-rendering builds from database...')
+                await renderBuilds()
+                console.log('✅ Builds re-rendered')
+                
+                closeDeleteBuildModal()
+            } else {
+                console.log('❌ No build to delete')
+                alert('No build selected for deletion')
+            }
+        })
+    } else {
+        console.error('❌ Confirm Delete Build button not found!')
     }
 }
 
@@ -8215,6 +8471,7 @@ const CommandPalette = {
             { id: 'nav-servers', title: 'Servers', description: 'Manage server infrastructure', icon: '🖥️', action: () => showView('servers'), section: 'Navigation' },
             { id: 'nav-scripts', title: 'Scripts', description: 'PowerShell script repository', icon: '📝', action: () => showView('scripts'), section: 'Navigation' },
             { id: 'nav-builds', title: 'Builds', description: 'Build execution and history', icon: '🔨', action: () => showView('builds'), section: 'Navigation' },
+            { id: 'nav-pipelines', title: 'Pipelines', description: 'CI/CD pipelines and automation', icon: '🔄', action: () => showView('pipelines'), section: 'Navigation' },
             { id: 'nav-admin', title: 'Admin Panel', description: 'System administration', icon: '⚙️', action: () => showView('admin'), section: 'Navigation' },
             
             // Actions
@@ -10520,10 +10777,14 @@ function setupCreateChannelModal() {
 
 // Initialize everything
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('📋 DOMContentLoaded at line 10618 - Initializing messaging and setup...')
     setupMessageModal()
     setupChannelTabs()
     setupCreateChannelModal()
     initMessaging()
+    
+    // Initialize build modal
+    initBuildModal()
     
     // Initialize setup wizard and check database
     initializeSetupWizard()

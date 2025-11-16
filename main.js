@@ -361,6 +361,107 @@ ipcMain.handle('test-server', async (event, { ipAddress, serverName, port = 3389
     }
 });
 
+// Execute PowerShell script on remote server
+ipcMain.handle('execute-powershell-remote', async (event, { host, script, username, password, domain }) => {
+    try {
+        console.log('🔧 Executing PowerShell remotely on', host, 'as', username);
+        
+        // Escape special characters in password and script
+        const escapedPassword = password.replace(/'/g, "''");
+        const escapedScript = script.replace(/'/g, "''").replace(/"/g, '""');
+        
+        // Build credential object
+        let credentialSetup = '';
+        if (domain) {
+            credentialSetup = `$username = '${domain}\\${username}'; $password = ConvertTo-SecureString '${escapedPassword}' -AsPlainText -Force; $credential = New-Object System.Management.Automation.PSCredential($username, $password);`;
+        } else {
+            credentialSetup = `$password = ConvertTo-SecureString '${escapedPassword}' -AsPlainText -Force; $credential = New-Object System.Management.Automation.PSCredential('${username}', $password);`;
+        }
+        
+        // Build PowerShell script block - encode script as base64 to avoid escaping issues
+        const scriptBytes = Buffer.from(script, 'utf16le');
+        const encodedScript = scriptBytes.toString('base64');
+        
+        // PowerShell command to execute remotely using base64 encoded script
+        const psCommand = `
+            ${credentialSetup}
+            $encodedScript = '${encodedScript}';
+            $scriptBytes = [System.Convert]::FromBase64String($encodedScript);
+            $decodedScript = [System.Text.Encoding]::Unicode.GetString($scriptBytes);
+            
+            try {
+                $result = Invoke-Command -ComputerName '${host}' -Credential $credential -ScriptBlock {
+                    param($scriptToRun)
+                    $output = Invoke-Expression $scriptToRun 2>&1 | Out-String
+                    Write-Output $output
+                } -ArgumentList $decodedScript -ErrorAction Stop
+                Write-Output "___BUILD_SUCCESS___"
+                Write-Output $result
+                exit 0
+            } catch {
+                Write-Output "___BUILD_ERROR___"
+                Write-Output "Error: $($_.Exception.Message)"
+                Write-Output "Stack: $($_.ScriptStackTrace)"
+                Write-Output $result
+                exit 1
+            }
+        `.trim();
+        
+        // Write PowerShell command to temp file to avoid command line length issues
+        const tempScriptPath = path.join(os.tmpdir(), `orbis-build-${Date.now()}.ps1`);
+        fs.writeFileSync(tempScriptPath, psCommand, 'utf8');
+        
+        // Execute PowerShell command
+        const { execSync } = require('child_process');
+        let output = '';
+        let exitCode = 0;
+        
+        try {
+            output = execSync(`powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${tempScriptPath}"`, {
+                encoding: 'utf8',
+                timeout: 300000, // 5 minutes timeout
+                maxBuffer: 20 * 1024 * 1024 // 20MB buffer
+            });
+            exitCode = 0;
+        } catch (error) {
+            output = (error.stdout || '') + '\n' + (error.stderr || '');
+            exitCode = error.status || 1;
+        } finally {
+            // Clean up temp file
+            try { fs.unlinkSync(tempScriptPath); } catch (e) { /* ignore */ }
+        }
+        
+        // Parse output
+        const isSuccess = exitCode === 0 && output.includes('___BUILD_SUCCESS___');
+        const isError = output.includes('___BUILD_ERROR___');
+        const cleanOutput = output
+            .replace(/___BUILD_SUCCESS___/g, '')
+            .replace(/___BUILD_ERROR___/g, '')
+            .trim();
+        
+        console.log('📊 PowerShell execution completed. Exit code:', exitCode);
+        console.log('📄 Output length:', cleanOutput.length, 'bytes');
+        console.log('📄 Output preview:', cleanOutput.substring(0, 500));
+        
+        return {
+            success: isSuccess,
+            output: isSuccess ? cleanOutput : '',
+            exitCode: exitCode,
+            error: isSuccess ? null : (cleanOutput || `Remote execution failed with exit code ${exitCode}`),
+            raw: output.substring(0, 1000) // Include raw output for debugging
+        };
+    } catch (error) {
+        console.error('❌ PowerShell remote execution error:', error);
+        return {
+            success: false,
+            output: '',
+            exitCode: 1,
+            error: `PowerShell execution failed: ${error.message}`,
+            raw: error.stack
+        };
+    }
+});
+
 // SSH/PuTTY connection
 ipcMain.handle('ssh-connect', async (event, { server, credential }) => {
     try {
@@ -653,6 +754,149 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
             )
         `);
         migrations.push('AuditLogs table created');
+        
+        // ==================== CI/CD PIPELINE TABLES ====================
+        
+        // Pipelines table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Pipelines' AND xtype='U')
+            CREATE TABLE Pipelines (
+                id NVARCHAR(50) PRIMARY KEY,
+                name NVARCHAR(255) NOT NULL,
+                description NVARCHAR(MAX),
+                enabled BIT DEFAULT 1,
+                created_by NVARCHAR(255),
+                created_at DATETIME DEFAULT GETDATE(),
+                updated_at DATETIME DEFAULT GETDATE()
+            )
+        `);
+        migrations.push('Pipelines table created');
+        
+        // PipelineStages table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='PipelineStages' AND xtype='U')
+            CREATE TABLE PipelineStages (
+                id NVARCHAR(50) PRIMARY KEY,
+                pipeline_id NVARCHAR(50) NOT NULL,
+                name NVARCHAR(255) NOT NULL,
+                [order] INT NOT NULL,
+                created_at DATETIME DEFAULT GETDATE(),
+                FOREIGN KEY (pipeline_id) REFERENCES Pipelines(id) ON DELETE CASCADE
+            )
+        `);
+        migrations.push('PipelineStages table created');
+        
+        // PipelineSteps table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='PipelineSteps' AND xtype='U')
+            CREATE TABLE PipelineSteps (
+                id NVARCHAR(50) PRIMARY KEY,
+                stage_id NVARCHAR(50) NOT NULL,
+                name NVARCHAR(255) NOT NULL,
+                [order] INT NOT NULL,
+                script_id NVARCHAR(50),
+                inline_script NVARCHAR(MAX),
+                server_id NVARCHAR(50),
+                timeout_ms INT DEFAULT 300000,
+                continue_on_error BIT DEFAULT 0,
+                created_at DATETIME DEFAULT GETDATE(),
+                FOREIGN KEY (stage_id) REFERENCES PipelineStages(id) ON DELETE CASCADE,
+                FOREIGN KEY (script_id) REFERENCES Scripts(id),
+                FOREIGN KEY (server_id) REFERENCES Servers(id)
+            )
+        `);
+        migrations.push('PipelineSteps table created');
+        
+        // PipelineRuns table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='PipelineRuns' AND xtype='U')
+            CREATE TABLE PipelineRuns (
+                id NVARCHAR(50) PRIMARY KEY,
+                pipeline_id NVARCHAR(50) NOT NULL,
+                status NVARCHAR(50) DEFAULT 'queued',
+                started_at DATETIME,
+                ended_at DATETIME,
+                triggered_by NVARCHAR(255),
+                trigger_type NVARCHAR(50) DEFAULT 'manual',
+                variables NVARCHAR(MAX),
+                created_at DATETIME DEFAULT GETDATE(),
+                FOREIGN KEY (pipeline_id) REFERENCES Pipelines(id) ON DELETE CASCADE
+            )
+        `);
+        migrations.push('PipelineRuns table created');
+        
+        // RunSteps table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='RunSteps' AND xtype='U')
+            CREATE TABLE RunSteps (
+                id NVARCHAR(50) PRIMARY KEY,
+                run_id NVARCHAR(50) NOT NULL,
+                step_id NVARCHAR(50) NOT NULL,
+                stage_name NVARCHAR(255),
+                step_name NVARCHAR(255),
+                status NVARCHAR(50) DEFAULT 'pending',
+                started_at DATETIME,
+                ended_at DATETIME,
+                exit_code INT,
+                output NVARCHAR(MAX),
+                log_path NVARCHAR(500),
+                error_message NVARCHAR(MAX),
+                created_at DATETIME DEFAULT GETDATE(),
+                FOREIGN KEY (run_id) REFERENCES PipelineRuns(id) ON DELETE CASCADE,
+                FOREIGN KEY (step_id) REFERENCES PipelineSteps(id)
+            )
+        `);
+        migrations.push('RunSteps table created');
+        
+        // Artifacts table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Artifacts' AND xtype='U')
+            CREATE TABLE Artifacts (
+                id NVARCHAR(50) PRIMARY KEY,
+                run_id NVARCHAR(50) NOT NULL,
+                name NVARCHAR(255) NOT NULL,
+                path NVARCHAR(500) NOT NULL,
+                size_bytes BIGINT,
+                mime_type NVARCHAR(100),
+                created_at DATETIME DEFAULT GETDATE(),
+                FOREIGN KEY (run_id) REFERENCES PipelineRuns(id) ON DELETE CASCADE
+            )
+        `);
+        migrations.push('Artifacts table created');
+        
+        // Variables table (pipeline variables and secrets)
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Variables' AND xtype='U')
+            CREATE TABLE Variables (
+                id NVARCHAR(50) PRIMARY KEY,
+                scope NVARCHAR(50) NOT NULL,
+                owner_id NVARCHAR(50),
+                [key] NVARCHAR(255) NOT NULL,
+                value NVARCHAR(MAX),
+                is_secret BIT DEFAULT 0,
+                created_at DATETIME DEFAULT GETDATE(),
+                updated_at DATETIME DEFAULT GETDATE()
+            )
+        `);
+        migrations.push('Variables table created');
+        
+        // PipelineSchedules table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='PipelineSchedules' AND xtype='U')
+            CREATE TABLE PipelineSchedules (
+                id NVARCHAR(50) PRIMARY KEY,
+                pipeline_id NVARCHAR(50) NOT NULL,
+                cron_expression NVARCHAR(100),
+                enabled BIT DEFAULT 1,
+                last_run DATETIME,
+                next_run DATETIME,
+                created_at DATETIME DEFAULT GETDATE(),
+                FOREIGN KEY (pipeline_id) REFERENCES Pipelines(id) ON DELETE CASCADE
+            )
+        `);
+        migrations.push('PipelineSchedules table created');
+        
+        // ==================== END PIPELINE TABLES ====================
         
         // Messages table (for direct and channel messages) - ensure dbo schema
         await pool.request().query(`
