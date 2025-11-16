@@ -331,49 +331,36 @@ async function emergencyStorageCleanup() {
 
 //
 
-// Audit logging function - async and database-first
+// Audit logging function - delegates to services/audit.js
 async function logAudit(action, entityType, entityName, details = {}) {
-	try {
-		const user = currentUser || { name: 'System', username: 'system' }
-		const ip = '127.0.0.1' // In a real app, this would be from backend
-		
-		const auditEntry = {
-			id: uid(),
-			action, // 'create', 'update', 'delete'
-			entityType, // 'environment', 'user', 'database', 'credential'
-			entityName,
-			user: user.name,
-			username: user.username,
-			timestamp: new Date().toISOString(),
-			ip,
-			details // Additional context like what changed
-		}
-
-		// Save directly to database
-		try {
-			const response = await fetch(`${API_BASE_URL}/api/sync-data`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					auditLogs: [auditEntry]
-				})
-			})
-			const result = await response.json()
-			if (result.success) {
-				console.log('📝 Audit log saved to database:', action, entityType, entityName)
-				
-				
-				const db = store.readSync()
-				db.auditLogs.push(auditEntry)
-				
-			}
-		} catch (syncError) {
-			console.error('⚠️ Failed to sync audit log to database:', syncError)
-		}
-	} catch (e) {
-		console.error('❌ Audit logging failed:', e)
-		// Don't throw - audit failures shouldn't break the main operation
-	}
+    try {
+        const userObj = currentUser || { name: 'System', username: 'system' }
+        const entry = {
+            id: uid(),
+            action,
+            entityType,
+            entityName,
+            user: userObj.name,
+            username: userObj.username,
+            timestamp: new Date().toISOString(),
+            ip: getLocalIP?.() || '127.0.0.1',
+            details
+        }
+        if (window.Audit && window.Audit.log) {
+            const res = await window.Audit.log(entry)
+            if (res && res.success) {
+                const db = store.readSync()
+                db.auditLogs = db.auditLogs || []
+                db.auditLogs.unshift(entry)
+                // Trim to reasonable recent size in memory
+                if (db.auditLogs.length > 1000) db.auditLogs.length = 1000
+            } else {
+                console.warn('Audit log DB write failed:', res?.error)
+            }
+        }
+    } catch (e) {
+        console.error('❌ Audit logging failed:', e)
+    }
 }
 
 // ========== CARD LOCK FUNCTIONALITY ==========

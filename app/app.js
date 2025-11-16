@@ -84,12 +84,8 @@ async function handleElectronAPI(url, options = {}) {
 
             case 'clear-audit-logs':
                 try {
-                    const del = await window.electronAPI.dbExecute('DELETE FROM AuditLogs', []);
-                    if (del.success) {
-                        result = { success: true, message: 'Audit logs cleared' };
-                    } else {
-                        result = { success: false, error: del.error || 'Failed to clear' };
-                    }
+                    const cleared = await window.Audit.clear();
+                    result = cleared.success ? { success: true, message: 'Audit logs cleared' } : { success: false, error: cleared.error };
                 } catch (error) {
                     result = { success: false, error: error.message };
                 }
