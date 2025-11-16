@@ -878,8 +878,3 @@ async function handleElectronAPI(url, options = {}) {
         };
     }
 }
-
-// Load the original app.js after setting up overrides
-const script = document.createElement('script');
-script.src = 'app-original.js';
-document.head.appendChild(script);

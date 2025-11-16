@@ -299,33 +299,6 @@
 </div>
 
 <div class="nav__group">
-  <div class="nav__label">DevOps</div>
-  <button class="nav__btn" data-view="scripts">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
-      <polyline points="16 18 22 12 16 6"></polyline>
-      <polyline points="8 6 2 12 8 18"></polyline>
-    </svg>
-    Scripts
-  </button>
-  <button class="nav__btn" data-view="builds">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
-      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-      <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-      <line x1="12" y1="22.08" x2="12" y2="12"></line>
-    </svg>
-    Builds
-  </button>
-  <button class="nav__btn" data-view="pipelines">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-      <line x1="9" y1="3" x2="9" y2="21"></line>
-      <line x1="15" y1="3" x2="15" y2="21"></line>
-    </svg>
-    Pipelines
-  </button>
-</div>
-
-<div class="nav__group">
   <div class="nav__label">System Administrators</div>
   <button class="nav__btn" data-view="admin-users">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
@@ -560,57 +533,6 @@
         </div>
       </div>
     </div>
-    
-    <!-- Scripts Summary -->
-    <div class="card" style="background:linear-gradient(135deg, rgba(139,92,246,0.1) 0%, rgba(124,58,237,0.05) 100%); border:1px solid rgba(139,92,246,0.2);">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-        <h3 style="margin:0;">Scripts</h3>
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(139,92,246,0.6)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="16 18 22 12 16 6"></polyline>
-          <polyline points="8 6 2 12 8 18"></polyline>
-        </svg>
-      </div>
-      <div style="font-size:36px; font-weight:700; color:#8b5cf6; margin-bottom:8px;" id="summaryScriptCount">0</div>
-      <div style="font-size:13px; color:var(--muted);">Total Scripts</div>
-      <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(139,92,246,0.2);">
-        <div style="display:flex; gap:16px; font-size:12px;">
-          <div style="flex:1;">
-            <div style="color:var(--muted);">PowerShell</div>
-            <div style="font-weight:600; color:#8b5cf6;" id="summaryScriptPS">0</div>
-          </div>
-          <div style="flex:1;">
-            <div style="color:var(--muted);">Bash</div>
-            <div style="font-weight:600; color:#8b5cf6;" id="summaryScriptBash">0</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Builds Summary -->
-    <div class="card" style="background:linear-gradient(135deg, rgba(245,158,11,0.1) 0%, rgba(217,119,6,0.05) 100%); border:1px solid rgba(245,158,11,0.2);">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-        <h3 style="margin:0;">Builds</h3>
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(245,158,11,0.6)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-          <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-          <line x1="12" y1="22.08" x2="12" y2="12"></line>
-        </svg>
-      </div>
-      <div style="font-size:36px; font-weight:700; color:#f59e0b; margin-bottom:8px;" id="summaryBuildCount">0</div>
-      <div style="font-size:13px; color:var(--muted);">Total Builds</div>
-      <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(245,158,11,0.2);">
-        <div style="display:flex; gap:16px; font-size:12px;">
-          <div style="flex:1;">
-            <div style="color:var(--muted);">Success</div>
-            <div style="font-weight:600; color:#10b981;" id="summaryBuildSuccess">0</div>
-          </div>
-          <div style="flex:1;">
-            <div style="color:var(--muted);">Failed</div>
-            <div style="font-weight:600; color:#ef4444;" id="summaryBuildFailed">0</div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
   
   <!-- Recent Activity -->
@@ -640,90 +562,12 @@
         </svg>
         Add Server
       </button>
-      <button class="btn btn-ghost" onclick="showView('scripts'); document.getElementById('addScriptBtn').click();">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
-          <polyline points="16 18 22 12 16 6"></polyline>
-          <polyline points="8 6 2 12 8 18"></polyline>
-        </svg>
-        New Script
-      </button>
-      <button class="btn btn-ghost" onclick="showView('builds'); document.getElementById('runBuildBtn').click();">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
-          <polygon points="5 3 19 12 5 21 5 3"></polygon>
-        </svg>
-        Run Build
-      </button>
     </div>
   </div>
 </div>
 </section>
 
 <section id="view-environments" class="view">
-<div class="view__header">
-  <h1>Environments</h1>
-  <div style="flex:1"></div>
-  <button id="addEnvBtn" class="btn">+ Add Environment</button>
-</div>
-<div id="envList" class="grid"></div>
-</section>
-
-
-<section id="view-scripts" class="view">
-<div class="view__header">
-  <h1>Scripts</h1>
-  <div style="flex:1"></div>
-  <button id="addScriptBtn" class="btn">+ New Script</button>
-</div>
-<div id="scriptsList" class="grid"></div>
-</section>
-
-<section id="view-builds" class="view">
-<div class="view__header">
-  <h1>Builds</h1>
-  <div style="flex:1"></div>
-  <button id="addBuildBtn" class="btn">+ Create Build</button>
-</div>
-<div id="buildsList" class="stack"></div>
-</section>
-
-<section id="view-pipelines" class="view">
-<div class="view__header">
-  <h1>Pipelines</h1>
-  <div style="flex:1"></div>
-  <button id="refreshPipelinesBtn" class="btn btn-ghost">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <polyline points="23 4 23 10 17 10"></polyline>
-      <polyline points="1 20 1 14 7 14"></polyline>
-      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-    </svg>
-    Refresh
-  </button>
-  <button id="addPipelineBtn" class="btn">+ Create Pipeline</button>
-</div>
-<div class="tabs">
-  <button class="tab-btn active" data-tab="pipelines-list">Pipelines</button>
-  <button class="tab-btn" data-tab="pipeline-runs">Run History</button>
-  <button class="tab-btn" data-tab="pipeline-variables">Variables</button>
-</div>
-<div id="pipelines-list" class="tab-content active">
-  <div id="pipelinesList" class="stack"></div>
-</div>
-<div id="pipeline-runs" class="tab-content">
-  <div id="pipelineRunsList" class="stack"></div>
-</div>
-<div id="pipeline-variables" class="tab-content">
-  <div class="stack">
-    <div class="card">
-      <h3>Global Variables</h3>
-      <p class="muted">Define variables that can be used across all pipelines</p>
-      <button id="addVariableBtn" class="btn btn-ghost">+ Add Variable</button>
-      <div id="variablesList" class="stack"></div>
-    </div>
-  </div>
-</div>
-</section>
-
-<section id="view-elasticsearch" class="view">
 <div class="view__header">
   <h1>ElasticSearch</h1>
   <div style="flex:1"></div>
@@ -2944,262 +2788,23 @@
 </form>
 </dialog>
 
-<dialog id="buildModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
-<h2>Create Build</h2>
-<label class="label">Build Name
-<input id="buildName" class="input" placeholder="e.g., Deploy Frontend, Run Tests" required />
-</label>
-<label class="label">PowerShell Script
-<textarea id="buildScript" class="input" placeholder="Enter PowerShell script to execute on target server..." required style="font-family:monospace; min-height:150px; resize:vertical;"></textarea>
-<small style="color:var(--muted); font-size:12px;">This script will be executed on the target server via PowerShell remoting</small>
-</label>
-<label class="label">Target Server
-<select id="buildServer" class="input" required>
-<option value="">-- Select Server --</option>
-</select>
-</label>
-<label class="label">Override Target IP/Hostname (Optional)
-<input id="buildTargetOverride" class="input" placeholder="e.g., 192.168.1.100 or SERVERNAME" />
-<small style="color:var(--muted); font-size:12px;">Leave empty to use server's configured IP. Or enter custom IP/hostname to override.</small>
-</label>
-<menu class="row end">
-<button id="saveBuildBtn" type="button" class="btn">Create Build</button>
-</menu>
-</form>
-</dialog>
 
-<dialog id="editBuildModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
-<h2>Edit Build</h2>
-<input type="hidden" id="editBuildId" />
-<label class="label">Build Name
-<input id="editBuildName" class="input" placeholder="e.g., Deploy Frontend, Run Tests" required />
-</label>
-<label class="label">PowerShell Script
-<textarea id="editBuildScript" class="input" placeholder="Enter PowerShell script to execute on target server..." required style="font-family:monospace; min-height:150px; resize:vertical;"></textarea>
-<small style="color:var(--muted); font-size:12px;">This script will be executed on the target server via PowerShell remoting</small>
-</label>
-<label class="label">Target Server
-<select id="editBuildServer" class="input" required>
-<option value="">-- Select Server --</option>
-</select>
-</label>
-<label class="label">Override Target IP/Hostname (Optional)
-<input id="editBuildTargetOverride" class="input" placeholder="e.g., 192.168.1.100 or SERVERNAME" />
-<small style="color:var(--muted); font-size:12px;">Leave empty to use server's configured IP. Or enter custom IP/hostname to override.</small>
-</label>
-<menu class="row end">
-<button id="saveEditBuildBtn" type="button" class="btn">Save Changes</button>
-</menu>
-</form>
-</dialog>
 
-<dialog id="deleteBuildModal" class="modal">
-<form method="dialog" class="card" style="max-width:500px;">
-<div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
-<div style="width:48px; height:48px; border-radius:12px; background:rgba(239,68,68,0.1); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-<line x1="12" y1="9" x2="12" y2="13"></line>
-<line x1="12" y1="17" x2="12.01" y2="17"></line>
-</svg>
-</div>
-<div style="flex:1;">
-<h2 style="margin:0 0 8px 0;">Delete Build?</h2>
-<p id="deleteBuildName" style="margin:0; color:var(--muted); font-size:14px;">Are you sure you want to delete this build? This action cannot be undone.</p>
-</div>
-</div>
-<menu class="row end">
-<button value="cancel" class="btn btn-ghost">Cancel</button>
-<button id="confirmDeleteBuildBtn" type="submit" value="confirm" class="btn btn-danger">Delete Build</button>
-</menu>
-</form>
-</dialog>
 
-<dialog id="buildStartedModal" class="modal">
-<form method="dialog" class="card" style="max-width:500px; overflow:hidden;">
-<div style="position:absolute; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg, #6366f1 0%, #8b5cf6 25%, #ec4899 50%, #8b5cf6 75%, #6366f1 100%); background-size:200% 100%; animation:shimmer 3s linear infinite;"></div>
-<div style="display:flex; align-items:center; gap:16px; margin:20px 0;">
-<div style="width:56px; height:56px; border-radius:16px; background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); display:flex; align-items:center; justify-content:center; flex-shrink:0; position:relative;">
-<div style="position:absolute; inset:0; border-radius:16px; background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); opacity:0.5; animation:pulse 2s ease-in-out infinite;"></div>
-<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:relative; z-index:1;">
-<polygon points="5 3 19 12 5 21 5 3"></polygon>
-</svg>
-</div>
-<div style="flex:1;">
-<h2 style="margin:0 0 8px 0; font-size:20px;">Build Started!</h2>
-<p id="buildStartedMessage" style="margin:0; color:var(--muted); font-size:14px; line-height:1.5;">Your build is now executing...</p>
-</div>
-</div>
-<div style="background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.2); border-radius:8px; padding:12px; margin-bottom:20px;">
-<div style="display:flex; gap:16px; align-items:center;">
-<div style="flex:1;">
-<div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Script</div>
-<div id="buildStartedScript" style="font-family:monospace; font-size:13px; color:#6366f1; font-weight:500;"></div>
-</div>
-<div style="flex:1;">
-<div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Server</div>
-<div id="buildStartedServer" style="font-size:13px; color:var(--text); font-weight:500;"></div>
-</div>
-</div>
-</div>
-<menu class="row end" style="margin:0;">
-<button type="submit" value="default" class="btn" style="background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color:white; border:none;">Got it!</button>
-</menu>
-</form>
-</dialog>
 
-<!-- Pipeline Modals -->
-<dialog id="pipelineModal" class="modal">
-<form method="dialog" class="card" style="max-width:700px;">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close" style="z-index:10;">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
-<h2>Create Pipeline</h2>
-<label class="label">Pipeline Name
-<input id="pipelineName" class="input" placeholder="e.g., Deploy to Production" required />
-</label>
-<label class="label">Description
-<textarea id="pipelineDescription" class="input" placeholder="Describe what this pipeline does..." style="min-height:80px; resize:vertical;"></textarea>
-</label>
-<menu class="row end" style="gap:12px;">
-<button type="submit" value="cancel" class="btn btn-ghost">Cancel</button>
-<button id="savePipelineBtn" type="button" class="btn">Create Pipeline</button>
-</menu>
-</form>
-</dialog>
 
-<dialog id="editPipelineModal" class="modal">
-<form method="dialog" class="card" style="width:90vw; max-width:680px; max-height:90vh; overflow-y:auto;">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close" style="z-index:10;">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
-<input type="hidden" id="editPipelineId" />
-<h2>Edit Pipeline</h2>
-<label class="label">Pipeline Name
-<input id="editPipelineName" class="input" required />
-</label>
-<label class="label">Description
-<textarea id="editPipelineDescription" class="input" style="min-height:80px; resize:vertical;"></textarea>
-</label>
-<div style="margin-top:32px; padding-top:24px; border-top:1px solid var(--border);">
-<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-<h3 style="margin:0;">Stages & Steps</h3>
-<button id="addStageBtn" type="button" class="btn btn-sm">+ Add Stage</button>
-</div>
-<div id="pipelineStagesList" class="stack" style="gap:12px;"></div>
-</div>
-<menu class="row end" style="gap:12px; margin-top:24px;">
-<button type="submit" value="cancel" class="btn btn-ghost">Cancel</button>
-<button id="saveEditPipelineBtn" type="button" class="btn">Save Changes</button>
-</menu>
-</form>
-</dialog>
 
-<dialog id="addStageModal" class="modal">
-<form method="dialog" class="card" style="max-width:500px;">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close" style="z-index:10;">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
-<h2>Add Stage</h2>
-<p style="color:var(--muted); margin:0 0 20px 0; font-size:14px;">Stages run sequentially. Add steps to each stage for parallel execution.</p>
-<label class="label">Stage Name
-<input id="stageName" class="input" placeholder="e.g., Build, Test, Deploy" required />
-</label>
-<menu class="row end" style="gap:12px; margin-top:24px;">
-<button type="submit" value="cancel" class="btn btn-ghost">Cancel</button>
-<button id="saveStageBtn" type="button" class="btn">Add Stage</button>
-</menu>
-</form>
-</dialog>
 
-<dialog id="addStepModal" class="modal">
-<form method="dialog" class="card" style="width:90vw; max-width:800px;">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close" style="z-index:10;">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
-<input type="hidden" id="stepStageId" />
-<h2>Add Step</h2>
-<label class="label">Step Name
-<input id="stepName" class="input" placeholder="e.g., Run Tests, Deploy Service" required />
-</label>
-<label class="label">Script Source
-<select id="stepScriptSource" class="input">
-<option value="inline">Inline Script</option>
-<option value="library">Script Library</option>
-</select>
-</label>
-<div id="inlineScriptContainer">
-<label class="label">PowerShell Script
-<textarea id="stepInlineScript" class="input" placeholder="Write-Host 'Hello from pipeline step'" style="font-family:monospace; min-height:150px; resize:vertical;"></textarea>
-</label>
-</div>
-<div id="libraryScriptContainer" style="display:none;">
-<label class="label">Select Script
-<select id="stepScriptId" class="input">
-<option value="">-- Select Script --</option>
-</select>
-</label>
-</div>
-<label class="label">Target Server
-<select id="stepServerId" class="input" required>
-<option value="">-- Select Server --</option>
-</select>
-</label>
-<label class="label">Timeout (seconds)
-<input id="stepTimeout" class="input" type="number" value="300" min="1" />
-</label>
-<label class="label" style="display:flex; align-items:center; gap:8px;">
-<input id="stepContinueOnError" type="checkbox" />
-<span>Continue pipeline if this step fails</span>
-</label>
-<menu class="row end" style="gap:12px;">
-<button type="submit" value="cancel" class="btn btn-ghost">Cancel</button>
-<button id="saveStepBtn" type="button" class="btn">Add Step</button>
-</menu>
-</form>
-</dialog>
 
-<dialog id="runDetailsModal" class="modal">
-<form method="dialog" class="card" style="width:90vw; max-width:1200px; max-height:90vh; overflow-y:auto;">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close" style="z-index:10;">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
-<h2 id="runDetailsTitle">Pipeline Run</h2>
-<div id="runDetailsContent" class="stack"></div>
-<menu class="row end" style="gap:12px; margin-top:24px;">
-<button type="submit" value="cancel" class="btn btn-ghost">Close</button>
-</menu>
-</form>
-</dialog>
+
+
+
+
+
+
+
+
+
 
 <!-- Custom Confirm Dialog -->
 <dialog id="customConfirmModal" class="modal">
@@ -3449,107 +3054,13 @@ Channels
 </form>
 </dialog>
 
-<dialog id="scriptModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
-<h2>Upload PowerShell Script</h2>
-<label class="label">Script Name
-<input id="scriptName" class="input" placeholder="e.g., Deploy Application" required />
-</label>
-<label class="label">Description
-<input id="scriptDescription" class="input" placeholder="Optional description" />
-</label>
-<label class="label">PowerShell Script File
-<input id="scriptFile" type="file" class="input" accept=".ps1" required style="padding:8px;" />
-</label>
-<div id="scriptFilePreview" style="display:none; margin-top:12px; padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
-<div style="font-size:12px; color:var(--muted); margin-bottom:8px;">File Preview:</div>
-<div id="scriptFileContent" style="font-family:monospace; font-size:12px; max-height:200px; overflow-y:auto; white-space:pre-wrap; word-break:break-all;"></div>
-</div>
-<menu class="row end">
-<button id="saveScriptBtn" type="submit" value="default" class="btn">Upload Script</button>
-</menu>
-</form>
-</dialog>
 
-<dialog id="editScriptModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
-<h2>Edit Script</h2>
-<input type="hidden" id="editScriptId" />
-<label class="label">Script Name
-<input id="editScriptName" class="input" placeholder="e.g., Deploy Application" required />
-</label>
-<label class="label">Description
-<input id="editScriptDescription" class="input" placeholder="Optional description" />
-</label>
-<label class="label">PowerShell Script File (optional - leave empty to keep current)
-<input id="editScriptFile" type="file" class="input" accept=".ps1" style="padding:8px;" />
-</label>
-<div id="editScriptFilePreview" style="display:none; margin-top:12px; padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
-<div style="font-size:12px; color:var(--muted); margin-bottom:8px;">File Preview:</div>
-<div id="editScriptFileContent" style="font-family:monospace; font-size:12px; max-height:200px; overflow-y:auto; white-space:pre-wrap; word-break:break-all;"></div>
-</div>
-<menu class="row end">
-<button id="saveEditScriptBtn" type="submit" value="default" class="btn">Save Changes</button>
-</menu>
-</form>
-</dialog>
 
-<dialog id="deleteScriptModal" class="modal">
-<form method="dialog" class="card" style="max-width:500px;">
-<div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
-<div style="width:48px; height:48px; border-radius:12px; background:rgba(239,68,68,0.1); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-<line x1="12" y1="9" x2="12" y2="13"></line>
-<line x1="12" y1="17" x2="12.01" y2="17"></line>
-</svg>
-</div>
-<div style="flex:1;">
-<h2 style="margin:0 0 8px 0;">Delete Script?</h2>
-<p id="deleteScriptName" style="margin:0; color:var(--muted); font-size:14px;">Are you sure you want to delete this script? This action cannot be undone.</p>
-</div>
-</div>
-<menu class="row end">
-<button value="cancel" class="btn btn-ghost">Cancel</button>
-<button id="confirmDeleteScriptBtn" type="submit" value="default" class="btn btn-danger">Delete Script</button>
-</menu>
-</form>
-</dialog>
 
-<dialog id="viewScriptModal" class="modal">
-<form method="dialog" class="card" style="max-width:800px;">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
-<h2 id="viewScriptTitle">Script Name</h2>
-<p id="viewScriptDescription" style="color:var(--muted); margin-bottom:16px;"></p>
-<div style="background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:16px;">
-<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-<span style="font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Script Content</span>
-<button type="button" id="copyScriptBtn" class="btn btn-ghost" style="font-size:12px; padding:4px 8px;">Copy</button>
-</div>
-<pre id="viewScriptContent" style="margin:0; font-family:monospace; font-size:12px; max-height:400px; overflow-y:auto; white-space:pre-wrap; word-break:break-all;"></pre>
-</div>
-<menu class="row end">
-<button type="submit" value="default" class="btn">Close</button>
-</menu>
-</form>
-</dialog>
+
+
+
+
 
 <!-- Database Setup Modals -->
 <dialog id="dbInitProgressModal" class="modal">
@@ -3849,7 +3360,8 @@ Channels
 </dialog>
 
 <!-- Socket.IO removed for desktop app -->
-<script src="app.js"></script><script src="pipeline-manager.js"></script><script src="pipeline-ui.js"></script><script src="app-main.js"></script>
+<script src="app.js"></script>
+<script src="app-main.js"></script>
 </body>
 </html>
 

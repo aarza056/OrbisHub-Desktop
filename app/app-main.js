@@ -105,7 +105,6 @@ const store = {
     ensureDbStructure(db) {
         if (!db.notificationSettings) {
             db.notificationSettings = {
-                builds: { enabled: false, on: 'all', channel: '', recipients: '' },
                 system: { enabled: false, level: 'all', channel: '', recipients: '' },
                 summary: { enabled: false, time: '09:00', channel: '', recipients: '' },
                 health: { enabled: false, status: 'all', channel: '', recipients: '' }
@@ -115,9 +114,7 @@ const store = {
         if (!db.integrations) db.integrations = []
         if (!db.credentials) db.credentials = []
         if (!db.auditLogs) db.auditLogs = []
-        if (!db.builds) db.builds = []
         if (!db.servers) db.servers = []
-        if (!db.scripts) db.scripts = []
         if (!db.environments) db.environments = []
         if (!db.users) db.users = []
         if (!db.jobs) db.jobs = []
@@ -272,6 +269,28 @@ function uid() {
 }
 
 // Storage utility removed - database-only architecture
+
+// Lightweight storage usage helper (safe in renderer; DB-first app)
+function getStorageUsage() {
+    try {
+        // Estimate JSON size of in-memory DB cache
+        const db = store.readSync?.() || {}
+        const json = JSON.stringify(db)
+        // Use TextEncoder for accurate byte length where available
+        let bytes = 0
+        try {
+            bytes = new TextEncoder().encode(json).length
+        } catch (e) {
+            bytes = json.length
+        }
+        const sizeMB = +(bytes / (1024 * 1024)).toFixed(2)
+        const limitMB = 512 // generous logical limit for display only
+        const percentUsed = Math.min(100, +((sizeMB / limitMB) * 100).toFixed(1))
+        return { sizeMB, limitMB, percentUsed }
+    } catch (e) {
+        return { sizeMB: 0, limitMB: 512, percentUsed: 0 }
+    }
+}
 
 // Clean up audit logs in database
 async function cleanupAuditLogs(keepCount = 100) {
@@ -2146,103 +2165,9 @@ function openEditCredential(credential) {
     }
 }
 
+/* BEGIN REMOVED: Obsolete Builds/Scripts/Pipelines code (commented out to restore syntax)
 
-// ========== BUILDS RENDERING ==========
-async function renderBuilds() {
-    const container = document.getElementById('buildsList')
-    if (!container) return
-    
-    console.log('🔨 Loading builds from database...')
-    
-    let builds = []
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/load-data`)
-        const result = await response.json()
-        
-        if (result.success && result.data) {
-            builds = result.data.builds || []
-            console.log('🔨 Loaded from database:', builds.length, 'builds')
-            
-            
-            const db = store.readSync()
-            db.builds = builds
-            
-        } else {
-            
-            const db = store.readSync()
-            builds = db.builds || []
-            console.log('⚠️ Database fallback:', builds.length, 'builds')
-        }
-    } catch (error) {
-        console.error('❌ Failed to load builds from database:', error)
-        const db = store.readSync()
-        builds = db.builds || []
-        console.log('⚠️ Database fallback:', builds.length, 'builds')
-    }
-    
-    if (builds.length === 0) {
-        container.innerHTML = '<p class="muted" style="text-align:center; padding:40px;">No builds configured yet. Create your first build to get started.</p>'
-        return
-    }
-    
-    // Helper function to format relative time
-    const formatRelativeTime = (timestamp) => {
-        if (!timestamp) return 'Never'
-        const now = Date.now()
-        const diff = now - timestamp
-        const minutes = Math.floor(diff / 60000)
-        const hours = Math.floor(diff / 3600000)
-        const days = Math.floor(diff / 86400000)
-        
-        if (minutes < 1) return 'Just now'
-        if (minutes < 60) return `${minutes}m ago`
-        if (hours < 24) return `${hours}h ago`
-        if (days < 7) return `${days}d ago`
-        return new Date(timestamp).toLocaleDateString()
-    }
-    
-    // Helper function to format elapsed time
-    const formatElapsedTime = (startTime) => {
-        const elapsed = Date.now() - startTime
-        const seconds = Math.floor(elapsed / 1000)
-        const minutes = Math.floor(seconds / 60)
-        const hours = Math.floor(minutes / 60)
-        
-        if (hours > 0) return `${hours}h ${minutes % 60}m ${seconds % 60}s`
-        if (minutes > 0) return `${minutes}m ${seconds % 60}s`
-        return `${seconds}s`
-    }
-    
-    // Helper function to format duration from milliseconds
-    const formatDuration = (ms) => {
-        if (!ms) return ''
-        const seconds = Math.floor(ms / 1000)
-        const minutes = Math.floor(seconds / 60)
-        const hours = Math.floor(minutes / 60)
-        
-        if (hours > 0) return `${hours}h ${minutes % 60}m ${seconds % 60}s`
-        if (minutes > 0) return `${minutes}m ${seconds % 60}s`
-        return `${seconds}s`
-    }
-    
-    // Get db reference for server lookups
-    const db = store.readSync()
-    
-    container.innerHTML = ''
-    builds.forEach(build => {
-        const card = document.createElement('div')
-        card.className = 'card'
-        card.style.padding = '20px'
-        card.id = `build-card-${build.id}`
-        
-        const server = db.servers?.find(s => s.id === build.serverId)
-        const serverName = server ? (server.displayName || server.name || 'Unknown Server') : 'Unknown Server'
-        
-        // Progress bar HTML (only if build is running)
-        let progressBarHtml = ''
-        if (build.isRunning) {
-            const elapsedTime = formatElapsedTime(build.runStartTime)
-            progressBarHtml = `
+// ========== AUDIT LOGS PAGINATION ==========
                 <div style="background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.3); border-radius:8px; padding:12px; margin:12px 0;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                         <div style="display:flex; align-items:center; gap:8px;">
@@ -2758,6 +2683,8 @@ function openEditBuild(build) {
     }
 }
 
+*/
+
 // ========== AUDIT LOGS PAGINATION ==========
 let auditPagination = {
     currentPage: 1,
@@ -3066,25 +2993,39 @@ const addEnvBtn = document.getElementById('addEnvBtn')
 const envModal = document.getElementById('envModal')
 
 function closeEnvModal() {
+    if (!envModal) return
     try { envModal.close() } catch (e) { /* ignore */ }
     // ensure open attribute removed and blur any focused control inside
     try { envModal.removeAttribute('open') } catch (e) {}
-    const focused = envModal.querySelector(':focus')
-    if (focused && typeof focused.blur === 'function') focused.blur()
+    try {
+        const focused = envModal.querySelector(':focus')
+        if (focused && typeof focused.blur === 'function') focused.blur()
+    } catch (e) {}
     
     // Clear form fields when closing
-    document.getElementById('envName').value = ''
-    document.getElementById('envUrl').value = ''
-    document.getElementById('envType').value = 'Production'
+    const nameEl = document.getElementById('envName')
+    const urlEl = document.getElementById('envUrl')
+    const typeEl = document.getElementById('envType')
+    if (nameEl) nameEl.value = ''
+    if (urlEl) urlEl.value = ''
+    if (typeEl) typeEl.value = 'Production'
     
     // move focus back to the Add button so keyboard users continue where they left off
-    try { addEnvBtn.focus() } catch (e) {}
+    try { addEnvBtn && addEnvBtn.focus() } catch (e) {}
 }
 
-addEnvBtn.addEventListener('click', () => {
-	// show modal and focus first input
-	try { envModal.showModal(); envModal.querySelector('#envName')?.focus() } catch (e) { envModal.setAttribute('open', '') }
-})
+if (addEnvBtn && envModal) {
+    addEnvBtn.addEventListener('click', () => {
+        // show modal and focus first input
+        try {
+            envModal.showModal()
+            const first = envModal.querySelector('#envName')
+            if (first) first.focus()
+        } catch (e) {
+            envModal.setAttribute('open', '')
+        }
+    })
+}
 
 // Add Server button (opens server modal)
 const addServerBtn = document.getElementById('addServerBtn')
@@ -3119,12 +3060,14 @@ const cancelBtn = document.querySelector('#envModal button[value="cancel"]')
 if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeEnvModal() })
 
 // close when clicking backdrop (dialog element) or pressing Escape
-envModal.addEventListener('click', (e) => { if (e.target === envModal) closeEnvModal() })
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && envModal.hasAttribute('open')) closeEnvModal() })
+if (envModal) {
+    envModal.addEventListener('click', (e) => { if (e.target === envModal) closeEnvModal() })
+}
+document.addEventListener('keydown', (e) => { if (envModal && e.key === 'Escape' && envModal.hasAttribute('open')) closeEnvModal() })
 
 
 // Handle env form submission (supports Enter key)
-const envForm = envModal.querySelector('form')
+const envForm = envModal ? envModal.querySelector('form') : null
 if (envForm) {
     envForm.addEventListener('submit', async (e) => {
         e.preventDefault()
@@ -4486,10 +4429,7 @@ async function renderAllViews() {
         console.log('✅ Credentials rendered')
         await renderAuditLogs()
         console.log('✅ Audit logs rendered')
-        await renderBuilds()
-        console.log('✅ Builds rendered')
-        renderScripts()
-        console.log('✅ Scripts rendered')
+        // Builds/Scripts removed; skip rendering those views
         renderIntegrations()
         console.log('✅ Integrations rendered')
         console.log('🎉 App initialization complete!')
@@ -5294,35 +5234,51 @@ function updateSummaryDashboard() {
     
     // Environments stats
     const environments = db.environments || []
-    document.getElementById('summaryEnvCount').textContent = environments.length
+    const elEnvCount = document.getElementById('summaryEnvCount')
+    if (elEnvCount) elEnvCount.textContent = environments.length
     const healthyEnvs = environments.filter(e => e.health === 'healthy').length
     const issueEnvs = environments.length - healthyEnvs
-    document.getElementById('summaryEnvHealthy').textContent = healthyEnvs
-    document.getElementById('summaryEnvIssues').textContent = issueEnvs
+    const elEnvHealthy = document.getElementById('summaryEnvHealthy')
+    if (elEnvHealthy) elEnvHealthy.textContent = healthyEnvs
+    const elEnvIssues = document.getElementById('summaryEnvIssues')
+    if (elEnvIssues) elEnvIssues.textContent = issueEnvs
     
     // Servers stats
     const servers = db.servers || []
-    document.getElementById('summaryServerCount').textContent = servers.length
+    const elSrvCount = document.getElementById('summaryServerCount')
+    if (elSrvCount) elSrvCount.textContent = servers.length
     const onlineServers = servers.filter(s => s.health === 'ok').length
     const offlineServers = servers.filter(s => s.health === 'error').length
-    document.getElementById('summaryServerOnline').textContent = onlineServers
-    document.getElementById('summaryServerOffline').textContent = offlineServers
+    const elSrvOnline = document.getElementById('summaryServerOnline')
+    if (elSrvOnline) elSrvOnline.textContent = onlineServers
+    const elSrvOffline = document.getElementById('summaryServerOffline')
+    if (elSrvOffline) elSrvOffline.textContent = offlineServers
     
-    // Scripts stats
+    // Scripts stats (UI removed) — update only if elements still exist
     const scripts = db.scripts || []
-    document.getElementById('summaryScriptCount').textContent = scripts.length
-    const psScripts = scripts.filter(s => s.language === 'powershell').length
-    const bashScripts = scripts.filter(s => s.language === 'bash').length
-    document.getElementById('summaryScriptPS').textContent = psScripts
-    document.getElementById('summaryScriptBash').textContent = bashScripts
+    const elScriptCount = document.getElementById('summaryScriptCount')
+    if (elScriptCount) {
+        elScriptCount.textContent = scripts.length
+        const psScripts = scripts.filter(s => s.language === 'powershell').length
+        const bashScripts = scripts.filter(s => s.language === 'bash').length
+        const elPS = document.getElementById('summaryScriptPS')
+        if (elPS) elPS.textContent = psScripts
+        const elBash = document.getElementById('summaryScriptBash')
+        if (elBash) elBash.textContent = bashScripts
+    }
     
-    // Builds stats
+    // Builds stats (UI removed) — update only if elements still exist
     const builds = db.builds || []
-    document.getElementById('summaryBuildCount').textContent = builds.length
-    const successBuilds = builds.filter(b => b.status === 'success').length
-    const failedBuilds = builds.filter(b => b.status === 'failed').length
-    document.getElementById('summaryBuildSuccess').textContent = successBuilds
-    document.getElementById('summaryBuildFailed').textContent = failedBuilds
+    const elBuildCount = document.getElementById('summaryBuildCount')
+    if (elBuildCount) {
+        elBuildCount.textContent = builds.length
+        const successBuilds = builds.filter(b => b.status === 'success').length
+        const failedBuilds = builds.filter(b => b.status === 'failed').length
+        const elBuildSuccess = document.getElementById('summaryBuildSuccess')
+        if (elBuildSuccess) elBuildSuccess.textContent = successBuilds
+        const elBuildFailed = document.getElementById('summaryBuildFailed')
+        if (elBuildFailed) elBuildFailed.textContent = failedBuilds
+    }
     
     // Recent activity
     updateRecentActivity(db)
@@ -5377,6 +5333,7 @@ function updateRecentActivity(db) {
         return
     }
     
+    if (!activityContainer) return
     activityContainer.innerHTML = recentActivities.map(activity => {
         const timeAgo = getTimeAgo(activity.time)
         const statusColor = activity.status === 'success' ? '#10b981' : 
@@ -5538,17 +5495,9 @@ async function showView(name, updateUrl = true) {
                 console.log('✅ Audit logs refreshed from database')
                 break
                 
-            case 'builds':
-                // Load fresh builds from database
-                await renderBuilds() // This function already loads from DB
-                console.log('✅ Builds refreshed from database')
-                break
-                
-            case 'pipelines':
-                // Load fresh pipelines from database
-                await renderPipelines()
-                console.log('✅ Pipelines refreshed from database')
-                break
+            // case 'builds':
+            //     // Builds view has been removed
+            //     break
                 
             case 'environments':
                 // Load fresh environment data from database
@@ -6693,10 +6642,19 @@ if (document.readyState === 'loading') {
             console.error('❌ initAuth() failed:', e)
         }
         
+        // Only init build modal if build UI exists
         try {
-            console.log('2️⃣ Calling initBuildModal()...')
-            initBuildModal()
-            console.log('✅ initBuildModal() completed')
+            const hasBuildUI = !!(document.getElementById('addBuildBtn') ||
+                                  document.getElementById('buildModal') ||
+                                  document.getElementById('editBuildModal') ||
+                                  document.getElementById('deleteBuildModal'))
+            if (hasBuildUI) {
+                console.log('2️⃣ Calling initBuildModal()...')
+                initBuildModal()
+                console.log('✅ initBuildModal() completed')
+            } else {
+                console.log('⏭️ Build UI not present; skipping initBuildModal()')
+            }
         } catch (e) {
             console.error('❌ initBuildModal() failed:', e)
         }
@@ -6785,6 +6743,12 @@ function initBuildModal() {
     console.log('🔧 Initializing build modal...')
     console.log('addBuildBtn:', addBuildBtn)
     console.log('buildModal:', buildModal)
+
+    // If none of the Build UI elements exist, silently skip
+    if (!addBuildBtn && !buildModal && !editBuildModal && !deleteBuildModal && !saveBuildBtn && !saveEditBuildBtn) {
+        console.log('⏭️ No Build UI detected; skipping initBuildModal()')
+        return
+    }
     
     // Add Build Button
     if (addBuildBtn && buildModal) {
@@ -7588,6 +7552,12 @@ function initAIChat() {
 
     let chatHistory = []
 
+    // If chat UI is completely absent, skip initialization quietly
+    if (!aiChatWidget && !aiChatToggle && !assistantTopBtn && !closeChatBtn && !aiChatInput && !aiChatSend && !aiChatMessages) {
+        console.log('⏭️ AI Chat UI not present; skipping initAIChat()')
+        return
+    }
+
     // Toggle chat widget
     if (aiChatToggle) {
         aiChatToggle.addEventListener('click', () => {
@@ -7598,7 +7568,8 @@ function initAIChat() {
             }
         })
     } else {
-        console.error('❌ aiChatToggle button not found')
+        // Not an error on pages without the toggle; just skip
+        console.log('⏭️ aiChatToggle button not found; skipping toggle wiring')
     }
 
     // Topbar Assistant button opens the chat
@@ -10781,10 +10752,33 @@ document.addEventListener('DOMContentLoaded', () => {
     setupMessageModal()
     setupChannelTabs()
     setupCreateChannelModal()
-    initMessaging()
+
+    // Only init messaging if a user session exists
+    try {
+        const uid = getCurrentUserId?.()
+        if (uid) {
+            initMessaging()
+        } else {
+            console.log('⏭️ No logged-in user; skipping initMessaging()')
+        }
+    } catch (e) {
+        console.error('❌ initMessaging() guard failed:', e)
+    }
     
-    // Initialize build modal
-    initBuildModal()
+    // Initialize build modal only if Build UI exists
+    try {
+        const hasBuildUI = !!(document.getElementById('addBuildBtn') ||
+                              document.getElementById('buildModal') ||
+                              document.getElementById('editBuildModal') ||
+                              document.getElementById('deleteBuildModal'))
+        if (hasBuildUI) {
+            initBuildModal()
+        } else {
+            console.log('⏭️ Build UI not present here; skipping initBuildModal()')
+        }
+    } catch (e) {
+        console.error('❌ initBuildModal() guard failed:', e)
+    }
     
     // Initialize setup wizard and check database
     initializeSetupWizard()
