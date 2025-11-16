@@ -145,11 +145,8 @@ const store = {
             integrations: [],
             credentials: [],
             auditLogs: [],
-            builds: [],
             servers: [],
-            scripts: [],
             notificationSettings: {
-                builds: { enabled: false, on: 'all', channel: '', recipients: '' },
                 system: { enabled: false, level: 'all', channel: '', recipients: '' },
                 summary: { enabled: false, time: '09:00', channel: '', recipients: '' },
                 health: { enabled: false, status: 'all', channel: '', recipients: '' }
@@ -189,8 +186,7 @@ const store = {
                     environments: db.environments || [],
                     servers: db.servers || [],
                     credentials: db.credentials || [],
-                    users: db.users || [],
-                    builds: db.builds || []
+                    users: db.users || []
                 })
             })
             const result = await response.json()
@@ -323,13 +319,6 @@ async function emergencyStorageCleanup() {
             console.log(`Removed ${count} audit logs`)
         }
         
-        // Keep only 50 most recent builds
-        if (db.builds && db.builds.length > 50) {
-            const removed = db.builds.length - 50
-            db.builds = db.builds.slice(0, 50)
-            console.log(`Removed ${removed} old builds`)
-        }
-        
         store.write(db)
         const usage = getStorageUsage()
         console.log(`Storage cleanup complete. Now using ${usage.sizeMB}MB (${usage.percentUsed}%)`)
@@ -340,111 +329,7 @@ async function emergencyStorageCleanup() {
     }
 }
 
-// Populate server dropdowns for builds
-function populateServerDropdowns() {
-    try {
-        const db = store.readSync()
-        let servers = []
-        
-        // Safely get servers array
-        try {
-            servers = Array.isArray(db.servers) ? db.servers : []
-        } catch (e) {
-            console.error('Error accessing servers array:', e)
-            servers = []
-        }
-        
-        console.log('Populating server dropdowns. Found servers:', servers.length)
-        
-        // Filter out invalid servers with extra safety
-        const validServers = []
-        for (let i = 0; i < servers.length; i++) {
-            try {
-                const server = servers[i]
-                if (server && typeof server === 'object' && server.id) {
-                    validServers.push(server)
-                } else {
-                    console.warn('Skipping invalid server at index', i, ':', server)
-                }
-            } catch (e) {
-                console.warn('Error processing server at index', i, ':', e.message)
-            }
-        }
-        
-        console.log('Valid servers after filtering:', validServers.length)
-        
-        const buildServerSelect = document.getElementById('buildServer')
-        const editBuildServerSelect = document.getElementById('editBuildServer')
-        
-        console.log('Build server select found:', !!buildServerSelect)
-        console.log('Edit build server select found:', !!editBuildServerSelect)
-        
-        // Process each select element that exists
-        const selectElements = []
-        if (buildServerSelect) selectElements.push(buildServerSelect)
-        if (editBuildServerSelect) selectElements.push(editBuildServerSelect)
-        
-        selectElements.forEach(select => {
-            try {
-                // Keep the first option (placeholder)
-                const currentValue = select.value
-                select.innerHTML = '<option value="">-- Select Server --</option>'
-                
-                console.log('Processing select element, adding', validServers.length, 'valid servers')
-                
-                for (let i = 0; i < validServers.length; i++) {
-                    try {
-                        const server = validServers[i]
-                        const option = document.createElement('option')
-                        option.value = server.id || ''
-                        const displayName = server.displayName || server.name || 'Unnamed Server'
-                        const serverType = server.type || 'Unknown'
-                        option.textContent = `${displayName} (${serverType})`
-                        select.appendChild(option)
-                        console.log('Added server option:', displayName, serverType)
-                    } catch (e) {
-                        console.error('Error adding server at index', i, ':', e)
-                    }
-                }
-                
-                // Restore selection if it was set
-                if (currentValue) select.value = currentValue
-            } catch (e) {
-                console.error('Error processing select element:', e)
-            }
-        })
-    } catch (error) {
-        console.error('Error populating server dropdowns:', error)
-    }
-}
-
-// Populate script dropdowns
-async function populateScriptDropdowns() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/load-data`);
-        const result = await response.json();
-        
-        if (!result.success || !result.data || !result.data.scripts) {
-            console.warn('No scripts available');
-            return;
-        }
-        
-        const scripts = result.data.scripts;
-        const stepScriptId = document.getElementById('stepScriptId');
-        
-        if (stepScriptId) {
-            stepScriptId.innerHTML = '<option value="">-- Select Script --</option>';
-            scripts.forEach(script => {
-                const option = document.createElement('option');
-                option.value = script.id;
-                option.textContent = script.name;
-                stepScriptId.appendChild(option);
-            });
-        }
-    } catch (error) {
-        console.error('Error populating script dropdowns:', error);
-    }
-}
+// Builds/Scripts/Pipelines functionality removed
 
 // Audit logging function - async and database-first
 async function logAudit(action, entityType, entityName, details = {}) {
@@ -2165,525 +2050,7 @@ function openEditCredential(credential) {
     }
 }
 
-/* BEGIN REMOVED: Obsolete Builds/Scripts/Pipelines code (commented out to restore syntax)
-
-// ========== AUDIT LOGS PAGINATION ==========
-                <div style="background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.3); border-radius:8px; padding:12px; margin:12px 0;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <div class="spinner-ring" style="width:16px; height:16px; border:2px solid #6366f1; border-top-color:transparent; border-radius:50%; animation:spin 0.8s linear infinite;"></div>
-                            <span style="font-size:13px; font-weight:600; color:#6366f1;">Build in Progress</span>
-                        </div>
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <div style="display:flex; align-items:center; gap:6px;">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <polyline points="12 6 12 12 16 14"></polyline>
-                                </svg>
-                                <span style="font-size:12px; color:#6366f1; font-weight:500;">${elapsedTime}</span>
-                            </div>
-                            <span style="font-size:13px; font-weight:600; color:#6366f1;">${build.currentProgress || 0}%</span>
-                        </div>
-                    </div>
-                    <div style="height:6px; background:rgba(99,102,241,0.2); border-radius:3px; overflow:hidden;">
-                        <div style="height:100%; background:linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%); width:${build.currentProgress || 0}%; transition:width 0.3s ease;"></div>
-                    </div>
-                </div>
-            `
-        }
-        
-        // Build status info HTML
-        let statusInfoHtml = '<div style="display:flex; gap:24px; margin:12px 0 16px 0; flex-wrap:wrap;">'
-        
-        if (build.lastRun) {
-            const runByUser = build.lastRunBy ? ` by ${build.lastRunBy}` : ''
-            statusInfoHtml += `
-                <div style="display:flex; align-items:center; gap:6px;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
-                    <span style="font-size:13px; color:var(--muted);">Last Run:</span>
-                    <span style="font-size:13px; font-weight:600; color:var(--text);">${formatRelativeTime(build.lastRun)}${runByUser}</span>
-                </div>
-            `
-        }
-        
-        if (build.lastSuccess) {
-            const successByUser = build.lastSuccessBy ? ` by ${build.lastSuccessBy}` : ''
-            const successElapsed = build.lastSuccessElapsed ? ` (${formatDuration(build.lastSuccessElapsed)})` : ''
-            statusInfoHtml += `
-                <div style="display:flex; align-items:center; gap:6px;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                    </svg>
-                    <span style="font-size:13px; color:#10b981;">Last Success:</span>
-                    <span style="font-size:13px; font-weight:600; color:#10b981;">${formatRelativeTime(build.lastSuccess)}${successByUser}${successElapsed}</span>
-                </div>
-            `
-        }
-        
-        if (build.lastFail) {
-            const failByUser = build.lastFailBy ? ` by ${build.lastFailBy}` : ''
-            const failElapsed = build.lastFailElapsed ? ` (${formatDuration(build.lastFailElapsed)})` : ''
-            statusInfoHtml += `
-                <div style="display:flex; align-items:center; gap:6px;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="15" y1="9" x2="9" y2="15"></line>
-                        <line x1="9" y1="9" x2="15" y2="15"></line>
-                    </svg>
-                    <span style="font-size:13px; color:#ef4444;">Last Fail:</span>
-                    <span style="font-size:13px; font-weight:600; color:#ef4444;">${formatRelativeTime(build.lastFail)}${failByUser}${failElapsed}</span>
-                </div>
-            `
-        }
-        
-        if (!build.lastRun && !build.lastSuccess && !build.lastFail) {
-            statusInfoHtml += `
-                <div style="display:flex; align-items:center; gap:6px;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="8" x2="12" y2="12"></line>
-                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                    </svg>
-                    <span style="font-size:13px; color:var(--muted); font-style:italic;">Never executed</span>
-                </div>
-            `
-        }
-        
-        statusInfoHtml += '</div>'
-        
-        card.innerHTML = `
-            <div style="display:flex; align-items:center; gap:16px; margin-bottom:8px;">
-                <div style="flex:1;">
-                    <strong style="font-size:16px;">${build.name}</strong>
-                </div>
-                <div style="display:flex; gap:8px;">
-                    ${build.isRunning ? `
-                        <button class="btn" data-build-stop="${build.id}" style="background:linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color:white; border:none;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                                <rect x="6" y="6" width="12" height="12" rx="2"></rect>
-                            </svg>
-                            Stop
-                        </button>
-                    ` : `
-                        <button class="btn" data-build-run="${build.id}" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                            </svg>
-                            Run
-                        </button>
-                    `}
-                    <button class="btn btn-ghost" data-build-edit="${build.id}" ${build.isRunning ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>Edit</button>
-                    <button class="btn btn-ghost" data-build-delete="${build.id}" ${build.isRunning ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : 'style="color:#ef4444;"'}>Delete</button>
-                </div>
-            </div>
-            ${progressBarHtml}
-            ${statusInfoHtml}
-            <div style="display:flex; gap:24px; padding-top:12px; border-top:1px solid var(--border);">
-                <div style="flex:1;">
-                    <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Script</div>
-                    <div style="font-family:monospace; font-size:13px;">${build.script || 'No script defined'}</div>
-                </div>
-                <div style="flex:1;">
-                    <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Server</div>
-                    <div>${serverName}</div>
-                </div>
-            </div>
-        `
-        
-        // Event listeners
-        const runBtn = card.querySelector(`[data-build-run="${build.id}"]`)
-        if (runBtn) runBtn.addEventListener('click', () => runBuild(build))
-        
-        const stopBtn = card.querySelector(`[data-build-stop="${build.id}"]`)
-        if (stopBtn) stopBtn.addEventListener('click', () => stopBuild(build))
-        
-        const editBtn = card.querySelector(`[data-build-edit="${build.id}"]`)
-        if (editBtn) editBtn.addEventListener('click', () => openEditBuild(build))
-        
-        const deleteBtn = card.querySelector(`[data-build-delete="${build.id}"]`)
-        if (deleteBtn) deleteBtn.addEventListener('click', () => openDeleteBuild(build))
-        
-        container.appendChild(card)
-    })
-    
-    // Auto-refresh for running builds (update elapsed time and progress)
-    const hasRunningBuilds = builds.some(b => b.isRunning)
-    if (hasRunningBuilds) {
-        // Clear any existing interval
-        if (window.buildRefreshInterval) {
-            clearInterval(window.buildRefreshInterval)
-        }
-        // Set up new interval to refresh every second
-        window.buildRefreshInterval = setInterval(() => {
-            const currentDb = store.read()
-            const stillHasRunningBuilds = currentDb.builds?.some(b => b.isRunning)
-            if (stillHasRunningBuilds) {
-                renderBuilds()
-            } else {
-                // No more running builds, clear the interval
-                if (window.buildRefreshInterval) {
-                    clearInterval(window.buildRefreshInterval)
-                    window.buildRefreshInterval = null
-                }
-            }
-        }, 1000)
-    }
-}
-
-function runBuild(build) {
-    const db = store.readSync()
-    const server = db.servers?.find(s => s.id === build.serverId)
-    const serverName = server ? (server.displayName || server.name || 'Unknown Server') : 'Unknown Server'
-    
-    // Get current user
-    const currentUser = window.currentUser || { name: 'Administrator' }
-    
-    // Update lastRun timestamp and lastRunBy user
-    const buildInDb = db.builds.find(b => b.id === build.id)
-    if (buildInDb) {
-        buildInDb.lastRun = Date.now()
-        buildInDb.lastRunBy = currentUser.name
-        buildInDb.isRunning = true
-        buildInDb.currentProgress = 0
-        buildInDb.runStartTime = Date.now()
-        store.write(db)
-    }
-    
-    // Create a job for the build
-    const job = { 
-        id: uid(), 
-        title: `${build.name} on ${serverName}`, 
-        status: 'Running', 
-        startedAt: Date.now(), 
-        progress: 0 
-    }
-    
-    // Ensure jobs array exists
-    if (!db.jobs) {
-        db.jobs = []
-    }
-    
-    db.jobs.push(job)
-    store.write(db)
-    
-    // Audit log
-    logAudit('run', 'build', build.name, { script: build.script, server: serverName, user: currentUser.name })
-    
-    renderJobs()
-    renderBuilds()
-    
-    // Show beautiful build started modal
-    showBuildStartedModal(build.name, build.script, serverName)
-    
-    // Call backend API to execute the build
-    fetch(`${API_BASE_URL}/api/run-build`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            buildId: build.id,
-            userId: currentUser.name
-        })
-    })
-    .then(response => response.json())
-    .then(async result => {
-        const db = store.readSync()
-        const j = db.jobs.find(x => x.id === job.id)
-        const buildInDb = db.builds.find(b => b.id === build.id)
-        
-        if (result.success) {
-            console.log('✅ Build execution completed:', result)
-            
-            if (j) {
-                j.status = result.buildSuccess ? 'Success' : 'Failed'
-                j.progress = 100
-            }
-            
-            if (buildInDb) {
-                buildInDb.isRunning = false
-                buildInDb.currentProgress = 100
-                
-                if (result.buildSuccess) {
-                    buildInDb.lastSuccess = result.timestamp
-                    buildInDb.lastSuccessBy = currentUser.name
-                    buildInDb.lastSuccessElapsed = result.elapsedMs
-                } else {
-                    buildInDb.lastFail = result.timestamp
-                    buildInDb.lastFailBy = currentUser.name
-                    buildInDb.lastFailElapsed = result.elapsedMs
-                }
-            }
-            
-            
-            store.write(db)
-            
-            // Then sync to database
-            await store.syncToDatabase(db)
-            
-            // Reload from database
-            await renderBuilds()
-            renderJobs()
-            
-            // Show result notification and detailed output
-            if (result.buildSuccess) {
-                showNotification(`Build "${build.name}" completed successfully!`, 'success')
-                console.log(`✅ Build output:\n${result.output}`)
-                
-                // Show output modal for successful builds
-                showBuildOutputModal(build.name, result.output, true, result.elapsedMs)
-            } else {
-                const errText = result.error || result.output || 'Unknown error';
-                showNotification(`Build "${build.name}" failed`, 'error')
-                console.error('❌ Build error:', errText, '\n📊 Full result:', result)
-                
-                // Show detailed error modal
-                showBuildOutputModal(build.name, errText, false, result.elapsedMs)
-            }
-        } else {
-            console.error('❌ Build execution failed:', result.error)
-            
-            if (j) {
-                j.status = 'Failed'
-                j.progress = 0
-            }
-            
-            if (buildInDb) {
-                buildInDb.isRunning = false
-                buildInDb.currentProgress = 0
-                buildInDb.lastFail = Date.now()
-                buildInDb.lastFailBy = currentUser.name
-                buildInDb.lastFailElapsed = 0
-            }
-            
-            store.write(db)
-            await store.syncToDatabase(db)
-            await renderBuilds()
-            renderJobs()
-            
-            showNotification(`Build execution failed: ${result.error}`, 'error')
-        }
-    })
-    .catch(async error => {
-        console.error('❌ Failed to execute build:', error)
-        
-        const db = store.readSync()
-        const j = db.jobs.find(x => x.id === job.id)
-        const buildInDb = db.builds.find(b => b.id === build.id)
-        
-        if (j) {
-            j.status = 'Failed'
-            j.progress = 0
-        }
-        
-        if (buildInDb) {
-            buildInDb.isRunning = false
-            buildInDb.currentProgress = 0
-            buildInDb.lastFail = Date.now()
-            buildInDb.lastFailBy = currentUser.name
-            buildInDb.lastFailElapsed = 0
-        }
-        
-        store.write(db)
-        await store.syncToDatabase(db)
-        await renderBuilds()
-        renderJobs()
-        
-        showNotification(`Failed to execute build: ${error.message}`, 'error')
-    })
-}
-
-function stopBuild(build) {
-    const db = store.readSync()
-    const buildInDb = db.builds.find(b => b.id === build.id)
-    
-    if (!buildInDb || !buildInDb.isRunning) return
-    
-    // Get current user
-    const currentUser = window.currentUser || { name: 'Administrator' }
-    
-    // Stop the build
-    buildInDb.isRunning = false
-    buildInDb.currentProgress = buildInDb.currentProgress || 0
-    const elapsedMs = Date.now() - buildInDb.runStartTime
-    
-    // Mark as failed since it was stopped manually
-    buildInDb.lastFail = Date.now()
-    buildInDb.lastFailBy = currentUser.name
-    buildInDb.lastFailElapsed = elapsedMs
-    
-    // Find and update the job
-    const job = db.jobs?.find(j => j.title.includes(build.name) && j.status === 'Running')
-    if (job) {
-        job.status = 'Stopped'
-        job.progress = buildInDb.currentProgress
-    }
-    
-    store.write(db)
-    
-    // Audit log
-    logAudit('stop', 'build', build.name, { user: currentUser.name, progress: buildInDb.currentProgress })
-    
-    // Show toast notification
-    if (typeof ToastManager !== 'undefined') {
-        ToastManager.warning('Build Stopped', `Build "${build.name}" was stopped manually`)
-    }
-    
-    renderJobs()
-    renderBuilds()
-}
-
-function showBuildStartedModal(buildName, script, serverName) {
-    const modal = document.getElementById('buildStartedModal')
-    if (!modal) return
-    
-    const messageEl = document.getElementById('buildStartedMessage')
-    const scriptEl = document.getElementById('buildStartedScript')
-    const serverEl = document.getElementById('buildStartedServer')
-    
-    if (messageEl) messageEl.textContent = `"${buildName}" is now executing on ${serverName}`
-    if (scriptEl) scriptEl.textContent = script
-    if (serverEl) serverEl.textContent = serverName
-    
-    try {
-        modal.showModal()
-    } catch (e) {
-        modal.setAttribute('open', '')
-    }
-    
-    // Auto-close after 3 seconds
-    setTimeout(() => {
-        try {
-            modal.close()
-        } catch (e) {
-            modal.removeAttribute('open')
-        }
-    }, 3000)
-}
-
-function showBuildOutputModal(buildName, output, success, elapsedMs) {
-    // Create modal if it doesn't exist
-    let modal = document.getElementById('buildOutputModal')
-    if (!modal) {
-        modal = document.createElement('dialog')
-        modal.id = 'buildOutputModal'
-        modal.className = 'modal'
-        modal.innerHTML = `
-            <div class="modal__content" style="max-width: 800px; max-height: 80vh;">
-                <h2 style="margin: 0 0 16px 0; display: flex; align-items: center; gap: 12px;">
-                    <span id="buildOutputIcon"></span>
-                    <span id="buildOutputTitle"></span>
-                </h2>
-                <div id="buildOutputMeta" style="margin-bottom: 16px; color: var(--muted); font-size: 14px;"></div>
-                <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; max-height: 400px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word;">
-                    <code id="buildOutputContent"></code>
-                </div>
-                <div style="display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end;">
-                    <button class="btn" onclick="navigator.clipboard.writeText(document.getElementById('buildOutputContent').textContent); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy Output', 1000)">Copy Output</button>
-                    <button class="btn btn-primary" onclick="document.getElementById('buildOutputModal').close()">Close</button>
-                </div>
-            </div>
-        `
-        document.body.appendChild(modal)
-    }
-    
-    const icon = modal.querySelector('#buildOutputIcon')
-    const title = modal.querySelector('#buildOutputTitle')
-    const meta = modal.querySelector('#buildOutputMeta')
-    const content = modal.querySelector('#buildOutputContent')
-    
-    const duration = elapsedMs ? formatDuration(elapsedMs) : 'Unknown'
-    
-    if (success) {
-        icon.innerHTML = '✅'
-        title.textContent = `Build "${buildName}" Succeeded`
-        title.style.color = '#10b981'
-        meta.textContent = `Completed in ${duration}`
-    } else {
-        icon.innerHTML = '❌'
-        title.textContent = `Build "${buildName}" Failed`
-        title.style.color = '#ef4444'
-        meta.textContent = `Failed after ${duration}`
-    }
-    
-    content.textContent = output || '(no output)'
-    
-    try {
-        modal.showModal()
-    } catch (e) {
-        modal.setAttribute('open', '')
-    }
-}
-
-// Helper function for formatting duration (if not already defined)
-function formatDuration(ms) {
-    if (!ms) return '0s'
-    const seconds = Math.floor(ms / 1000)
-    const minutes = Math.floor(seconds / 60)
-    const hours = Math.floor(minutes / 60)
-    
-    if (hours > 0) return `${hours}h ${minutes % 60}m ${seconds % 60}s`
-    if (minutes > 0) return `${minutes}m ${seconds % 60}s`
-    return `${seconds}s`
-}
-
-let buildToDelete = null
-
-function openDeleteBuild(build) {
-    window.buildToDelete = build
-    buildToDelete = build
-    const nameElement = document.getElementById('deleteBuildName')
-    if (nameElement) {
-        nameElement.textContent = `Are you sure you want to delete "${build.name}"? This action cannot be undone.`
-    }
-    const modal = document.getElementById('deleteBuildModal')
-    if (modal) {
-        try {
-            modal.showModal()
-        } catch (e) {
-            modal.setAttribute('open', '')
-        }
-    }
-}
-
-function openEditBuild(build) {
-    console.log('📝 Opening edit modal for build:', build)
-    
-    // Update URL to reflect current action
-    const url = new URL(window.location)
-    url.searchParams.set('view', 'builds')
-    url.searchParams.set('action', 'edit')
-    url.searchParams.set('id', build.id)
-    window.history.pushState({ view: 'builds', action: 'edit', id: build.id }, '', url)
-    
-    document.getElementById('editBuildId').value = build.id
-    document.getElementById('editBuildName').value = build.name
-    document.getElementById('editBuildScript').value = build.script || ''
-    document.getElementById('editBuildTargetOverride').value = build.targetOverride || ''
-    
-    console.log('📝 Set editBuildScript value to:', build.script)
-    
-    // Populate server dropdown first, then set the value
-    populateServerDropdowns()
-    
-    // Set server value after dropdown is populated
-    document.getElementById('editBuildServer').value = build.serverId
-    
-    console.log('📝 Set editBuildServer value to:', build.serverId)
-    
-    const modal = document.getElementById('editBuildModal')
-    if (modal) {
-        try {
-            modal.showModal()
-        } catch (e) {
-            modal.setAttribute('open', '')
-        }
-    }
-}
-
-*/
+/* Removed: Obsolete Builds/Scripts/Pipelines code */
 
 // ========== AUDIT LOGS PAGINATION ==========
 let auditPagination = {
@@ -3509,8 +2876,6 @@ if (buildDbBtn) {
             { name: 'Users', description: 'User accounts and authentication' },
             { name: 'Environments', description: 'Environment configurations' },
             { name: 'Servers', description: 'Server inventory and status' },
-            { name: 'Scripts', description: 'PowerShell script repository' },
-            { name: 'Builds', description: 'Build execution history' },
             { name: 'Credentials', description: 'Encrypted credentials vault' },
             { name: 'DatabaseConnections', description: 'Database connection strings' },
             { name: 'AuditLogs', description: 'System activity tracking' },
@@ -3887,72 +3252,7 @@ if (credentialSearchInput) {
 }
 
 
-// ========== BUILD MODALS ==========
-const buildModal = document.getElementById('buildModal')
-const editBuildModal = document.getElementById('editBuildModal')
-const deleteBuildModal = document.getElementById('deleteBuildModal')
-// addBuildBtn event listener is in initBuildModal() function called after DOMContentLoaded
-
-function closeBuildModal() {
-    // Clear URL parameters
-    const url = new URL(window.location)
-    url.searchParams.delete('action')
-    url.searchParams.delete('id')
-    window.history.pushState({ view: url.searchParams.get('view') || 'builds' }, '', url)
-    
-    try { buildModal.close() } catch (e) {}
-    try { buildModal.removeAttribute('open') } catch (e) {}
-    document.getElementById('buildName').value = ''
-    document.getElementById('buildScript').value = ''
-    document.getElementById('buildServer').value = ''
-    document.getElementById('buildTargetOverride').value = ''
-}
-
-function closeEditBuildModal() {
-    // Clear URL parameters
-    const url = new URL(window.location)
-    url.searchParams.delete('action')
-    url.searchParams.delete('id')
-    window.history.pushState({ view: url.searchParams.get('view') || 'builds' }, '', url)
-    
-    try { editBuildModal.close() } catch (e) {}
-    try { editBuildModal.removeAttribute('open') } catch (e) {}
-    document.getElementById('editBuildTargetOverride').value = ''
-}
-
-function closeDeleteBuildModal() {
-    // Clear URL parameters
-    const url = new URL(window.location)
-    url.searchParams.delete('action')
-    url.searchParams.delete('id')
-    window.history.pushState({ view: url.searchParams.get('view') || 'builds' }, '', url)
-    
-    try { deleteBuildModal.close() } catch (e) {}
-    try { deleteBuildModal.removeAttribute('open') } catch (e) {}
-}
-
-// Build button event listener moved to initBuildModal() function called after DOMContentLoaded
-
-// Create build - moved to initBuildModal()
-// Edit build - moved to initBuildModal()
-// Delete build modal - moved to initBuildModal()
-
-// Build started modal
-const buildStartedModal = document.getElementById('buildStartedModal')
-if (buildStartedModal) {
-    buildStartedModal.addEventListener('click', (e) => { 
-        if (e.target === buildStartedModal) {
-            try {
-                buildStartedModal.close()
-            } catch (e) {
-                buildStartedModal.removeAttribute('open')
-            }
-        }
-    })
-}
-
-// Confirm delete build
-// Confirm delete build - moved to initBuildModal()
+// Builds/Scripts/Pipelines functionality removed
 
 
 // ========== SERVER MODALS ==========
@@ -4439,346 +3739,7 @@ async function renderAllViews() {
     }
 }
 
-// ============================================
-// SCRIPTS MANAGEMENT
-// ============================================
-
-function renderScripts() {
-    const db = store.readSync()
-    let scripts = db.scripts || []
-    if (!Array.isArray(scripts)) {
-        scripts = []
-    }
-    const list = document.getElementById('scriptsList')
-    if (!list) return
-
-    list.innerHTML = ''
-
-    if (scripts.length === 0) {
-        list.innerHTML = '<div class="card" style="text-align:center; padding:40px;"><p class="muted">No scripts uploaded yet. Click "+ New Script" to upload your first PowerShell script.</p></div>'
-        return
-    }
-
-    scripts.forEach(script => {
-        const card = document.createElement('div')
-        card.className = 'card'
-        card.style.cursor = 'pointer'
-        
-        const fileSize = script.fileSize ? `${(script.fileSize / 1024).toFixed(2)} KB` : 'N/A'
-        const uploadDate = script.uploadDate ? new Date(script.uploadDate).toLocaleDateString() : 'Unknown'
-        
-        card.innerHTML = `
-            <div style="display:flex; align-items:flex-start; gap:16px;">
-                <div style="width:48px; height:48px; border-radius:12px; background:linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="16 18 22 12 16 6"></polyline>
-                        <polyline points="8 6 2 12 8 18"></polyline>
-                    </svg>
-                </div>
-                <div style="flex:1; min-width:0;">
-                    <h3 style="margin:0 0 8px 0; font-size:16px;">${script.name}</h3>
-                    ${script.description ? `<p style="margin:0 0 12px 0; color:var(--muted); font-size:14px;">${script.description}</p>` : ''}
-                    <div style="display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--muted);">
-                        <div style="display:flex; align-items:center; gap:4px;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
-                                <polyline points="13 2 13 9 20 9"></polyline>
-                            </svg>
-                            ${script.fileName || 'script.ps1'}
-                        </div>
-                        <div style="display:flex; align-items:center; gap:4px;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="7 10 12 15 17 10"></polyline>
-                                <line x1="12" y1="15" x2="12" y2="3"></line>
-                            </svg>
-                            ${fileSize}
-                        </div>
-                        <div style="display:flex; align-items:center; gap:4px;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <polyline points="12 6 12 12 16 14"></polyline>
-                            </svg>
-                            ${uploadDate}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div style="display:flex; gap:8px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
-                <button class="btn btn-ghost" data-script-view="${script.id}" style="flex:1;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                        <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
-                    View
-                </button>
-                <button class="btn btn-ghost" data-script-edit="${script.id}" style="flex:1;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                    </svg>
-                    Edit
-                </button>
-                <button class="btn btn-ghost" data-script-delete="${script.id}" style="color:#ef4444;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                    Delete
-                </button>
-            </div>
-        `
-
-        // View button
-        const viewBtn = card.querySelector(`[data-script-view="${script.id}"]`)
-        if (viewBtn) viewBtn.addEventListener('click', (e) => {
-            e.stopPropagation()
-            viewScript(script)
-        })
-
-        // Edit button
-        const editBtn = card.querySelector(`[data-script-edit="${script.id}"]`)
-        if (editBtn) editBtn.addEventListener('click', (e) => {
-            e.stopPropagation()
-            editScript(script)
-        })
-
-        // Delete button
-        const deleteBtn = card.querySelector(`[data-script-delete="${script.id}"]`)
-        if (deleteBtn) deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation()
-            deleteScript(script)
-        })
-
-        list.appendChild(card)
-    })
-}
-
-function viewScript(script) {
-    const modal = document.getElementById('viewScriptModal')
-    const titleEl = document.getElementById('viewScriptTitle')
-    const descEl = document.getElementById('viewScriptDescription')
-    const contentEl = document.getElementById('viewScriptContent')
-    const copyBtn = document.getElementById('copyScriptBtn')
-
-    titleEl.textContent = script.name
-    descEl.textContent = script.description || 'No description'
-    contentEl.textContent = script.content || '// Script content not available'
-
-    copyBtn.onclick = () => {
-        navigator.clipboard.writeText(script.content || '').then(() => {
-            const originalText = copyBtn.textContent
-            copyBtn.textContent = 'Copied!'
-            setTimeout(() => {
-                copyBtn.textContent = originalText
-            }, 2000)
-        })
-    }
-
-    modal.showModal()
-}
-
-function editScript(script) {
-    const modal = document.getElementById('editScriptModal')
-    document.getElementById('editScriptId').value = script.id
-    document.getElementById('editScriptName').value = script.name
-    document.getElementById('editScriptDescription').value = script.description || ''
-    document.getElementById('editScriptFile').value = ''
-    document.getElementById('editScriptFilePreview').style.display = 'none'
-    modal.showModal()
-}
-
-function deleteScript(script) {
-    const modal = document.getElementById('deleteScriptModal')
-    const nameEl = document.getElementById('deleteScriptName')
-    nameEl.textContent = `Are you sure you want to delete "${script.name}"? This action cannot be undone.`
-    
-    modal.dataset.scriptId = script.id
-    modal.showModal()
-}
-
-// Add Script Button
-const addScriptBtn = document.getElementById('addScriptBtn')
-if (addScriptBtn) {
-    addScriptBtn.addEventListener('click', () => {
-        const modal = document.getElementById('scriptModal')
-        document.getElementById('scriptName').value = ''
-        document.getElementById('scriptDescription').value = ''
-        document.getElementById('scriptFile').value = ''
-        document.getElementById('scriptFilePreview').style.display = 'none'
-        modal.showModal()
-    })
-}
-
-// File preview for new script
-const scriptFileInput = document.getElementById('scriptFile')
-if (scriptFileInput) {
-    scriptFileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0]
-        if (file) {
-            const reader = new FileReader()
-            reader.onload = (event) => {
-                const preview = document.getElementById('scriptFilePreview')
-                const content = document.getElementById('scriptFileContent')
-                content.textContent = event.target.result
-                preview.style.display = 'block'
-            }
-            reader.readAsText(file)
-        }
-    })
-}
-
-// File preview for edit script
-const editScriptFileInput = document.getElementById('editScriptFile')
-if (editScriptFileInput) {
-    editScriptFileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0]
-        if (file) {
-            const reader = new FileReader()
-            reader.onload = (event) => {
-                const preview = document.getElementById('editScriptFilePreview')
-                const content = document.getElementById('editScriptFileContent')
-                content.textContent = event.target.result
-                preview.style.display = 'block'
-            }
-            reader.readAsText(file)
-        }
-    })
-}
-
-// Save Script
-const saveScriptBtn = document.getElementById('saveScriptBtn')
-if (saveScriptBtn) {
-    saveScriptBtn.addEventListener('click', (e) => {
-        e.preventDefault()
-        
-        const name = document.getElementById('scriptName').value.trim()
-        const description = document.getElementById('scriptDescription').value.trim()
-        const fileInput = document.getElementById('scriptFile')
-        const file = fileInput.files[0]
-
-        if (!name || !file) {
-            alert('Please provide a script name and select a file.')
-            return
-        }
-
-        const reader = new FileReader()
-        reader.onload = (event) => {
-            const db = store.readSync()
-            let scripts = db.scripts || []
-            if (!Array.isArray(scripts)) {
-                scripts = []
-            }
-            
-            const newScript = {
-                id: Date.now().toString(),
-                name: name,
-                description: description,
-                fileName: file.name,
-                fileSize: file.size,
-                content: event.target.result,
-                uploadDate: new Date().toISOString(),
-                uploadedBy: (window.currentUser || currentUser || {}).username || 'Administrator'
-            }
-
-            scripts.push(newScript)
-            db.scripts = scripts
-            store.write(db)
-            
-            logAudit('create', 'script', name, `Uploaded PowerShell script: ${file.name}`)
-            renderScripts()
-            
-            // Close modal
-            document.getElementById('scriptModal').close()
-        }
-        reader.readAsText(file)
-    })
-}
-
-// Save Edit Script
-const saveEditScriptBtn = document.getElementById('saveEditScriptBtn')
-if (saveEditScriptBtn) {
-    saveEditScriptBtn.addEventListener('click', (e) => {
-        e.preventDefault()
-        
-        const id = document.getElementById('editScriptId').value
-        const name = document.getElementById('editScriptName').value.trim()
-        const description = document.getElementById('editScriptDescription').value.trim()
-        const fileInput = document.getElementById('editScriptFile')
-        const file = fileInput.files[0]
-
-        if (!name) {
-            alert('Please provide a script name.')
-            return
-        }
-
-        const db = store.readSync()
-        const scripts = db.scripts || []
-        const script = scripts.find(s => s.id === id)
-        
-        if (!script) return
-
-        script.name = name
-        script.description = description
-
-        if (file) {
-            const reader = new FileReader()
-            reader.onload = (event) => {
-                script.fileName = file.name
-                script.fileSize = file.size
-                script.content = event.target.result
-                script.lastModified = new Date().toISOString()
-                script.lastModifiedBy = (window.currentUser || currentUser || {}).username || 'Administrator'
-
-                db.scripts = scripts
-                store.write(db)
-                logAudit('update', 'script', name, 'Updated script content')
-                renderScripts()
-                
-                // Close modal
-                document.getElementById('editScriptModal').close()
-            }
-            reader.readAsText(file)
-        } else {
-            script.lastModified = new Date().toISOString()
-            script.lastModifiedBy = (window.currentUser || currentUser || {}).username || 'Administrator'
-            db.scripts = scripts
-            store.write(db)
-            logAudit('update', 'script', name, 'Updated script details')
-            renderScripts()
-            
-            // Close modal
-            document.getElementById('editScriptModal').close()
-        }
-    })
-}
-
-// Delete Script Confirmation
-const confirmDeleteScriptBtn = document.getElementById('confirmDeleteScriptBtn')
-if (confirmDeleteScriptBtn) {
-    confirmDeleteScriptBtn.addEventListener('click', () => {
-        const modal = document.getElementById('deleteScriptModal')
-        const scriptId = modal.dataset.scriptId
-        
-        if (scriptId) {
-            const db = store.readSync()
-            const scripts = db.scripts || []
-            const script = scripts.find(s => s.id === scriptId)
-            const scriptName = script ? script.name : 'Unknown'
-            
-            const filtered = scripts.filter(s => s.id !== scriptId)
-            db.scripts = filtered
-            store.write(db)
-            
-            logAudit('delete', 'script', scriptName, 'Deleted PowerShell script')
-            renderScripts()
-        }
-    })
-}
-
-// ============================================
-// END SCRIPTS MANAGEMENT
-// ============================================
+/* Removed: Obsolete Builds/Scripts/Pipelines code */
 
 // ============================================
 // DATABASE SETUP MANAGEMENT
@@ -4896,11 +3857,7 @@ if (migrateDataBtn) {
         document.getElementById('migrateCountUsers').textContent = (db.users || []).length
         document.getElementById('migrateCountEnvs').textContent = (db.environments || []).length
         document.getElementById('migrateCountServers').textContent = (db.servers || []).length
-        document.getElementById('migrateCountScripts').textContent = (db.scripts || []).length
-        document.getElementById('migrateCountBuilds').textContent = (db.builds || []).length
-        
-        const total = (db.users || []).length + (db.environments || []).length + (db.servers || []).length + 
-                      (db.scripts || []).length + (db.builds || []).length
+        const total = (db.users || []).length + (db.environments || []).length + (db.servers || []).length
         document.getElementById('migrateCountTotal').textContent = total
         
         modal.showModal()
@@ -4996,7 +3953,6 @@ function populateNotificationChannels() {
     )
     
     const channelSelects = [
-        'notifyBuildsChannel',
         'notifySystemChannel',
         'notifySummaryChannel',
         'notifyHealthChannel'
@@ -5021,12 +3977,6 @@ function populateNotificationChannels() {
 function loadNotificationSettings() {
     const db = store.readSync()
     const settings = db.notificationSettings || {
-        builds: {
-            enabled: false,
-            on: 'all',
-            channel: '',
-            recipients: ''
-        },
         system: {
             enabled: false,
             level: 'all',
@@ -5046,12 +3996,6 @@ function loadNotificationSettings() {
             recipients: ''
         }
     }
-    
-    // Load build notifications
-    document.getElementById('notifyBuildsEnabled').checked = settings.builds.enabled
-    document.getElementById('notifyBuildsOn').value = settings.builds.on
-    document.getElementById('notifyBuildsChannel').value = settings.builds.channel
-    document.getElementById('notifyBuildsRecipients').value = settings.builds.recipients
     
     // Load system alerts
     document.getElementById('notifySystemEnabled').checked = settings.system.enabled
@@ -5079,12 +4023,6 @@ if (saveNotificationsBtn) {
         const db = store.readSync()
         
         db.notificationSettings = {
-            builds: {
-                enabled: document.getElementById('notifyBuildsEnabled').checked,
-                on: document.getElementById('notifyBuildsOn').value,
-                channel: document.getElementById('notifyBuildsChannel').value,
-                recipients: document.getElementById('notifyBuildsRecipients').value
-            },
             system: {
                 enabled: document.getElementById('notifySystemEnabled').checked,
                 level: document.getElementById('notifySystemLevel').value,
@@ -5135,10 +4073,7 @@ if (testNotificationBtn) {
         let testChannel = null
         let testRecipients = ''
         
-        if (document.getElementById('notifyBuildsEnabled').checked) {
-            testChannel = document.getElementById('notifyBuildsChannel').value
-            testRecipients = document.getElementById('notifyBuildsRecipients').value
-        } else if (document.getElementById('notifySystemEnabled').checked) {
+        if (document.getElementById('notifySystemEnabled').checked) {
             testChannel = document.getElementById('notifySystemChannel').value
             testRecipients = document.getElementById('notifySystemRecipients').value
         } else if (document.getElementById('notifySummaryEnabled').checked) {
@@ -5254,31 +4189,7 @@ function updateSummaryDashboard() {
     const elSrvOffline = document.getElementById('summaryServerOffline')
     if (elSrvOffline) elSrvOffline.textContent = offlineServers
     
-    // Scripts stats (UI removed) — update only if elements still exist
-    const scripts = db.scripts || []
-    const elScriptCount = document.getElementById('summaryScriptCount')
-    if (elScriptCount) {
-        elScriptCount.textContent = scripts.length
-        const psScripts = scripts.filter(s => s.language === 'powershell').length
-        const bashScripts = scripts.filter(s => s.language === 'bash').length
-        const elPS = document.getElementById('summaryScriptPS')
-        if (elPS) elPS.textContent = psScripts
-        const elBash = document.getElementById('summaryScriptBash')
-        if (elBash) elBash.textContent = bashScripts
-    }
-    
-    // Builds stats (UI removed) — update only if elements still exist
-    const builds = db.builds || []
-    const elBuildCount = document.getElementById('summaryBuildCount')
-    if (elBuildCount) {
-        elBuildCount.textContent = builds.length
-        const successBuilds = builds.filter(b => b.status === 'success').length
-        const failedBuilds = builds.filter(b => b.status === 'failed').length
-        const elBuildSuccess = document.getElementById('summaryBuildSuccess')
-        if (elBuildSuccess) elBuildSuccess.textContent = successBuilds
-        const elBuildFailed = document.getElementById('summaryBuildFailed')
-        if (elBuildFailed) elBuildFailed.textContent = failedBuilds
-    }
+    // Scripts/Builds removed: no script/build stats
     
     // Recent activity
     updateRecentActivity(db)
@@ -5288,17 +4199,7 @@ function updateRecentActivity(db) {
     const activityContainer = document.getElementById('summaryRecentActivity')
     const activities = []
     
-    // Get recent builds
-    const builds = (db.builds || []).slice(-5).reverse()
-    builds.forEach(build => {
-        activities.push({
-            type: 'build',
-            icon: '🔨',
-            text: `Build "${build.name}" ${build.status === 'success' ? 'completed successfully' : 'failed'}`,
-            time: build.timestamp,
-            status: build.status
-        })
-    })
+    // Build activities removed
     
     // Get recently added environments
     const environments = (db.environments || []).slice(-3).reverse()
@@ -5569,8 +4470,7 @@ function handleUrlAction(view, action, id) {
     const entityMap = {
         'servers': 'server',
         'credentials': 'credential',
-        'admin-users': 'user',
-        'builds': 'build'
+        'admin-users': 'user'
     }
     
     const entityType = entityMap[view]
@@ -5586,13 +4486,13 @@ function handleUrlAction(view, action, id) {
             if (entityType === 'server') item = db.servers?.find(s => s.id === id)
             else if (entityType === 'credential') item = db.credentials?.find(c => c.id === id)
             else if (entityType === 'user') item = db.users?.find(u => u.id === id)
-            else if (entityType === 'build') item = db.builds?.find(b => b.id === id)
+            // builds removed
             
             if (item) {
                 if (entityType === 'server') openEditServer(item)
                 else if (entityType === 'credential') openEditCredential(item)
                 else if (entityType === 'user') openEditUser(item)
-                else if (entityType === 'build') openEditBuild(item)
+                // builds removed
             }
         }
     }, 100)
@@ -6642,22 +5542,7 @@ if (document.readyState === 'loading') {
             console.error('❌ initAuth() failed:', e)
         }
         
-        // Only init build modal if build UI exists
-        try {
-            const hasBuildUI = !!(document.getElementById('addBuildBtn') ||
-                                  document.getElementById('buildModal') ||
-                                  document.getElementById('editBuildModal') ||
-                                  document.getElementById('deleteBuildModal'))
-            if (hasBuildUI) {
-                console.log('2️⃣ Calling initBuildModal()...')
-                initBuildModal()
-                console.log('✅ initBuildModal() completed')
-            } else {
-                console.log('⏭️ Build UI not present; skipping initBuildModal()')
-            }
-        } catch (e) {
-            console.error('❌ initBuildModal() failed:', e)
-        }
+        // Build UI removed; skipping initBuildModal()
         
         try {
             console.log('3️⃣ Calling initRefreshButtons()...')
@@ -6696,13 +5581,7 @@ if (document.readyState === 'loading') {
         console.error('❌ initAuth() failed:', e)
     }
     
-    try {
-        console.log('2️⃣ Calling initBuildModal()...')
-        initBuildModal()
-        console.log('✅ initBuildModal() completed')
-    } catch (e) {
-        console.error('❌ initBuildModal() failed:', e)
-    }
+    // Build UI removed; no initBuildModal()
     
     try {
         console.log('3️⃣ Calling initRefreshButtons()...')
@@ -6731,254 +5610,11 @@ if (document.readyState === 'loading') {
     console.log('✅ All components initialized')
 }
 
-// Initialize build modal event listeners after DOM is ready
-function initBuildModal() {
-    const addBuildBtn = document.getElementById('addBuildBtn')
-    const buildModal = document.getElementById('buildModal')
-    const editBuildModal = document.getElementById('editBuildModal')
-    const deleteBuildModal = document.getElementById('deleteBuildModal')
-    const saveBuildBtn = document.getElementById('saveBuildBtn')
-    const saveEditBuildBtn = document.getElementById('saveEditBuildBtn')
-    
-    console.log('🔧 Initializing build modal...')
-    console.log('addBuildBtn:', addBuildBtn)
-    console.log('buildModal:', buildModal)
-
-    // If none of the Build UI elements exist, silently skip
-    if (!addBuildBtn && !buildModal && !editBuildModal && !deleteBuildModal && !saveBuildBtn && !saveEditBuildBtn) {
-        console.log('⏭️ No Build UI detected; skipping initBuildModal()')
-        return
-    }
-    
-    // Add Build Button
-    if (addBuildBtn && buildModal) {
-        console.log('✅ Build button and modal found, adding click listener')
-        addBuildBtn.addEventListener('click', () => {
-            console.log('🖱️ Create Build button clicked!')
-            populateServerDropdowns()
-            try {
-                buildModal.showModal()
-                console.log('✅ Build modal opened')
-            } catch (e) {
-                console.error('❌ Error opening build modal:', e)
-                buildModal.setAttribute('open', '')
-            }
-        })
-    } else {
-        console.error('❌ Build button or modal not found!')
-        console.error('Missing elements:', {
-            addBuildBtn: !addBuildBtn,
-            buildModal: !buildModal
-        })
-    }
-    
-    // Build Modal Event Listeners
-    if (buildModal) {
-        const cancelBtn = buildModal.querySelector('button[value="cancel"]')
-        if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeBuildModal() })
-        buildModal.addEventListener('click', (e) => { if (e.target === buildModal) closeBuildModal() })
-    }
-    
-    // Save Build Button
-    if (saveBuildBtn) {
-        saveBuildBtn.addEventListener('click', async (e) => {
-            e.preventDefault()
-            console.log('💾 Creating new build...')
-            const name = document.getElementById('buildName').value.trim()
-            const scriptElement = document.getElementById('buildScript')
-            const script = scriptElement ? scriptElement.value.trim() : ''
-            const serverElement = document.getElementById('buildServer')
-            const serverId = serverElement ? serverElement.value : ''
-            const targetOverride = document.getElementById('buildTargetOverride').value.trim()
-            
-            console.log('Build values:', { name, script, serverId, targetOverride })
-            
-            if (!name || !script || !serverId) {
-                console.log('❌ Missing required fields')
-                alert('Please fill in all required fields: Name, Script, and Server')
-                return
-            }
-            
-            const db = store.readSync()
-            db.builds = db.builds || []
-            const newBuild = {
-                id: uid(),
-                name: name,
-                script: script,
-                serverId: serverId,
-                targetOverride: targetOverride || null
-            }
-            console.log('New build object:', newBuild)
-            db.builds.push(newBuild)
-            
-            await store.syncToDatabase(db)
-            console.log('✅ Build synced to database')
-            
-            store.write(db, true)
-            
-            const server = db.servers?.find(s => s.id === serverId)
-            const serverName = server ? (server.displayName || server.name || 'Unknown') : 'Unknown'
-            await logAudit('create', 'build', name, { script, server: serverName, targetOverride })
-            console.log('✅ Audit log created')
-            
-            console.log('🔄 Re-rendering builds from database...')
-            await renderBuilds()
-            console.log('✅ Builds re-rendered')
-            closeBuildModal()
-        })
-    }
-    
-    // Edit Build Modal Event Listeners
-    if (editBuildModal) {
-        const cancelBtn = editBuildModal.querySelector('button[value="cancel"]')
-        if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeEditBuildModal() })
-        editBuildModal.addEventListener('click', (e) => { if (e.target === editBuildModal) closeEditBuildModal() })
-    }
-    
-    // Save Edit Build Button
-    if (saveEditBuildBtn) {
-        console.log('✅ Save Edit Build button found, adding click listener')
-        saveEditBuildBtn.addEventListener('click', async (e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            console.log('✏️ Editing build...')
-            const id = document.getElementById('editBuildId').value
-            const name = document.getElementById('editBuildName').value.trim()
-            const scriptElement = document.getElementById('editBuildScript')
-            const script = scriptElement ? scriptElement.value.trim() : ''
-            const serverElement = document.getElementById('editBuildServer')
-            const serverId = serverElement ? serverElement.value : ''
-            const targetOverride = document.getElementById('editBuildTargetOverride').value.trim()
-            
-            console.log('Edit build values:', { id, name, script, serverId, targetOverride })
-            
-            if (!id || !name || !script || !serverId) {
-                console.log('❌ Missing required fields for edit')
-                alert('Please fill in all required fields: Name, Script, and Server')
-                return
-            }
-            
-            const db = store.readSync()
-            const build = db.builds.find(x => x.id === id)
-            if (build) {
-                const oldValues = {
-                    name: build.name,
-                    script: build.script,
-                    serverId: build.serverId,
-                    targetOverride: build.targetOverride
-                }
-                
-                build.name = name
-                build.script = script
-                build.serverId = serverId
-                build.targetOverride = targetOverride || null
-                
-                console.log('Updated build object:', build)
-                
-                await store.syncToDatabase(db)
-                console.log('✅ Build synced to database')
-                
-                store.write(db, true)
-                
-                await logAudit('update', 'build', name, { 
-                    old: oldValues,
-                    new: { name, script, serverId, targetOverride }
-                })
-                console.log('✅ Audit log created')
-                
-                console.log('🔄 Re-rendering builds from database...')
-                await renderBuilds()
-                console.log('✅ Builds re-rendered')
-                
-                closeEditBuildModal()
-            } else {
-                console.log('❌ Build not found with id:', id)
-                alert('Build not found')
-            }
-        })
-    } else {
-        console.error('❌ Save Edit Build button not found!')
-    }
-    
-    // Delete Build Modal Event Listeners
-    if (deleteBuildModal) {
-        const cancelBtn = deleteBuildModal.querySelector('button[value="cancel"]')
-        if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeDeleteBuildModal() })
-        deleteBuildModal.addEventListener('click', (e) => { if (e.target === deleteBuildModal) closeDeleteBuildModal() })
-    }
-    
-    // Confirm Delete Build Button
-    const confirmDeleteBuildBtn = document.getElementById('confirmDeleteBuildBtn')
-    if (confirmDeleteBuildBtn) {
-        console.log('✅ Confirm Delete Build button found, adding click listener')
-        confirmDeleteBuildBtn.addEventListener('click', async (e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            console.log('🗑️ Deleting build...')
-            
-            const buildToDelete = window.buildToDelete
-            if (buildToDelete) {
-                const buildName = buildToDelete.name
-                const buildId = buildToDelete.id
-                console.log('Deleting build:', buildName, 'with id:', buildId)
-                
-                // Delete from database first
-                try {
-                    console.log('Sending delete request to database...')
-                    const response = await fetch(`${API_BASE_URL}/api/delete-record`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            entityType: 'build',
-                            id: buildId
-                        })
-                    })
-                    const result = await response.json()
-                    console.log('Delete response:', result)
-                    
-                    if (!result.success) {
-                        console.error('❌ Database delete failed:', result.error)
-                        alert('Failed to delete build from database: ' + (result.error || 'Unknown error'))
-                        return
-                    }
-                } catch (error) {
-                    console.error('❌ Failed to delete build from database:', error)
-                    alert('Failed to delete build: ' + error.message)
-                    return
-                }
-                
-                
-                const db = store.readSync()
-                const idx = db.builds.findIndex(x => x.id === buildId)
-                if (idx >= 0) {
-                    db.builds.splice(idx, 1)
-                    store.write(db, true)
-                }
-                
-                // Audit log
-                await logAudit('delete', 'build', buildName, {})
-                console.log('✅ Audit log created')
-                
-                // Re-render from database
-                console.log('🔄 Re-rendering builds from database...')
-                await renderBuilds()
-                console.log('✅ Builds re-rendered')
-                
-                closeDeleteBuildModal()
-            } else {
-                console.log('❌ No build to delete')
-                alert('No build selected for deletion')
-            }
-        })
-    } else {
-        console.error('❌ Confirm Delete Build button not found!')
-    }
-}
+// Build UI removed; initBuildModal not used
 
 // Initialize refresh buttons
 function initRefreshButtons() {
     const refreshServersBtn = document.getElementById('refreshServersBtn')
-    const refreshBuildsBtn = document.getElementById('refreshBuildsBtn')
     const refreshUsersBtn = document.getElementById('refreshUsersBtn')
     const refreshCredentialsBtn = document.getElementById('refreshCredentialsBtn')
     
@@ -6993,16 +5629,7 @@ function initRefreshButtons() {
         })
     }
     
-    if (refreshBuildsBtn) {
-        refreshBuildsBtn.addEventListener('click', async () => {
-            refreshBuildsBtn.disabled = true
-            refreshBuildsBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Refreshing...'
-            await renderBuilds()
-            refreshBuildsBtn.disabled = false
-            refreshBuildsBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Refresh'
-            showNotification('Builds refreshed from database', 'success')
-        })
-    }
+    // Builds removed: no refreshBuildsBtn
     
     if (refreshUsersBtn) {
         refreshUsersBtn.addEventListener('click', async () => {
@@ -8172,15 +6799,14 @@ function initAIChat() {
             }
             
             // General count
-            return `📊 **OrbisHub Stats:**\n\n` +
-                   `• Environments: ${(db.environments || []).length}\n` +
-                   `• Servers: ${(db.servers || []).length}\n` +
-                   `• Users: ${(db.users || []).length}\n` +
-                   `• Databases: ${(db.databases || []).length}\n` +
-                   `• Scripts: ${(db.scripts || []).length}\n` +
-                   `• Integrations: ${(db.integrations || []).length}\n` +
-                   `• Credentials: ${(db.credentials || []).length}\n` +
-                   `• Audit Logs: ${(db.auditLogs || []).length}\n`
+                 return `📊 **OrbisHub Stats:**\n\n` +
+                     `• Environments: ${(db.environments || []).length}\n` +
+                     `• Servers: ${(db.servers || []).length}\n` +
+                     `• Users: ${(db.users || []).length}\n` +
+                     `• Databases: ${(db.databases || []).length}\n` +
+                     `• Integrations: ${(db.integrations || []).length}\n` +
+                     `• Credentials: ${(db.credentials || []).length}\n` +
+                     `• Audit Logs: ${(db.auditLogs || []).length}\n`
         }
         
         // ========== HELP COMMANDS ==========
@@ -8192,7 +6818,7 @@ function initAIChat() {
                    `• **Summary Dashboard** - Real-time statistics and recent activity\n` +
                    `• **Remote Desktop Manager** - One-click RDP connections to servers\n` +
                    `• **Integrations** - Connect Exchange, SMTP, Slack, Teams\n` +
-                   `• **Notifications** - Configure build, system, and health alerts\n` +
+                   `• **Notifications** - Configure system and health alerts\n` +
                    `• **Credentials** - Secure credential storage and management\n\n` +
                    `**CREATE:**\n` +
                    `• \`Create environment named X at https://...\`\n` +
@@ -8226,7 +6852,7 @@ function initAIChat() {
         }
         
         if (lowerMessage.includes('summary') || lowerMessage.includes('dashboard')) {
-            return "The **Summary Dashboard** shows real-time statistics for all your resources:\n\n• Environment, server, script, and build counts\n• Recent activity feed\n• Quick action buttons\n\nCheck it out in the General section!"
+            return "The **Summary Dashboard** shows real-time statistics for all your resources:\n\n• Environment and server counts\n• Recent activity feed\n• Quick action buttons\n\nCheck it out in the General section!"
         }
         
         if (lowerMessage.includes('rdp') || lowerMessage.includes('remote desktop')) {
@@ -8238,7 +6864,7 @@ function initAIChat() {
         }
         
         if (lowerMessage.includes('notification') || lowerMessage.includes('alert')) {
-            return "**Notifications** keep you informed:\n\n• **Build Notifications** - Deployment status\n• **System Alerts** - Critical warnings\n• **Daily Summaries** - Activity reports\n• **Health Monitoring** - Service status\n\nConfigure in System Administrators → Notifications."
+            return "**Notifications** keep you informed:\n\n• **System Alerts** - Critical warnings\n• **Daily Summaries** - Activity reports\n• **Health Monitoring** - Service status\n\nConfigure in System Administrators → Notifications."
         }
         
         if (lowerMessage.includes('credential')) {
@@ -8253,9 +6879,7 @@ function initAIChat() {
             return "I can help with server management! You can:\n\n• **Create**: `Create server named Web01 with IP 192.168.1.10`\n• **List**: `List servers`\n• **Connect**: Use Remote Desktop Manager for RDP connections\n\nWhat would you like to do?"
         }
         
-        if (lowerMessage.includes('script') || lowerMessage.includes('powershell')) {
-            return "PowerShell scripts can be uploaded in the Scripts section. You can then run them across your servers. Would you like some script examples?"
-        }
+        // Scripts functionality removed
         
         if (lowerMessage.includes('user') || lowerMessage.includes('admin')) {
             return "User management is available in System Administrators → Users / Permissions. You can:\n\n• Create users and assign roles\n• View online/offline status (green/gray indicator)\n• Manage permissions\n\nWhat would you like to know?"
@@ -8266,14 +6890,14 @@ function initAIChat() {
         }
         
         if (lowerMessage.includes('help')) {
-            return "I can help you with:\n\n• **Summary Dashboard** - Statistics and recent activity\n• **Remote Desktop Manager** - RDP connections\n• **Integrations** - External service connections\n• **Notifications** - Alert configuration\n• **Credentials** - Secure credential storage\n• **Environments & Servers** - Infrastructure management\n• **Users & Permissions** - User administration\n• **Scripts** - PowerShell automation\n\nWhat would you like to know more about?"
+            return "I can help you with:\n\n• **Summary Dashboard** - Statistics and recent activity\n• **Remote Desktop Manager** - RDP connections\n• **Integrations** - External service connections\n• **Notifications** - Alert configuration\n• **Credentials** - Secure credential storage\n• **Environments & Servers** - Infrastructure management\n• **Users & Permissions** - User administration\n\nWhat would you like to know more about?"
         }
         
         if (lowerMessage.includes('thank')) {
             return "You're welcome! Let me know if you need anything else. 😊"
         }
         
-        return "I'm here to help with OrbisHub! You can ask me about:\n\n• Summary Dashboard\n• Remote Desktop Manager\n• Integrations & Notifications\n• Environments, Servers, Scripts\n• User management\n• General DevOps topics\n\nWhat would you like to know?"
+        return "I'm here to help with OrbisHub! You can ask me about:\n\n• Summary Dashboard\n• Remote Desktop Manager\n• Integrations & Notifications\n• Environments & Servers\n• User management\n• General DevOps topics\n\nWhat would you like to know?"
     }
 }
 
@@ -8440,9 +7064,7 @@ const CommandPalette = {
             // Navigation
             { id: 'nav-environments', title: 'Environments', description: 'View and manage environments', icon: '🌍', action: () => showView('environments'), section: 'Navigation' },
             { id: 'nav-servers', title: 'Servers', description: 'Manage server infrastructure', icon: '🖥️', action: () => showView('servers'), section: 'Navigation' },
-            { id: 'nav-scripts', title: 'Scripts', description: 'PowerShell script repository', icon: '📝', action: () => showView('scripts'), section: 'Navigation' },
-            { id: 'nav-builds', title: 'Builds', description: 'Build execution and history', icon: '🔨', action: () => showView('builds'), section: 'Navigation' },
-            { id: 'nav-pipelines', title: 'Pipelines', description: 'CI/CD pipelines and automation', icon: '🔄', action: () => showView('pipelines'), section: 'Navigation' },
+            // Removed: Scripts, Builds, Pipelines navigation
             { id: 'nav-admin', title: 'Admin Panel', description: 'System administration', icon: '⚙️', action: () => showView('admin'), section: 'Navigation' },
             
             // Actions
@@ -10771,13 +9393,9 @@ document.addEventListener('DOMContentLoaded', () => {
                               document.getElementById('buildModal') ||
                               document.getElementById('editBuildModal') ||
                               document.getElementById('deleteBuildModal'))
-        if (hasBuildUI) {
-            initBuildModal()
-        } else {
-            console.log('⏭️ Build UI not present here; skipping initBuildModal()')
-        }
+        // Build UI removed; no initBuildModal()
     } catch (e) {
-        console.error('❌ initBuildModal() guard failed:', e)
+        // Build UI removed
     }
     
     // Initialize setup wizard and check database

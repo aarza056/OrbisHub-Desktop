@@ -709,10 +709,7 @@
               <input type="checkbox" checked disabled>
               <span>Manage Credentials</span>
             </label>
-            <label class="permission-item">
-              <input type="checkbox" checked disabled>
-              <span>Execute Builds</span>
-            </label>
+            
             <label class="permission-item">
               <input type="checkbox" checked disabled>
               <span>View Audit Logs</span>
@@ -754,10 +751,7 @@
               <input type="checkbox" id="opManageCredentials">
               <span>Manage Credentials</span>
             </label>
-            <label class="permission-item">
-              <input type="checkbox" id="opExecuteBuilds" checked>
-              <span>Execute Builds</span>
-            </label>
+            
             <label class="permission-item">
               <input type="checkbox" id="opViewAudit" checked>
               <span>View Audit Logs</span>
@@ -802,10 +796,7 @@
               <input type="checkbox" id="viewManageCredentials">
               <span>Manage Credentials</span>
             </label>
-            <label class="permission-item">
-              <input type="checkbox" id="viewExecuteBuilds">
-              <span>Execute Builds</span>
-            </label>
+            
             <label class="permission-item">
               <input type="checkbox" id="viewViewAudit" checked>
               <span>View Audit Logs</span>
@@ -984,7 +975,7 @@
       <option value="user">Users</option>
       <option value="database">Databases</option>
       <option value="credential">Credentials</option>
-      <option value="build">Builds</option>
+      
       <option value="server">Servers</option>
     </select>
     <div style="flex:1"></div>
@@ -1305,14 +1296,7 @@
           <div style="font-weight:600; margin-bottom:4px;">Servers</div>
           <div style="font-size:12px; color:var(--muted);">Server inventory</div>
         </div>
-        <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
-          <div style="font-weight:600; margin-bottom:4px;">Scripts</div>
-          <div style="font-size:12px; color:var(--muted);">PowerShell scripts</div>
-        </div>
-        <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
-          <div style="font-weight:600; margin-bottom:4px;">Builds</div>
-          <div style="font-size:12px; color:var(--muted);">Build execution logs</div>
-        </div>
+        
         <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
           <div style="font-weight:600; margin-bottom:4px;">Credentials</div>
           <div style="font-size:12px; color:var(--muted);">Encrypted credentials</div>
@@ -1337,37 +1321,7 @@
     <div style="flex:1"></div>
   </div>
   <div class="stack">
-    <div class="card">
-      <h3>Build Notifications</h3>
-      <p class="muted" style="margin-bottom:20px;">Configure notifications for build events and execution status updates.</p>
-      
-      <div style="display:flex; align-items:center; margin-bottom:16px;">
-        <label style="flex:1; font-weight:500;">Enable Build Notifications</label>
-        <label class="toggle-switch">
-          <input type="checkbox" id="notifyBuildsEnabled">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-      
-      <label class="label">Notify On
-        <select id="notifyBuildsOn" class="input" style="margin-top:8px;">
-          <option value="all">All Builds</option>
-          <option value="failures">Failures Only</option>
-          <option value="success">Success Only</option>
-        </select>
-      </label>
-      
-      <label class="label">Notification Channel
-        <select id="notifyBuildsChannel" class="input" style="margin-top:8px;">
-          <option value="">-- Select Integration --</option>
-        </select>
-      </label>
-      
-      <label class="label">Recipients
-        <input type="text" id="notifyBuildsRecipients" class="input" placeholder="email@example.com, user@domain.com" style="margin-top:8px;">
-        <span style="font-size:11px; color:var(--muted); margin-top:4px; display:block;">Comma-separated email addresses or usernames</span>
-      </label>
-    </div>
+    
     
     <div class="card">
       <h3>System Alerts</h3>
@@ -1403,7 +1357,7 @@
     
     <div class="card">
       <h3>Daily Summary Reports</h3>
-      <p class="muted" style="margin-bottom:20px;">Receive daily summary of all activities, builds, and system status.</p>
+      <p class="muted" style="margin-bottom:20px;">Receive daily summary of all activities and system status.</p>
       
       <div style="display:flex; align-items:center; margin-bottom:16px;">
         <label style="flex:1; font-weight:500;">Enable Daily Summary</label>
@@ -1492,7 +1446,7 @@
     <div class="doc-hero">
       <h1>OrbisHub</h1>
       <p class="doc-hero-tagline">By Admins, For Admins</p>
-      <p class="doc-hero-description">A comprehensive system administration and DevOps dashboard for managing environments, servers, remote connections, integrations, notifications, and automated builds—all from one centralized interface.</p>
+      <p class="doc-hero-description">A comprehensive system administration and DevOps dashboard for managing environments, servers, remote connections, integrations, and notifications—all from one centralized interface.</p>
     </div>
 
     <!-- Quick Start -->
@@ -1501,7 +1455,7 @@
       <div class="doc-card">
         <h3>Getting Started in 5 Steps</h3>
         <ol class="doc-list">
-          <li><strong>View Summary Dashboard:</strong> Start at the Summary page to see an overview of your entire system—environments, servers, scripts, builds, and recent activity.</li>
+          <li><strong>View Summary Dashboard:</strong> Start at the Summary page to see an overview of your entire system—environments, servers, and recent activity.</li>
           <li><strong>Add Credentials:</strong> Navigate to Credentials in System Administrators to securely store login credentials for your servers.</li>
           <li><strong>Register Servers:</strong> Go to Remote Desktop Manager and add your infrastructure with IP addresses and assigned credentials for one-click RDP access.</li>
           <li><strong>Create Environments:</strong> Define your deployment targets (Production, Staging, Dev) to organize your infrastructure logically.</li>
@@ -1527,7 +1481,7 @@
             <li>Environment and server health status</li>
             <li>Recent activity feed with timeline</li>
             <li>Quick action buttons for common tasks</li>
-            <li>Script and build execution summaries</li>
+            
           </ul>
         </div>
 
@@ -1629,7 +1583,6 @@
           <h3>Notifications</h3>
           <p>Automated alerts and daily summaries</p>
           <ul class="doc-feature-list">
-            <li>Build completion notifications (success/failure)</li>
             <li>System alerts for errors and warnings</li>
             <li>Daily summary reports with scheduling</li>
             <li>Environment health change alerts</li>
@@ -1638,31 +1591,7 @@
           </ul>
         </div>
 
-        <div class="doc-feature-card">
-          <div class="doc-feature-icon">�</div>
-          <h3>Scripts</h3>
-          <p>PowerShell script repository and execution</p>
-          <ul class="doc-feature-list">
-            <li>Upload and organize PowerShell scripts</li>
-            <li>Syntax highlighting and preview</li>
-            <li>Version tracking and history</li>
-            <li>Execute on remote servers</li>
-            <li>Script templates and examples</li>
-          </ul>
-        </div>
-
-        <div class="doc-feature-card">
-          <div class="doc-feature-icon">🔨</div>
-          <h3>Builds</h3>
-          <p>Automated build execution and monitoring</p>
-          <ul class="doc-feature-list">
-            <li>Configure build pipelines</li>
-            <li>Real-time progress tracking</li>
-            <li>Build history with success/failure status</li>
-            <li>Automatic notifications on completion</li>
-            <li>Build logs and output capture</li>
-          </ul>
-        </div>
+        
 
         <div class="doc-feature-card">
           <div class="doc-feature-icon">🔍</div>
@@ -1718,11 +1647,7 @@
             </ul>
           </div>
           <div class="doc-nav-section">
-            <strong>DevOps</strong>
-            <ul>
-              <li>Scripts - PowerShell automation repository</li>
-              <li>Builds - Build execution and monitoring</li>
-            </ul>
+              <!-- DevOps section removed (Scripts/Builds) -->
           </div>
           <div class="doc-nav-section">
             <strong>System Administrators</strong>
@@ -1804,8 +1729,6 @@
 {
   "environments": [],      // Deployment environments
   "servers": [],          // Server infrastructure with RDP details
-  "scripts": [],          // PowerShell automation scripts
-  "builds": [],           // Build configurations and history
   "integrations": [],     // External service connections
   "credentials": [],      // Encrypted login credentials
   "users": [],            // User accounts with online status
@@ -1838,10 +1761,8 @@
         <h3>Optional Node.js Backend</h3>
         <p>OrbisHub can connect to an optional backend for advanced features:</p>
         <ul class="doc-list">
-          <li>Remote script execution</li>
           <li>Database connection testing</li>
           <li>Server health monitoring</li>
-          <li>Real-time build execution</li>
         </ul>
         <div class="doc-warning">
           <strong>⚠️ Note:</strong> Backend is optional. The Electron app can work directly with SQL Server.
@@ -1866,7 +1787,7 @@
 
         <details class="doc-faq-item">
           <summary>Do I need a backend server?</summary>
-          <p>No, OrbisHub works completely standalone in your browser. The optional Node.js backend adds features like remote script execution, but isn't required.</p>
+          <p>No, OrbisHub works completely standalone in your browser. The optional Node.js backend adds features like database connection testing, but isn't required.</p>
         </details>
 
         <details class="doc-faq-item">
@@ -1880,8 +1801,7 @@
         </details>
 
         <details class="doc-faq-item">
-          <summary>How do I stop a running build?</summary>
-          <p>Click the red "Stop" button that appears on the build card while it's running. The build will be marked as stopped and logged in the audit trail.</p>
+          <!-- Build-related FAQ removed -->
         </details>
       </div>
     </div>
@@ -1967,14 +1887,10 @@
 
         <div class="settings-row">
           <div class="settings-row-info">
-            <h3>Build Completion Alerts</h3>
-            <p>Get notified when builds finish executing</p>
+            <!-- Build Completion Alerts removed -->
           </div>
           <div class="settings-row-control">
-            <label class="toggle-switch">
-              <input type="checkbox" id="settingsBuildAlerts" checked>
-              <span class="toggle-slider"></span>
-            </label>
+            
           </div>
         </div>
 
@@ -2041,14 +1957,10 @@
 
         <div class="settings-row">
           <div class="settings-row-info">
-            <h3>Real-time Build Monitoring</h3>
-            <p>Monitor running builds in real-time</p>
+            <!-- Real-time Build Monitoring removed -->
           </div>
           <div class="settings-row-control">
-            <label class="toggle-switch">
-              <input type="checkbox" id="settingsRealtimeBuilds" checked>
-              <span class="toggle-slider"></span>
-            </label>
+            
           </div>
         </div>
       </div>
@@ -2089,7 +2001,7 @@
         <div class="settings-row">
           <div class="settings-row-info">
             <h3>Data Retention</h3>
-            <p>How long to keep audit logs and build history</p>
+            <p>How long to keep audit logs</p>
           </div>
           <div class="settings-row-control">
             <select class="input" id="settingsDataRetention" style="width: 150px;">
@@ -3113,14 +3025,6 @@ Channels
     <div>
       <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Servers</div>
       <div id="migrateCountServers" style="font-size:24px; font-weight:700; color:#3b82f6;">0</div>
-    </div>
-    <div>
-      <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Scripts</div>
-      <div id="migrateCountScripts" style="font-size:24px; font-weight:700; color:#3b82f6;">0</div>
-    </div>
-    <div>
-      <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Builds</div>
-      <div id="migrateCountBuilds" style="font-size:24px; font-weight:700; color:#3b82f6;">0</div>
     </div>
     <div>
       <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Total Records</div>

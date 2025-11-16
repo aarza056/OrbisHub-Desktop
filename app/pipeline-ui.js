@@ -1,10 +1,11 @@
-// Pipeline UI Handlers
-// Manages pipeline CRUD, rendering, and execution UI
+// Removed: Pipelines UI is no longer supported in this app.
+// This file is intentionally left blank.
 
-// Load pipeline-manager.js
-const pipelineManagerScript = document.createElement('script');
-pipelineManagerScript.src = 'pipeline-manager.js';
-document.head.appendChild(pipelineManagerScript);
+// No-op export for safety if imported
+if (typeof window !== 'undefined') {
+    window.__pipelinesRemoved = true;
+}
+
 
 // Custom confirm dialog
 function customConfirm(message, title = 'Confirm Action') {
