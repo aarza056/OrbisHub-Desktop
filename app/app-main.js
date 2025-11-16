@@ -329,7 +329,7 @@ async function emergencyStorageCleanup() {
     }
 }
 
-// Builds/Scripts/Pipelines functionality removed
+//
 
 // Audit logging function - async and database-first
 async function logAudit(action, entityType, entityName, details = {}) {
@@ -445,7 +445,7 @@ function renderEnvs(filter = '') {
 		const mappedServerIds = env.mappedServers || []
 		const mappedServers = mappedServerIds.map(id => db.servers?.find(s => s.id === id)).filter(Boolean)
 		
-		// Build uptime section only if there are mapped servers
+        // Uptime section only if there are mapped servers
 		let uptimeSectionHTML = ''
 		
 		if (mappedServers.length > 0) {
@@ -463,7 +463,7 @@ function renderEnvs(filter = '') {
 				}
 			})
 			
-			// Build uptime rows based on mapped servers
+            // Uptime rows based on mapped servers
 			let uptimeRowsHTML = ''
 			
 			Object.keys(serversByType).forEach(type => {
@@ -2050,7 +2050,7 @@ function openEditCredential(credential) {
     }
 }
 
-/* Removed: Obsolete Builds/Scripts/Pipelines code */
+/* Removed: obsolete code */
 
 // ========== AUDIT LOGS PAGINATION ==========
 let auditPagination = {
@@ -3252,7 +3252,7 @@ if (credentialSearchInput) {
 }
 
 
-// Builds/Scripts/Pipelines functionality removed
+// Section removed
 
 
 // ========== SERVER MODALS ==========
@@ -3739,7 +3739,7 @@ async function renderAllViews() {
     }
 }
 
-/* Removed: Obsolete Builds/Scripts/Pipelines code */
+/* Removed: obsolete code */
 
 // ============================================
 // DATABASE SETUP MANAGEMENT
@@ -4189,7 +4189,7 @@ function updateSummaryDashboard() {
     const elSrvOffline = document.getElementById('summaryServerOffline')
     if (elSrvOffline) elSrvOffline.textContent = offlineServers
     
-    // Scripts/Builds removed: no script/build stats
+    // No script/build stats
     
     // Recent activity
     updateRecentActivity(db)
@@ -4199,7 +4199,7 @@ function updateRecentActivity(db) {
     const activityContainer = document.getElementById('summaryRecentActivity')
     const activities = []
     
-    // Build activities removed
+    // Activities removed
     
     // Get recently added environments
     const environments = (db.environments || []).slice(-3).reverse()
@@ -4397,7 +4397,7 @@ async function showView(name, updateUrl = true) {
                 break
                 
             // case 'builds':
-            //     // Builds view has been removed
+            //     // View has been removed
             //     break
                 
             case 'environments':
@@ -4486,13 +4486,13 @@ function handleUrlAction(view, action, id) {
             if (entityType === 'server') item = db.servers?.find(s => s.id === id)
             else if (entityType === 'credential') item = db.credentials?.find(c => c.id === id)
             else if (entityType === 'user') item = db.users?.find(u => u.id === id)
-            // builds removed
+            // removed
             
             if (item) {
                 if (entityType === 'server') openEditServer(item)
                 else if (entityType === 'credential') openEditCredential(item)
                 else if (entityType === 'user') openEditUser(item)
-                // builds removed
+                // removed
             }
         }
     }, 100)
@@ -5542,7 +5542,7 @@ if (document.readyState === 'loading') {
             console.error('❌ initAuth() failed:', e)
         }
         
-        // Build UI removed; skipping initBuildModal()
+        // Skipping initBuildModal()
         
         try {
             console.log('3️⃣ Calling initRefreshButtons()...')
@@ -5581,7 +5581,7 @@ if (document.readyState === 'loading') {
         console.error('❌ initAuth() failed:', e)
     }
     
-    // Build UI removed; no initBuildModal()
+    // No initBuildModal()
     
     try {
         console.log('3️⃣ Calling initRefreshButtons()...')
@@ -5610,7 +5610,7 @@ if (document.readyState === 'loading') {
     console.log('✅ All components initialized')
 }
 
-// Build UI removed; initBuildModal not used
+// initBuildModal not used
 
 // Initialize refresh buttons
 function initRefreshButtons() {
@@ -5629,7 +5629,7 @@ function initRefreshButtons() {
         })
     }
     
-    // Builds removed: no refreshBuildsBtn
+    // No refreshBuildsBtn
     
     if (refreshUsersBtn) {
         refreshUsersBtn.addEventListener('click', async () => {
@@ -6879,7 +6879,7 @@ function initAIChat() {
             return "I can help with server management! You can:\n\n• **Create**: `Create server named Web01 with IP 192.168.1.10`\n• **List**: `List servers`\n• **Connect**: Use Remote Desktop Manager for RDP connections\n\nWhat would you like to do?"
         }
         
-        // Scripts functionality removed
+        // Functionality removed
         
         if (lowerMessage.includes('user') || lowerMessage.includes('admin')) {
             return "User management is available in System Administrators → Users / Permissions. You can:\n\n• Create users and assign roles\n• View online/offline status (green/gray indicator)\n• Manage permissions\n\nWhat would you like to know?"
@@ -7023,7 +7023,7 @@ const CommandPalette = {
         this.input = this.overlay.querySelector('.command-palette-input')
         this.results = this.overlay.querySelector('.command-palette-results')
         
-        // Build commands
+        // Commands
         this.buildCommands()
         
         // Event listeners
@@ -7064,7 +7064,7 @@ const CommandPalette = {
             // Navigation
             { id: 'nav-environments', title: 'Environments', description: 'View and manage environments', icon: '🌍', action: () => showView('environments'), section: 'Navigation' },
             { id: 'nav-servers', title: 'Servers', description: 'Manage server infrastructure', icon: '🖥️', action: () => showView('servers'), section: 'Navigation' },
-            // Removed: Scripts, Builds, Pipelines navigation
+            // Navigation simplified
             { id: 'nav-admin', title: 'Admin Panel', description: 'System administration', icon: '⚙️', action: () => showView('admin'), section: 'Navigation' },
             
             // Actions
@@ -9387,15 +9387,15 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('❌ initMessaging() guard failed:', e)
     }
     
-    // Initialize build modal only if Build UI exists
+    // Initialize only if UI exists
     try {
         const hasBuildUI = !!(document.getElementById('addBuildBtn') ||
                               document.getElementById('buildModal') ||
                               document.getElementById('editBuildModal') ||
                               document.getElementById('deleteBuildModal'))
-        // Build UI removed; no initBuildModal()
+        // No initBuildModal()
     } catch (e) {
-        // Build UI removed
+        // UI removed
     }
     
     // Initialize setup wizard and check database

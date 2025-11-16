@@ -367,7 +367,7 @@ async function handleElectronAPI(url, options = {}) {
                         }
                     }
                     
-                    // Scripts/Builds/Pipelines removed
+                    // Section removed
                     
                     // Sync audit logs
                     if (auditLogs && auditLogs.length > 0) {

@@ -361,7 +361,7 @@ ipcMain.handle('test-server', async (event, { ipAddress, serverName, port = 3389
     }
 });
 
-// Remote PowerShell execution removed with Scripts/Builds/Pipelines
+// Remote PowerShell execution removed
 
 // SSH/PuTTY connection
 ipcMain.handle('ssh-connect', async (event, { server, credential }) => {
@@ -607,7 +607,7 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
         `);
         migrations.push('Servers table created');
         
-        // Scripts/Builds removed: no Scripts or Builds tables created
+        // No Scripts or Builds tables created
 
         // AuditLogs table
         await pool.request().query(`
@@ -626,7 +626,7 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
         `);
         migrations.push('AuditLogs table created');
         
-        // Pipelines/Scripts/Builds removed: no pipeline tables created
+        // No pipeline tables created
         
         // Messages table (for direct and channel messages) - ensure dbo schema
         await pool.request().query(`
