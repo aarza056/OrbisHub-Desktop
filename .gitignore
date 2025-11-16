@@ -1,0 +1,28 @@
+# Node/Electron
+node_modules/
+dist/
+out/
+*.log
+.env
+.env.*
+.DS_Store
+.vscode/
+
+# Electron builder outputs
+dist/win-*/
+dist/*.yml
+dist/*.blockmap
+dist/*.exe
+dist/*.msi
+dist/builder-*/
+
+# OS junk
+Thumbs.db
+
+# .NET build artifacts
+AutomationTests/bin/
+AutomationTests/obj/
+
+# VS/IDE
+.vs/
+.idea/
