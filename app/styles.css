@@ -4083,14 +4083,10 @@ SETUP WIZARD
 
 .card.is-locked .btn-ghost[data-action*="delete"],
 .card.is-locked button[data-action*="delete"],
-.card.is-locked button[data-build-delete],
-.card.is-locked button[data-script-delete],
 .card.is-locked .env__delete-btn,
 .card.is-locked .btn-ghost[data-action="edit"],
 .card.is-locked button[data-action="edit"],
-.card.is-locked button[data-action="server-edit"],
-.card.is-locked button[data-build-edit],
-.card.is-locked button[data-script-edit] {
+.card.is-locked button[data-action="server-edit"] {
   opacity: 0.4;
   pointer-events: none;
   cursor: not-allowed;
