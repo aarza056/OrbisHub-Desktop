@@ -208,6 +208,26 @@ const store = {
     }
 }
 
+// Approximate storage usage of in-memory cache (for UI display)
+function getStorageUsage() {
+    try {
+        const db = (typeof store?.readSync === 'function') ? store.readSync() : {}
+        const json = JSON.stringify(db || {})
+        let sizeBytes = 0
+        try {
+            sizeBytes = (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(json).length : json.length * 2
+        } catch {
+            sizeBytes = json.length * 2
+        }
+        const sizeMB = +(sizeBytes / (1024 * 1024)).toFixed(2)
+        const limitMB = 5
+        const percentUsed = Math.min(100, +(sizeMB / limitMB * 100).toFixed(1))
+        return { sizeBytes, sizeMB, limitMB, percentUsed }
+    } catch (e) {
+        return { sizeBytes: 0, sizeMB: 0, limitMB: 5, percentUsed: 0 }
+    }
+}
+
 // Clean up audit logs in database
 async function cleanupAuditLogs(keepCount = 100) {
     try {
@@ -349,12 +369,9 @@ window.toggleCardLock = toggleCardLock
 window.isCardLocked = isCardLocked
 window.createLockButton = createLockButton
 
-// Forward to the environments view module
-function renderEnvs(filter = '') {
-    if (window.renderEnvs && window.renderEnvs !== renderEnvs) {
-        return window.renderEnvs(filter)
-    }
-}
+// Use environments view module directly when available
+// Note: do NOT declare a global function named `renderEnvs` here,
+// as it would overwrite the module export on `window.renderEnvs`.
 
 // Edit User modal logic
 const editUserModal = document.getElementById('editUserModal')
@@ -2404,7 +2421,7 @@ if (confirmDeleteCredBtn) {
                 // Re-render from database
                 await renderCredentials()
                 renderServers()
-                renderEnvs(document.getElementById('search')?.value || '')
+                window.renderEnvs && window.renderEnvs(document.getElementById('search')?.value || '')
             }
         }
         closeDeleteCredentialModal()
@@ -2488,7 +2505,8 @@ if (saveServerBtn) {
                 os,
                 status: 'active',
                 serverGroup: group || 'Ungrouped',
-                health: 'checking'
+                health: 'checking',
+                createdAt: Date.now()
             }
             
             // Test connection based on OS (RDP 3389 vs SSH 22)
@@ -2879,7 +2897,7 @@ async function renderAllViews() {
     // Render all views using cached data
     try {
         console.log('🔄 Starting app initialization...')
-        renderEnvs()
+        window.renderEnvs && window.renderEnvs()
         console.log('✅ Environments rendered')
         renderServers()
         console.log('✅ Servers rendered')
@@ -3333,7 +3351,7 @@ function updateSummaryDashboard() {
     const environments = db.environments || []
     const elEnvCount = document.getElementById('summaryEnvCount')
     if (elEnvCount) elEnvCount.textContent = environments.length
-    const healthyEnvs = environments.filter(e => e.health === 'healthy').length
+    const healthyEnvs = environments.filter(e => (e.health || 'ok') === 'ok').length
     const issueEnvs = environments.length - healthyEnvs
     const elEnvHealthy = document.getElementById('summaryEnvHealthy')
     if (elEnvHealthy) elEnvHealthy.textContent = healthyEnvs
@@ -3344,8 +3362,8 @@ function updateSummaryDashboard() {
     const servers = db.servers || []
     const elSrvCount = document.getElementById('summaryServerCount')
     if (elSrvCount) elSrvCount.textContent = servers.length
-    const onlineServers = servers.filter(s => s.health === 'ok').length
-    const offlineServers = servers.filter(s => s.health === 'error').length
+    const onlineServers = servers.filter(s => (s.health || 'ok') === 'ok').length
+    const offlineServers = servers.length - onlineServers
     const elSrvOnline = document.getElementById('summaryServerOnline')
     if (elSrvOnline) elSrvOnline.textContent = onlineServers
     const elSrvOffline = document.getElementById('summaryServerOffline')
@@ -3381,7 +3399,7 @@ function updateRecentActivity(db) {
         activities.push({
             type: 'server',
             icon: '🖥️',
-            text: `Server "${server.name}" added`,
+            text: `Server "${server.displayName || server.hostname || server.ipAddress || 'Server'}" added`,
             time: server.createdAt || Date.now(),
             status: 'info'
         })
@@ -3570,7 +3588,7 @@ async function showView(name, updateUrl = true) {
                     const db = store.readSync()
                     db.environments = envsResult.data.environments || []
                     store.write(db, true)
-                    renderEnvs()
+                    window.renderEnvs && window.renderEnvs()
                     console.log(`✅ Loaded ${db.environments.length} environments from database`)
                 }
                 break
@@ -5573,7 +5591,7 @@ function initAIChat() {
                 db.environments.push(newEnv)
                 store.write(db)
                 logAudit('create', 'environment', name, { url, type })
-                renderEnvs()
+                window.renderEnvs && window.renderEnvs()
                 
                 return `✅ Environment **${name}** created successfully!\n\n• URL: ${url}\n• Type: ${type}\n\nYou can find it in the Environments section.`
             } catch (error) {
@@ -5724,7 +5742,7 @@ function initAIChat() {
                 db.environments.splice(index, 1)
                 store.write(db)
                 logAudit('delete', 'environment', name, {})
-                renderEnvs()
+                window.renderEnvs && window.renderEnvs()
                 
                 return `✅ Environment **${name}** deleted successfully!`
             } catch (error) {

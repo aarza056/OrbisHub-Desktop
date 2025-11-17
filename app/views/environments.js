@@ -414,7 +414,7 @@
       if (!name || !url) return
       try {
         const db = store.readSync()
-        const newEnv = { id: uid(), name, url, type, health: 'ok', mappedServers: [] }
+        const newEnv = { id: uid(), name, url, type, health: 'ok', mappedServers: [], createdAt: Date.now() }
         db.environments.push(newEnv)
         await store.write(db)
         memoryCache = db
