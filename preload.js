@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Server utilities
     testServer: (ipAddress, serverName, port = 3389) => 
         ipcRenderer.invoke('test-server', { ipAddress, serverName, port }),
+    getServerUptime: (params) => ipcRenderer.invoke('get-server-uptime', params),
     
     
     // System info

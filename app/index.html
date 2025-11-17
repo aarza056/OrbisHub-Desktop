@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- Electron CSP: restrict sources while allowing current inline handlers and Google Fonts -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>OrbisHub</title>
 <link rel="icon" type="image/x-icon" href="../media/favicon.ico">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3286,6 +3288,10 @@ Channels
 <script src="services/audit.js"></script>
 <script src="services/entities.js"></script>
 <script src="app.js"></script>
+<!-- Utilities -->
+<script src="utils/toast.js"></script>
+<script src="views/environments.js"></script>
+<!-- Core -->
 <script src="app-main.js"></script>
 </body>
 </html>
