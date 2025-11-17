@@ -569,13 +569,29 @@
 
 <section id="view-environments" class="view">
 <div class="view__header">
-  <h1>ElasticSearch</h1>
+  <h1>Environments</h1>
   <div style="flex:1"></div>
-  <button class="btn btn-ghost">Configure</button>
+  <button id="addEnvBtn" class="btn">+ Add Environment</button>
+  
+</div>
+<div class="view__toolbar">
+  <input id="search" class="input" placeholder="Search environments by name or URL..." style="flex:1; max-width: 600px;" />
 </div>
 <div class="stack">
-  <p class="muted">ElasticSearch logs and analytics viewer.</p>
+  <div id="envList" class="grid"></div>
 </div>
+</section>
+
+<!-- ElasticSearch View -->
+<section id="view-elasticsearch" class="view">
+  <div class="view__header">
+    <h1>ElasticSearch</h1>
+    <div style="flex:1"></div>
+    <button class="btn btn-ghost">Configure</button>
+  </div>
+  <div class="stack">
+    <p class="muted">ElasticSearch logs and analytics viewer.</p>
+  </div>
 </section>
 
 
