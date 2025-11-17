@@ -129,23 +129,18 @@ const store = {
             })
         }
         
-        // Migration: Update servers with credentialId if missing
-        if (db.servers) {
-            db.servers.forEach(server => {
-                if (!server.credentialId) server.credentialId = null
-            })
-        }
+        // moved: renderEnvs is implemented in views/environments.js
     },
-    
+
     getEmptyDb() {
         return {
             environments: [],
-            jobs: [],
-            users: [],
-            integrations: [],
-            credentials: [],
-            auditLogs: [],
             servers: [],
+            users: [],
+            credentials: [],
+            integrations: [],
+            auditLogs: [],
+            jobs: [],
             notificationSettings: {
                 system: { enabled: false, level: 'all', channel: '', recipients: '' },
                 summary: { enabled: false, time: '09:00', channel: '', recipients: '' },
@@ -156,135 +151,60 @@ const store = {
         }
     },
 
-    // Database-only write
     async write(db, skipSync = false) {
-        if (skipSync) {
-            memoryCache = db
-            return true
+        this.ensureDbStructure(db)
+        if (!skipSync) {
+            await this.syncToDatabase(db)
         }
-        
-        await this.syncToDatabase(db).catch(err => {
-            console.error('Database sync failed:', err.message)
-            throw err
-        })
         memoryCache = db
         return true
     },
 
     async syncToDatabase(db) {
         const isConnected = await this.checkDatabaseConnection()
-        if (!isConnected) {
-            throw new Error('❌ Database not connected. Please configure database connection in Settings.')
-        }
+        if (!isConnected) throw new Error('Database not connected')
 
-        try {
-            console.log('🔄 Syncing data to database...')
-            const response = await fetch(`${API_BASE_URL}/api/sync-data`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    environments: db.environments || [],
-                    servers: db.servers || [],
-                    credentials: db.credentials || [],
-                    users: db.users || []
-                })
+        const response = await fetch(`${API_BASE_URL}/api/sync-data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                environments: db.environments || [],
+                servers: db.servers || [],
+                credentials: db.credentials || [],
+                users: db.users || [],
+                auditLogs: db.auditLogs || []
             })
-            const result = await response.json()
-            if (result.success) {
-                console.log('✅ Data synced to database successfully')
-            } else {
-                throw new Error(result.error || 'Sync failed')
-            }
-        } catch (error) {
-            console.error('❌ Failed to sync to database:', error.message)
-            throw error
-        }
+        })
+        const result = await response.json()
+        if (!result.success) throw new Error(result.error || 'Sync failed')
+        return result
     },
 
     async loadFromDatabase() {
         const isConnected = await this.checkDatabaseConnection()
-        if (!isConnected) {
-            return null
-        }
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/load-data`)
-            const result = await response.json()
-            
-            if (result.success) {
-                return result.data
-            } else {
-                console.error('❌ Failed to load from database:', result.error)
-                return null
-            }
-        } catch (error) {
-            console.error('❌ Load from database failed:', error.message)
+        if (!isConnected) return null
+        const response = await fetch(`${API_BASE_URL}/api/load-data`)
+        const result = await response.json()
+        if (result.success) {
+            const data = result.data || {}
+            this.ensureDbStructure(data)
+            return data
+        } else {
+            console.error('❌ Failed to load from database:', result.error)
             return null
         }
     },
 
     async deleteFromDatabase(entityType, id) {
         const isConnected = await this.checkDatabaseConnection()
-        if (!isConnected) {
-            throw new Error('❌ Database not connected. Please configure database connection in Settings.')
-        }
-
-        console.log(`🗑️ Attempting to delete ${entityType} with ID: ${id}`)
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/delete-record`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ entityType, id })
-            })
-            
-            const result = await response.json()
-            
-            if (result.success) {
-                console.log(`✅ Successfully deleted ${entityType} ${id} from database`)
-            } else {
-                console.error(`❌ Failed to delete ${entityType} ${id}:`, result.error || result.message)
-            }
-            
-            return result
-        } catch (error) {
-            console.error(`❌ Delete ${entityType} ${id} failed:`, error.message)
-            throw error
-        }
-    }
-}
-
-// Small stable id helper with a crypto fallback for older browsers
-function uid() {
-    try {
-        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
-    } catch (e) {}
-
-    // Fallback for older environments
-    return 'id-' + Math.random().toString(36).slice(2, 10)
-}
-
-// Storage utility removed - database-only architecture
-
-// Lightweight storage usage helper (safe in renderer; DB-first app)
-function getStorageUsage() {
-    try {
-        // Estimate JSON size of in-memory DB cache
-        const db = store.readSync?.() || {}
-        const json = JSON.stringify(db)
-        // Use TextEncoder for accurate byte length where available
-        let bytes = 0
-        try {
-            bytes = new TextEncoder().encode(json).length
-        } catch (e) {
-            bytes = json.length
-        }
-        const sizeMB = +(bytes / (1024 * 1024)).toFixed(2)
-        const limitMB = 512 // generous logical limit for display only
-        const percentUsed = Math.min(100, +((sizeMB / limitMB) * 100).toFixed(1))
-        return { sizeMB, limitMB, percentUsed }
-    } catch (e) {
-        return { sizeMB: 0, limitMB: 512, percentUsed: 0 }
+        if (!isConnected) throw new Error('Database not connected')
+        const response = await fetch(`${API_BASE_URL}/api/delete-record`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entityType, id })
+        })
+        const result = await response.json()
+        return result
     }
 }
 
@@ -330,6 +250,17 @@ async function emergencyStorageCleanup() {
 }
 
 //
+
+// Simple UUID generator used across the app (global)
+function uid(prefix = '') {
+    const id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0
+        const v = c === 'x' ? r : (r & 0x3 | 0x8)
+        return v.toString(16)
+    })
+    return prefix ? `${prefix}-${id}` : id
+}
+window.uid = uid
 
 // Audit logging function - delegates to services/audit.js
 async function logAudit(action, entityType, entityName, details = {}) {
@@ -413,245 +344,15 @@ function createLockButton(entityType, entityId) {
 	`
 }
 
-// Render environments into #envList (simple, minimal UI used by the demo)
+// Expose lock helpers globally for modules
+window.toggleCardLock = toggleCardLock
+window.isCardLocked = isCardLocked
+window.createLockButton = createLockButton
+
+// Forward to the environments view module
 function renderEnvs(filter = '') {
-	const envList = document.getElementById('envList')
-	if (!envList) return
-	const db = store.readSync()
-	const environments = db.environments || []
-	if (!Array.isArray(environments)) {
-		console.error('db.environments is not an array:', environments)
-		db.environments = []
-		store.write(db)
-		return
-	}
-	const q = (filter || '').toLowerCase()
-	envList.innerHTML = ''
-	environments.filter(e => !q || e.name.toLowerCase().includes(q) || e.url.toLowerCase().includes(q)).forEach(env => {
-		// Get mapped servers info
-		const mappedServerIds = env.mappedServers || []
-		const mappedServers = mappedServerIds.map(id => db.servers?.find(s => s.id === id)).filter(Boolean)
-		
-        // Uptime section only if there are mapped servers
-		let uptimeSectionHTML = ''
-		
-		if (mappedServers.length > 0) {
-			// Group mapped servers by type
-			const serversByType = {
-				'Front End': [],
-				'Back End': [],
-				'Win Server': [],
-				'Web Server': []
-			}
-			
-			mappedServers.forEach(srv => {
-				if (serversByType[srv.type]) {
-					serversByType[srv.type].push(srv)
-				}
-			})
-			
-            // Uptime rows based on mapped servers
-			let uptimeRowsHTML = ''
-			
-			Object.keys(serversByType).forEach(type => {
-				const servers = serversByType[type]
-				
-				if (servers.length > 0) {
-					// Show server names
-					servers.forEach(server => {
-						uptimeRowsHTML += `<div class="uptime-row"><span>${server.displayName}</span><span class="uptime-value">00:00:00</span></div>`
-					})
-				}
-			})
-			
-			uptimeSectionHTML = `<div class="env__uptime">${uptimeRowsHTML}</div>`
-		}
-		
-		const el = document.createElement('div')
-        el.className = 'card env'
-		if (isCardLocked('environment', env.id)) el.classList.add('is-locked')
-        el.draggable = true
-        el.dataset.envId = env.id
-        el.innerHTML = `
-			${createLockButton('environment', env.id)}
-            <button class="env__delete-btn" data-action="delete" data-id="${env.id}" title="Delete environment">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="3 6 5 6 21 6"></polyline>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    <line x1="10" y1="11" x2="10" y2="17"></line>
-                    <line x1="14" y1="11" x2="14" y2="17"></line>
-                </svg>
-            </button>
-            <div class="env__health ${(env.health || 'ok') === 'faulty' ? 'is-faulty' : (env.health || 'ok') === 'warning' ? 'is-warning' : 'is-ok'}" 
-                 title="Health: ${env.health === 'faulty' ? 'Faulty' : env.health === 'warning' ? 'Warning' : 'OK'}"></div>
-			<div class="title">${env.name}</div>
-			<div class="meta muted">${env.type} • ${env.url}</div>
-			${uptimeSectionHTML}
-		<div class="actions row">
-			<button class="btn btn-icon" data-action="open-url" data-url="${env.url}" title="Open ${env.url}">
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-					<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-					<polyline points="15 3 21 3 21 9"></polyline>
-					<line x1="10" y1="14" x2="21" y2="3"></line>
-				</svg>
-			</button>
-			<button class="btn" data-action="details" data-id="${env.id}">Show Details</button>
-            <button class="btn btn-ghost" data-action="edit" data-id="${env.id}">Edit</button>
-		</div>
-	`		// Lock button handler
-		const lockBtn = el.querySelector('.card-lock-btn')
-		if (lockBtn) {
-			lockBtn.addEventListener('click', (e) => {
-				e.stopPropagation()
-				toggleCardLock(el, 'environment', env.id)
-			})
-		}
-		
-		// Drag and drop handlers
-		el.addEventListener('dragstart', (e) => {
-			el.classList.add('dragging')
-			e.dataTransfer.effectAllowed = 'move'
-			e.dataTransfer.setData('text/html', el.innerHTML)
-		})
-		
-		el.addEventListener('dragend', (e) => {
-			el.classList.remove('dragging')
-			// Save new order to database
-			const cards = Array.from(envList.querySelectorAll('.env'))
-			const newOrder = cards.map(card => card.dataset.envId)
-			const db = store.readSync()
-			db.environments.sort((a, b) => newOrder.indexOf(a.id) - newOrder.indexOf(b.id))
-			store.write(db)
-		})
-		
-		el.addEventListener('dragover', (e) => {
-			e.preventDefault()
-			const draggingCard = document.querySelector('.dragging')
-			if (draggingCard && draggingCard !== el) {
-				const rect = el.getBoundingClientRect()
-				const midpoint = rect.left + rect.width / 2
-				if (e.clientX < midpoint) {
-					envList.insertBefore(draggingCard, el)
-				} else {
-					envList.insertBefore(draggingCard, el.nextSibling)
-				}
-			}
-		})
-		
-		// Wire action handlers
-		el.querySelectorAll('button[data-action]').forEach(b => b.addEventListener('click', (ev) => {
-			const id = b.dataset.id
-			const action = b.dataset.action
-			
-			// Handle open-url action - use external browser
-			if (action === 'open-url') {
-				const url = b.dataset.url
-				if (url && window.electronAPI && window.electronAPI.openExternal) {
-					window.electronAPI.openExternal(url)
-				} else if (url) {
-					window.open(url, '_blank')
-				}
-				return
-			}
-			
-			// Get current environment from database
-			const db = store.readSync()
-			const env = db.environments.find(x => x.id === id)
-			if (env) onEnvAction(env, action)
-		}))
-		
-		// Check if this is a newly created environment (by checking if it's the first one or was just added)
-		const existingCard = envList.querySelector(`[data-env-id="${env.id}"]`)
-		if (!existingCard) {
-			el.classList.add('env--entering')
-		}
-		
-		envList.appendChild(el)
-	})
-}
-
-
-// Environment delete confirmation modal handling
-const deleteEnvModal = document.getElementById('deleteEnvModal')
-let envToDelete = null
-
-// Delete user modal handling
-const deleteUserModal = document.getElementById('deleteUserModal')
-let userToDelete = null
-
-function closeDeleteUserModal() {
-    try { deleteUserModal.close() } catch (e) { /* ignore */ }
-    try { deleteUserModal.removeAttribute('open') } catch (e) {}
-    const focused = deleteUserModal.querySelector(':focus')
-    if (focused && typeof focused.blur === 'function') focused.blur()
-    userToDelete = null
-}
-
-if (deleteUserModal) {
-    deleteUserModal.addEventListener('close', async () => {
-        if (deleteUserModal.returnValue === 'confirm' && userToDelete) {
-            const db = store.readSync()
-            const idx = db.users.findIndex(x => x.id === userToDelete.id)
-            if (idx >= 0) {
-                const userName = db.users[idx].name
-                const userId = db.users[idx].id
-                
-                console.log('🗑️ Deleting user:', userName, 'ID:', userId)
-                
-                // Delete from database FIRST
-                console.log('📡 Calling deleteFromDatabase...')
-                try {
-                    const result = await store.deleteFromDatabase('user', userId)
-                    console.log('✅ Database delete result:', JSON.stringify(result))
-                    if (!result || !result.success) {
-                        console.error('❌ Database delete failed:', JSON.stringify(result))
-                        alert('Failed to delete user from database: ' + (result?.error || 'Unknown error'))
-                        return // Stop if database delete failed
-                    }
-                    console.log('✅ User successfully deleted from database')
-                } catch (error) {
-                    console.error('❌ Failed to delete user from database:', error)
-                    alert('Failed to delete user from database: ' + error.message)
-                    return // Stop if database delete failed
-                }
-                
-                
-                db.users.splice(idx, 1)
-                store.write(db, true) // Skip sync - we already deleted from DB
-                
-                // User deleted from database
-                
-                // Reload users from database
-                console.log('🔄 Reloading users from database...')
-                try {
-                    const reloadResponse = await fetch(`${API_BASE_URL}/api/load-data`)
-                    const reloadData = await reloadResponse.json()
-                    if (reloadData.success && reloadData.data && reloadData.data.users) {
-                        // [Removed - database-only architecture]
-                        freshDb.users = reloadData.data.users
-                        store.write(freshDb, true) // Skip sync - we just loaded from DB
-                        console.log('✅ Users reloaded from database')
-                    }
-                } catch (reloadError) {
-                    console.warn('⚠️ Could not reload users from database:', reloadError)
-                }
-                
-                // Audit log
-                await logAudit('delete', 'user', userName, {})
-                
-                renderUsers()
-            }
-        }
-        userToDelete = null
-    })
-
-    deleteUserModal.addEventListener('click', (e) => {
-        if (e.target === deleteUserModal) closeDeleteUserModal()
-    })
-
-    const deleteUserCancel = deleteUserModal.querySelector('button[value="cancel"]')
-    if (deleteUserCancel) {
-        deleteUserCancel.addEventListener('click', (e) => { e.preventDefault(); closeDeleteUserModal() })
+    if (window.renderEnvs && window.renderEnvs !== renderEnvs) {
+        return window.renderEnvs(filter)
     }
 }
 
@@ -713,435 +414,15 @@ if (editUserModal) {
     })
 }
 
-function closeDeleteEnvModal() {
-    try { deleteEnvModal.close() } catch (e) { /* ignore */ }
-    try { deleteEnvModal.removeAttribute('open') } catch (e) {}
-    const focused = deleteEnvModal.querySelector(':focus')
-    if (focused && typeof focused.blur === 'function') focused.blur()
-    envToDelete = null
-}
+// moved: environment delete modal handling is in views/environments.js
 
-if (deleteEnvModal) {
-    // Handle confirmation result
-    deleteEnvModal.addEventListener('close', () => {
-        console.log('Modal closed. returnValue:', deleteEnvModal.returnValue, 'envToDelete:', envToDelete)
-        if (deleteEnvModal.returnValue === 'confirm' && envToDelete) {
-            console.log('Confirmed delete for:', envToDelete.name, envToDelete.id)
-            
-            // Capture the environment to delete before clearing the global variable
-            const envToRemove = envToDelete
-            
-            // Find the card element and animate it out
-            const cardToDelete = document.querySelector(`.env[data-env-id="${envToRemove.id}"]`)
-            console.log('Card found:', !!cardToDelete)
-            
-            if (cardToDelete) {
-                cardToDelete.classList.add('env--exiting')
-                
-                // Wait for animation to complete before removing from DOM and database
-                setTimeout(() => {
-                    const db = store.readSync()
-                    const idx = db.environments.findIndex(x => x.id === envToRemove.id)
-                    console.log('Environment index to delete:', idx, 'Total envs before delete:', db.environments.length)
-                    if (idx >= 0) {
-                        const envName = db.environments[idx].name
-                        const envId = db.environments[idx].id
-                        
-                        // Delete from database FIRST
-                        store.deleteFromDatabase('environment', envId).catch(err => {
-                            console.error('Failed to delete from database:', err)
-                        })
-                        
-                        
-                        db.environments.splice(idx, 1)
-                        console.log('Spliced environment. Total envs after delete:', db.environments.length)
-                        store.write(db)
-                        
-                        // Audit log
-                        logAudit('delete', 'environment', envName, {})
-                        
-                        // Show success toast
-                        ToastManager.success(
-                            'Environment Deleted',
-                            `${envName} has been removed from your environments`,
-                            4000
-                        )
-                        
-                        const searchInput = document.getElementById('search')
-                        renderEnvs(searchInput ? searchInput.value : '')
-                        renderServers()
-                    }
-                }, 300) // Match animation duration
-            } else {
-                // Fallback if card not found
-                console.log('Card not found, using fallback')
-                const db = store.readSync()
-                const idx = db.environments.findIndex(x => x.id === envToRemove.id)
-                console.log('Fallback - Environment index to delete:', idx)
-                if (idx >= 0) {
-                    const envName = db.environments[idx].name
-                    const envId = db.environments[idx].id
-                    
-                    // Delete from database FIRST
-                    store.deleteFromDatabase('environment', envId).catch(err => {
-                        console.error('Failed to delete from database:', err)
-                    })
-                    
-                    
-                    db.environments.splice(idx, 1)
-                    store.write(db)
-                    
-                    // Audit log
-                    logAudit('delete', 'environment', envName, {})
-                    
-                    const searchInput = document.getElementById('search')
-                    renderEnvs(searchInput ? searchInput.value : '')
-                    renderServers()
-                }
-            }
-        }
-        envToDelete = null
-    })
+// moved: onEnvAction is in views/environments.js
 
-    // Close when clicking backdrop
-    deleteEnvModal.addEventListener('click', (e) => {
-        if (e.target === deleteEnvModal) closeDeleteEnvModal()
-    })
+// moved: environment details modal handlers are in views/environments.js
 
-    // Close on cancel button
-    const cancelBtn = deleteEnvModal.querySelector('button[value="cancel"]')
-    if (cancelBtn) {
-        cancelBtn.addEventListener('click', (e) => {
-            e.preventDefault()
-            closeDeleteEnvModal()
-        })
-    }
-}
+// moved: map servers and environment details handlers are in views/environments.js
 
-function onEnvAction(env, action) {
-    if (action === 'export') queueJob(`Export ${env.name}`, 3000)
-    if (action === 'import') queueJob(`Import → ${env.name}`, 4000)
-    if (action === 'backup') queueJob(`Backup ${env.name}`, 2500)
-    if (action === 'list-solutions') alert('Stub: show solutions for ' + env.name)
-    if (action === 'details') showEnvDetails(env)
-    if (action === 'edit') openEditEnv(env)
-    if (action === 'delete') {
-        // Show delete confirmation modal
-        envToDelete = env
-        const nameSpan = document.getElementById('deleteEnvName')
-        if (nameSpan) nameSpan.textContent = env.name
-        try {
-            deleteEnvModal.showModal()
-            deleteEnvModal.querySelector('button[value="confirm"]')?.focus()
-        } catch (e) {
-            deleteEnvModal.setAttribute('open', '')
-        }
-    }
-}
-
-// Show Environment Details modal
-const envDetailsModal = document.getElementById('envDetailsModal')
-function showEnvDetails(env) {
-    if (!envDetailsModal) return
-    
-    const content = document.getElementById('envDetailsContent')
-    if (content) {
-        const healthStatus = env.health === 'faulty' ? 'Faulty' : env.health === 'warning' ? 'Warning' : 'OK'
-        const healthColor = env.health === 'faulty' ? '#ef4444' : env.health === 'warning' ? '#facc15' : '#4ade80'
-        
-        content.innerHTML = `
-            <div style="display: grid; gap: 16px;">
-                <div class="detail-row">
-                    <div class="detail-label">Name</div>
-                    <div class="detail-value">${env.name}</div>
-                </div>
-                <div class="detail-row">
-                    <div class="detail-label">URL</div>
-                    <div class="detail-value"><a href="${env.url}" target="_blank" style="color: var(--primary); text-decoration: none;">${env.url}</a></div>
-                </div>
-                <div class="detail-row">
-                    <div class="detail-label">Type</div>
-                    <div class="detail-value">${env.type}</div>
-                </div>
-                <div class="detail-row">
-                    <div class="detail-label">Health Status</div>
-                    <div class="detail-value">
-                        <span style="display: inline-flex; align-items: center; gap: 8px;">
-                            <span style="width: 12px; height: 12px; border-radius: 50%; background: ${healthColor};"></span>
-                            ${healthStatus}
-                        </span>
-                    </div>
-                </div>
-                <div class="detail-row">
-                    <div class="detail-label">Environment ID</div>
-                    <div class="detail-value" style="font-family: monospace; font-size: 12px; color: #9aa3b2; opacity: 0.8;">${env.id}</div>
-                </div>
-            </div>
-        `
-    }
-    
-    // Store env ID for button actions
-    envDetailsModal.dataset.envId = env.id
-    
-    try {
-        envDetailsModal.showModal()
-    } catch (e) {
-        envDetailsModal.setAttribute('open', '')
-    }
-}
-
-// Map Servers modal
-const mapServersModal = document.getElementById('mapServersModal')
-let currentMappingEnv = null
-
-function openMapServers(env) {
-    if (!mapServersModal) return
-    
-    currentMappingEnv = env
-    const envNameSpan = document.getElementById('mapServersEnvName')
-    if (envNameSpan) envNameSpan.textContent = env.name
-    
-    // Populate all server types at once
-    populateAllServerTypes(env)
-    
-    try {
-        mapServersModal.showModal()
-    } catch (e) {
-        mapServersModal.setAttribute('open', '')
-    }
-}
-
-function populateAllServerTypes(env) {
-    const allTypesContainer = document.getElementById('mapServersAllTypes')
-    if (!allTypesContainer || !env) return
-    
-    const db = store.readSync()
-    const servers = db.servers || []
-    const existingMappedServers = env.mappedServers || []
-    
-    // Filter servers to match environment type (Production servers for Production env, etc.)
-    const compatibleServers = servers.filter(server => server.serverGroup === env.type)
-    
-    if (compatibleServers.length === 0) {
-        allTypesContainer.innerHTML = '<div style="color: var(--muted); font-size: 14px; padding: 8px;">No compatible servers found for this environment type.</div>'
-        return
-    }
-    
-    // Group servers by type
-    const serversByType = {
-        'Front End': [],
-        'Back End': [],
-        'Win Server': [],
-        'Web Server': []
-    }
-    
-    compatibleServers.forEach(server => {
-        if (serversByType[server.type]) {
-            serversByType[server.type].push(server)
-        }
-    })
-    
-    let html = ''
-    
-    Object.keys(serversByType).forEach(type => {
-        const serversOfType = serversByType[type]
-        
-        if (serversOfType.length > 0) {
-            html += `<div style="margin-bottom: 20px;">
-                <h4 style="margin: 0 0 8px 0; color: var(--text); font-size: 14px; font-weight: 600;">${type}</h4>
-                <div style="padding-left: 8px; border-left: 2px solid var(--border);">
-            `
-            
-            serversOfType.forEach(server => {
-                const isChecked = existingMappedServers.includes(server.id)
-                html += `
-                    <label style="display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer;">
-                        <input type="checkbox" value="${server.id}" ${isChecked ? 'checked' : ''}>
-                        <span style="flex: 1;">${server.displayName}</span>
-                        <span style="color: var(--muted); font-size: 12px; font-family: monospace;">${server.ipAddress || 'N/A'}</span>
-                    </label>
-                `
-            })
-            
-            html += '</div></div>'
-        }
-    })
-    
-    if (html === '') {
-        html = '<div style="color: var(--muted); font-size: 14px; padding: 8px;">No servers available for this environment type.</div>'
-    }
-    
-    allTypesContainer.innerHTML = html
-}
-
-function closeMapServersModal() {
-    try { mapServersModal.close() } catch (e) {}
-    try { mapServersModal.removeAttribute('open') } catch (e) {}
-    currentMappingEnv = null
-}
-
-// Map Servers modal handlers
-if (mapServersModal) {
-    const cancelBtn = mapServersModal.querySelector('button[value="cancel"]')
-    if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeMapServersModal() })
-    
-    mapServersModal.addEventListener('click', (e) => { if (e.target === mapServersModal) closeMapServersModal() })
-}
-
-// Type selector is no longer used - servers are now shown grouped by type in a single view
-
-// Save mapped servers
-const saveMapServersBtn = document.getElementById('saveMapServersBtn')
-if (saveMapServersBtn) {
-    saveMapServersBtn.addEventListener('click', (e) => {
-        e.preventDefault()
-        
-        if (!currentMappingEnv) return
-        
-        // Get all checked servers from all types
-        const allTypesContainer = document.getElementById('mapServersAllTypes')
-        const checkboxes = allTypesContainer.querySelectorAll('input[type="checkbox"]:checked')
-        const selectedServerIds = Array.from(checkboxes).map(cb => cb.value)
-        
-        const db = store.readSync()
-        const env = db.environments.find(e => e.id === currentMappingEnv.id)
-        
-        if (env) {
-            const oldServers = env.mappedServers || []
-            
-            // Simply replace with the new selection (all selected servers across all types)
-            const newMappedServers = selectedServerIds
-            
-            env.mappedServers = newMappedServers
-            store.write(db)
-            
-            // Audit log
-            logAudit('update', 'environment', env.name, {
-                old: { mappedServers: oldServers },
-                new: { mappedServers: newMappedServers }
-            })
-            
-            renderEnvs(document.getElementById('search')?.value || '')
-        }
-        
-        closeMapServersModal()
-    })
-}
-
-// Environment Details modal action buttons
-const envDetailsDeployBtn = document.getElementById('envDetailsDeployBtn')
-const envDetailsSolutionsBtn = document.getElementById('envDetailsSolutionsBtn')
-
-if (envDetailsDeployBtn) {
-    envDetailsDeployBtn.addEventListener('click', () => {
-        const envId = envDetailsModal.dataset.envId
-        if (envId) {
-            const db = store.readSync()
-            const env = db.environments.find(e => e.id === envId)
-            if (env) {
-                queueJob(`Deploy to ${env.name}`, 5000)
-                envDetailsModal.close()
-            }
-        }
-    })
-}
-
-if (envDetailsSolutionsBtn) {
-    envDetailsSolutionsBtn.addEventListener('click', () => {
-        const envId = envDetailsModal.dataset.envId
-        if (envId) {
-            const db = store.readSync()
-            const env = db.environments.find(e => e.id === envId)
-            if (env) {
-                alert('Stub: show solutions for ' + env.name)
-            }
-        }
-    })
-}
-
-const envDetailsMapServersBtn = document.getElementById('envDetailsMapServersBtn')
-if (envDetailsMapServersBtn) {
-    envDetailsMapServersBtn.addEventListener('click', () => {
-        const envId = envDetailsModal.dataset.envId
-        if (envId) {
-            const db = store.readSync()
-            const env = db.environments.find(e => e.id === envId)
-            if (env) {
-                openMapServers(env)
-                envDetailsModal.close()
-            }
-        }
-    })
-}
-
-// Edit Environment modal logic
-const editEnvModal = document.getElementById('editEnvModal')
-function openEditEnv(env) {
-    if (!editEnvModal) return
-    // Prefill fields
-    document.getElementById('editEnvId').value = env.id
-    document.getElementById('editEnvName').value = env.name
-    document.getElementById('editEnvUrl').value = env.url
-    document.getElementById('editEnvType').value = env.type
-    try { editEnvModal.showModal(); document.getElementById('editEnvName').focus() } catch (e) { editEnvModal.setAttribute('open','') }
-}
-
-function closeEditEnvModal() {
-    try { editEnvModal.close() } catch (e) {}
-    try { editEnvModal.removeAttribute('open') } catch (e) {}
-    const f = editEnvModal.querySelector(':focus'); if (f && f.blur) f.blur()
-}
-
-if (editEnvModal) {
-    // Cancel button
-    const cancelEdit = editEnvModal.querySelector('button[value="cancel"]')
-    if (cancelEdit) cancelEdit.addEventListener('click', (e) => { e.preventDefault(); closeEditEnvModal() })
-    // Backdrop click
-    editEnvModal.addEventListener('click', (e) => { if (e.target === editEnvModal) closeEditEnvModal() })
-    // Escape key
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && editEnvModal.hasAttribute('open')) closeEditEnvModal() })
-    // Submit handler
-    const editForm = editEnvModal.querySelector('form')
-    if (editForm) editForm.addEventListener('submit', (e) => {
-        e.preventDefault()
-        const id = document.getElementById('editEnvId').value
-        const name = document.getElementById('editEnvName').value.trim()
-        const url = document.getElementById('editEnvUrl').value.trim()
-        const type = document.getElementById('editEnvType').value
-        if (!id || !name || !url) return
-        const db = store.readSync()
-        const env = db.environments.find(x => x.id === id)
-        if (env) {
-            const oldValues = {
-                name: env.name,
-                url: env.url,
-                type: env.type
-            }
-            
-            env.name = name
-            env.url = url
-            env.type = type
-            store.write(db)
-            
-            // Audit log with old and new values
-            logAudit('update', 'environment', name, { 
-                old: oldValues,
-                new: { name, url, type }
-            })
-            
-            // Show success toast
-            ToastManager.success(
-                'Environment Updated',
-                `${name} has been successfully updated`,
-                4000
-            )
-            
-            const searchInput = document.getElementById('search')
-            renderEnvs(searchInput ? searchInput.value : '')
-        }
-        closeEditEnvModal()
-    })
-}
+// moved: edit environment modal logic is in views/environments.js
 
 
 // Jobs
@@ -2342,44 +1623,7 @@ if (j.progress >= 100) clearInterval(timer)
 }
 
 
-// Add environment modal
-const addEnvBtn = document.getElementById('addEnvBtn')
-const envModal = document.getElementById('envModal')
-
-function closeEnvModal() {
-    if (!envModal) return
-    try { envModal.close() } catch (e) { /* ignore */ }
-    // ensure open attribute removed and blur any focused control inside
-    try { envModal.removeAttribute('open') } catch (e) {}
-    try {
-        const focused = envModal.querySelector(':focus')
-        if (focused && typeof focused.blur === 'function') focused.blur()
-    } catch (e) {}
-    
-    // Clear form fields when closing
-    const nameEl = document.getElementById('envName')
-    const urlEl = document.getElementById('envUrl')
-    const typeEl = document.getElementById('envType')
-    if (nameEl) nameEl.value = ''
-    if (urlEl) urlEl.value = ''
-    if (typeEl) typeEl.value = 'Production'
-    
-    // move focus back to the Add button so keyboard users continue where they left off
-    try { addEnvBtn && addEnvBtn.focus() } catch (e) {}
-}
-
-if (addEnvBtn && envModal) {
-    addEnvBtn.addEventListener('click', () => {
-        // show modal and focus first input
-        try {
-            envModal.showModal()
-            const first = envModal.querySelector('#envName')
-            if (first) first.focus()
-        } catch (e) {
-            envModal.setAttribute('open', '')
-        }
-    })
-}
+// moved: add environment modal is handled in views/environments.js
 
 // Add Server button (opens server modal)
 const addServerBtn = document.getElementById('addServerBtn')
@@ -2409,72 +1653,7 @@ if (serverSearchInput) {
 	})
 }
 
-// Ensure cancel closes fully
-const cancelBtn = document.querySelector('#envModal button[value="cancel"]')
-if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeEnvModal() })
-
-// close when clicking backdrop (dialog element) or pressing Escape
-if (envModal) {
-    envModal.addEventListener('click', (e) => { if (e.target === envModal) closeEnvModal() })
-}
-document.addEventListener('keydown', (e) => { if (envModal && e.key === 'Escape' && envModal.hasAttribute('open')) closeEnvModal() })
-
-
-// Handle env form submission (supports Enter key)
-const envForm = envModal ? envModal.querySelector('form') : null
-if (envForm) {
-    envForm.addEventListener('submit', async (e) => {
-        e.preventDefault()
-        const name = document.getElementById('envName').value.trim()
-        const url = document.getElementById('envUrl').value.trim()
-        const type = document.getElementById('envType').value
-        if (!name || !url) return
-
-        try {
-            const db = store.readSync()
-            const newEnv = { 
-                id: uid(), 
-                name, 
-                url, 
-                type, 
-                health: 'ok',
-                mappedServers: []
-            }
-            
-            db.environments.push(newEnv)
-            
-            // Save to database and update memory cache
-            await store.write(db)
-            memoryCache = db
-            
-            // Audit log
-            logAudit('create', 'environment', name, { url, type })
-            
-            console.log('✅ Environment created successfully:', name)
-            
-            // Show success toast
-            ToastManager.success(
-                'Environment Created',
-                `${name} has been successfully added to ${type}`,
-                4000
-            )
-            
-            // Clear form fields
-            document.getElementById('envName').value = ''
-            document.getElementById('envUrl').value = ''
-            document.getElementById('envType').value = 'Production' // Reset to default
-
-            try { envModal.close() } catch (e) { /* ignore */ }
-            
-            const searchInput = document.getElementById('search')
-            renderEnvs(searchInput ? searchInput.value : '')
-            
-        } catch (error) {
-            console.error('❌ Failed to create environment:', error)
-            alert('Failed to create environment: ' + error.message)
-        }
-    })
-}
+// moved: environment form submission handled in views/environments.js
 
 // Wire Admin create user action
 const createUserBtn = document.getElementById('createUserBtn')
@@ -3670,11 +2849,7 @@ if (confirmClearAuditBtn) {
 }
 
 
-// Search
-const searchInput = document.getElementById('search')
-if (searchInput) {
-    searchInput.addEventListener('input', (e) => renderEnvs(e.target.value))
-}
+// moved: environments search input handler is set in views/environments.js
 
 
 // Initial render - moved to after authentication
@@ -6895,88 +6070,7 @@ setTimeout(initAIChat, 100)
 // MODERN UI/UX ENHANCEMENTS
 // ============================================
 
-// 1. TOAST NOTIFICATION SYSTEM
-const ToastManager = {
-    container: null,
-    
-    init() {
-        if (!this.container) {
-            this.container = document.createElement('div')
-            this.container.className = 'toast-container'
-            document.body.appendChild(this.container)
-        }
-    },
-    
-    show(title, message, type = 'info', duration = 5000) {
-        this.init()
-        
-        const toast = document.createElement('div')
-        toast.className = `toast toast-${type}`
-        
-        const icons = {
-            success: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>',
-            error: '<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>',
-            warning: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>',
-            info: '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line>'
-        }
-        
-        toast.innerHTML = `
-            <div class="toast-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    ${icons[type]}
-                </svg>
-            </div>
-            <div class="toast-content">
-                <div class="toast-title">${title}</div>
-                <div class="toast-message">${message}</div>
-            </div>
-            <button class="toast-close">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-            </button>
-        `
-        
-        this.container.appendChild(toast)
-        
-        // Close button handler
-        const closeBtn = toast.querySelector('.toast-close')
-        closeBtn.addEventListener('click', () => this.remove(toast))
-        
-        // Auto remove after duration
-        if (duration > 0) {
-            setTimeout(() => this.remove(toast), duration)
-        }
-        
-        return toast
-    },
-    
-    remove(toast) {
-        toast.style.animation = 'toast-slide-out 0.3s cubic-bezier(0.4, 0, 1, 1) forwards'
-        setTimeout(() => {
-            if (toast.parentElement) {
-                toast.remove()
-            }
-        }, 300)
-    },
-    
-    success(title, message, duration) {
-        return this.show(title, message, 'success', duration)
-    },
-    
-    error(title, message, duration) {
-        return this.show(title, message, 'error', duration)
-    },
-    
-    warning(title, message, duration) {
-        return this.show(title, message, 'warning', duration)
-    },
-    
-    info(title, message, duration) {
-        return this.show(title, message, 'info', duration)
-    }
-}
+// ToastManager moved to app/utils/toast.js
 
 // 2. COMMAND PALETTE (Cmd+` / Ctrl+`)
 const CommandPalette = {
