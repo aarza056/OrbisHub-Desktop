@@ -40,7 +40,7 @@
             const servers = serversByType[type]
             if (servers.length > 0) {
               servers.forEach(server => {
-                uptimeRowsHTML += `<div class="uptime-row"><span>${server.displayName}</span><span class="uptime-value">00:00:00</span></div>`
+                uptimeRowsHTML += `<div class="uptime-row" data-server-id="${server.id}"><span>${server.displayName}</span><span class="uptime-value">—</span></div>`
               })
             }
           })
@@ -131,6 +131,11 @@
         const existingCard = envList.querySelector(`[data-env-id="${env.id}"]`)
         if (!existingCard) el.classList.add('env--entering')
         envList.appendChild(el)
+
+        // After DOM insert, resolve uptimes for mapped servers
+        if (mappedServers.length > 0) {
+          updateEnvUptimes(el, mappedServers)
+        }
       })
   }
 
@@ -443,3 +448,66 @@
   window.showEnvDetails = showEnvDetails
   window.openMapServers = openMapServers
 })()
+
+// Lightweight uptime cache to reduce repeated IPC calls during re-renders
+const __uptimeCache = {}
+
+function formatUptime(seconds) {
+  if (typeof seconds !== 'number' || seconds < 0) return '—'
+  const d = Math.floor(seconds / 86400)
+  seconds %= 86400
+  const h = Math.floor(seconds / 3600)
+  seconds %= 3600
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  const hh = String(h).padStart(2, '0')
+  const mm = String(m).padStart(2, '0')
+  const ss = String(s).padStart(2, '0')
+  return d > 0 ? `${d}d ${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`
+}
+
+async function fetchServerUptime(server) {
+  try {
+    if (!window.electronAPI || !window.electronAPI.getServerUptime) return null
+    const db = store.readSync()
+    let username = ''
+    let password = ''
+    if (server.credentialId) {
+      const cred = (db.credentials || []).find(c => c.id === server.credentialId)
+      if (cred) { username = cred.username || ''; password = cred.password || '' }
+    }
+    const res = await window.electronAPI.getServerUptime({
+      host: server.ipAddress || server.hostname,
+      osType: server.os || 'Windows',
+      username,
+      password,
+      port: server.os === 'Linux' ? (server.port || 22) : (server.port || 5985)
+    })
+    if (res && res.success) return res.seconds
+    return null
+  } catch (e) {
+    return null
+  }
+}
+
+function updateEnvUptimes(envCardEl, servers) {
+  const now = Date.now()
+  servers.forEach(async (server) => {
+    const row = envCardEl.querySelector(`.uptime-row[data-server-id="${server.id}"] .uptime-value`)
+    if (!row) return
+    const cacheKey = server.id
+    const cached = __uptimeCache[cacheKey]
+    if (cached && now - cached.ts < 60_000) {
+      row.textContent = formatUptime(cached.seconds)
+      return
+    }
+    row.textContent = '…'
+    const seconds = await fetchServerUptime(server)
+    if (typeof seconds === 'number') {
+      __uptimeCache[cacheKey] = { seconds, ts: Date.now() }
+      row.textContent = formatUptime(seconds)
+    } else {
+      row.textContent = 'N/A'
+    }
+  })
+}

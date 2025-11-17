@@ -3,6 +3,12 @@
 
 console.log('📦 app-main.js loaded')
 
+// Defensive: some environments emit stray ondrag handlers referencing `dragEvent`
+// Provide a no-op to avoid console spam if present in DOM attributes.
+if (typeof window !== 'undefined' && typeof window.dragEvent === 'undefined') {
+    window.dragEvent = function () {}
+}
+
 // Desktop app - no API server needed, using Electron IPC directly
 // Empty API_BASE_URL since app.js intercepts all /api/ calls
 const API_BASE_URL = ''

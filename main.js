@@ -361,6 +361,76 @@ ipcMain.handle('test-server', async (event, { ipAddress, serverName, port = 3389
     }
 });
 
+// Get remote server uptime (best-effort)
+ipcMain.handle('get-server-uptime', async (event, { host, osType = 'Windows', username, password, port = 22 }) => {
+    try {
+        if (!host) return { success: false, error: 'Host required' };
+        const isWindows = /win/i.test(osType) || process.platform === 'win32';
+
+        function psEscape(str) {
+            return String(str || '').replace(/`/g, '``').replace(/"/g, '\"');
+        }
+
+        if (isWindows) {
+            // Use CIM to get LastBootUpTime and compute uptime seconds
+            const user = psEscape(username || '');
+            const pass = psEscape(password || '');
+            const hasCreds = !!(user && pass);
+            const credBlock = hasCreds ? `
+                $sec = ConvertTo-SecureString \"${pass}\" -AsPlainText -Force; 
+                $cred = New-Object System.Management.Automation.PSCredential(\"${user}\", $sec);
+                $params = @{ ComputerName='${host}'; Credential=$cred }
+            ` : `$params = @{ ComputerName='${host}' }`;
+            const ps = `
+                try {
+                    ${credBlock}
+                    $os = Get-CimInstance Win32_OperatingSystem @params -ErrorAction Stop;
+                    $boot = $os.LastBootUpTime;
+                    $ts = New-TimeSpan -Start $boot -End (Get-Date);
+                    [math]::Floor($ts.TotalSeconds)
+                } catch { -1 }
+            `;
+            const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command \"${ps.replace(/\n/g,' ').replace(/\s+/g,' ').trim()}\"`;
+            return await new Promise((resolve) => {
+                exec(cmd, { timeout: 6000 }, (err, stdout) => {
+                    const out = (stdout || '').toString().trim();
+                    const seconds = parseInt(out, 10);
+                    if (!isNaN(seconds) && seconds >= 0) return resolve({ success: true, seconds });
+                    resolve({ success: false, error: 'Uptime query failed', stdout: out, code: err?.code || 0 });
+                });
+            });
+        }
+
+        // Linux via plink (PuTTY) if available
+        const puttyPaths = [
+            'C\\\\Program Files\\\\PuTTY\\\\plink.exe',
+            'C\\\\Program Files (x86)\\\\PuTTY\\\\plink.exe'
+        ];
+        let plink = null;
+        for (const p of puttyPaths) { try { if (fs.existsSync(p.replace(/\\\\/g,'\\'))) { plink = p.replace(/\\\\/g,'\\'); break; } } catch {}
+        }
+        if (plink && username && password) {
+            const userAt = `${username}@${host}`;
+            const cmd = `\"${plink}\" -ssh -P ${port} -batch -pw \"${password}\" ${userAt} cat /proc/uptime`;
+            return await new Promise((resolve) => {
+                exec(cmd, { timeout: 6000 }, (err, stdout) => {
+                    const out = (stdout || '').toString().trim();
+                    const match = /^([0-9]+\.?[0-9]*)/.exec(out);
+                    if (match) {
+                        const seconds = Math.floor(parseFloat(match[1]));
+                        return resolve({ success: true, seconds });
+                    }
+                    resolve({ success: false, error: 'Uptime parse failed', stdout: out, code: err?.code || 0 });
+                });
+            });
+        }
+
+        return { success: false, error: 'Unsupported host or missing tools/credentials' };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
 // Remote PowerShell execution removed
 
 // SSH/PuTTY connection
