@@ -14,20 +14,237 @@ const API_BASE_URL = ''
 // Session management (in-memory only)
 let currentUser = null
 
+// Session timeout settings
+const SESSION_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes in milliseconds
+const SESSION_WARNING_MS = 2 * 60 * 1000 // Show warning 2 minutes before timeout
+let sessionTimeoutTimer = null
+let sessionWarningTimer = null
+let lastActivityTime = Date.now()
+
 function getSession() {
     return currentUser
 }
 
 function setSession(user) {
     currentUser = user
+    // Start session timeout tracking when user logs in
+    if (user) {
+        startSessionTimeout()
+    }
 }
 
 function clearSession() {
     currentUser = null
+    stopSessionTimeout()
 }
 
 function isAuthenticated() {
     return currentUser !== null
+}
+
+// ========== SESSION TIMEOUT MANAGEMENT ==========
+function startSessionTimeout() {
+    // Clear any existing timers
+    stopSessionTimeout()
+    
+    lastActivityTime = Date.now()
+    
+    // Set warning timer (8 minutes - 2 minutes before logout)
+    sessionWarningTimer = setTimeout(() => {
+        showSessionWarning()
+    }, SESSION_TIMEOUT_MS - SESSION_WARNING_MS)
+    
+    // Set logout timer (10 minutes)
+    sessionTimeoutTimer = setTimeout(() => {
+        handleSessionTimeout()
+    }, SESSION_TIMEOUT_MS)
+}
+
+function stopSessionTimeout() {
+    if (sessionTimeoutTimer) {
+        clearTimeout(sessionTimeoutTimer)
+        sessionTimeoutTimer = null
+    }
+    if (sessionWarningTimer) {
+        clearTimeout(sessionWarningTimer)
+        sessionWarningTimer = null
+    }
+    hideSessionWarning()
+}
+
+function resetSessionTimeout() {
+    if (!currentUser) return // Don't reset if not logged in
+    
+    const now = Date.now()
+    const timeSinceLastActivity = now - lastActivityTime
+    
+    // Only reset if it's been at least 1 second since last reset (prevent excessive resets)
+    if (timeSinceLastActivity < 1000) return
+    
+    lastActivityTime = now
+    startSessionTimeout()
+}
+
+function showSessionWarning() {
+    // Create warning toast
+    const warningDiv = document.createElement('div')
+    warningDiv.id = 'sessionWarningToast'
+    warningDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: white;
+        padding: 20px 24px;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        z-index: 10001;
+        max-width: 400px;
+        animation: slideIn 0.3s ease;
+        border: 2px solid #fbbf24;
+    `
+    
+    warningDiv.innerHTML = `
+        <div style="display: flex; align-items: start; gap: 12px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <div style="flex: 1;">
+                <div style="font-weight: 600; font-size: 16px; margin-bottom: 6px;">Session Expiring Soon</div>
+                <div style="font-size: 14px; opacity: 0.95; line-height: 1.4;">
+                    Your session will expire in <strong>2 minutes</strong> due to inactivity. Move your mouse or press any key to stay logged in.
+                </div>
+                <button id="sessionWarningDismiss" style="
+                    margin-top: 12px;
+                    padding: 6px 12px;
+                    background: rgba(255,255,255,0.2);
+                    border: 1px solid rgba(255,255,255,0.3);
+                    border-radius: 6px;
+                    color: white;
+                    cursor: pointer;
+                    font-size: 13px;
+                    font-weight: 500;
+                    transition: all 0.2s;
+                ">
+                    Stay Logged In
+                </button>
+            </div>
+        </div>
+    `
+    
+    document.body.appendChild(warningDiv)
+    
+    // Dismiss button handler
+    const dismissBtn = document.getElementById('sessionWarningDismiss')
+    if (dismissBtn) {
+        dismissBtn.addEventListener('click', () => {
+            resetSessionTimeout()
+            hideSessionWarning()
+        })
+        dismissBtn.addEventListener('mouseenter', (e) => {
+            e.target.style.background = 'rgba(255,255,255,0.3)'
+        })
+        dismissBtn.addEventListener('mouseleave', (e) => {
+            e.target.style.background = 'rgba(255,255,255,0.2)'
+        })
+    }
+}
+
+function hideSessionWarning() {
+    const warningDiv = document.getElementById('sessionWarningToast')
+    if (warningDiv) {
+        warningDiv.remove()
+    }
+}
+
+async function handleSessionTimeout() {
+    if (!currentUser) return
+    
+    // Log the timeout event
+    await logAudit('logout', 'session', currentUser.name, { 
+        reason: 'Session timeout due to inactivity',
+        username: currentUser.username,
+        duration: SESSION_TIMEOUT_MS / 1000 / 60 + ' minutes'
+    })
+    
+    // Show timeout message
+    const timeoutDiv = document.createElement('div')
+    timeoutDiv.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: var(--panel);
+        color: var(--text);
+        padding: 32px;
+        border-radius: 16px;
+        box-shadow: 0 12px 48px rgba(0,0,0,0.5);
+        z-index: 10002;
+        max-width: 400px;
+        text-align: center;
+        border: 2px solid var(--border);
+    `
+    
+    timeoutDiv.innerHTML = `
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" style="margin: 0 auto 20px;">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        <div style="font-size: 20px; font-weight: 600; margin-bottom: 12px; color: var(--text);">Session Expired</div>
+        <div style="font-size: 14px; color: var(--muted); line-height: 1.5;">
+            Your session has expired due to 10 minutes of inactivity. Please log in again to continue.
+        </div>
+        <button id="timeoutOkBtn" style="
+            margin-top: 24px;
+            padding: 10px 24px;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+        ">OK</button>
+    `
+    
+    document.body.appendChild(timeoutDiv)
+    
+    // OK button handler
+    const okBtn = document.getElementById('timeoutOkBtn')
+    if (okBtn) {
+        okBtn.addEventListener('click', () => {
+            timeoutDiv.remove()
+            // Log out and return to login screen
+            clearSession()
+            showLoginScreen()
+        })
+    }
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        if (timeoutDiv.parentNode) {
+            timeoutDiv.remove()
+            clearSession()
+            showLoginScreen()
+        }
+    }, 5000)
+}
+
+// Track user activity to reset session timeout
+function initializeActivityTracking() {
+    // Track various user activities
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click']
+    
+    activityEvents.forEach(eventType => {
+        document.addEventListener(eventType, () => {
+            if (currentUser) {
+                resetSessionTimeout()
+            }
+        }, { passive: true })
+    })
 }
 
 // Get local IP address (cached)
@@ -297,6 +514,18 @@ async function logAudit(action, entityType, entityName, details = {}) {
             timestamp: new Date().toISOString(),
             ip: getLocalIP?.() || '127.0.0.1',
             details
+        }
+        
+        // Update user's last activity timestamp in database if this is a real user action
+        if (currentUser && action !== 'logout' && window.electronAPI) {
+            try {
+                await window.electronAPI.dbExecute(
+                    'UPDATE Users SET lastActivity = @param0 WHERE id = @param1',
+                    [{ value: Date.now() }, { value: currentUser.id }]
+                )
+            } catch (e) {
+                console.warn('Failed to update lastActivity:', e)
+            }
         }
         if (window.Audit && window.Audit.log) {
             const res = await window.Audit.log(entry)
@@ -4071,7 +4300,15 @@ function signOut() {
     }
 }
 
-function performSignOut() {
+async function performSignOut() {
+    // Log the logout action before clearing session
+    if (currentUser) {
+        await logAudit('logout', 'session', currentUser.name, { 
+            username: currentUser.username,
+            reason: 'User initiated logout'
+        })
+    }
+    
     clearSession()
     showLoginScreen()
     // Clear form
@@ -4922,6 +5159,13 @@ if (document.readyState === 'loading') {
         } catch (e) {
             console.error('❌ initializeAuditPagination() failed:', e)
         }
+        
+        // Initialize session timeout activity tracking
+        try {
+            initializeActivityTracking()
+        } catch (e) {
+            console.error('❌ initializeActivityTracking() failed:', e)
+        }
 
     })
 } else {
@@ -4950,6 +5194,13 @@ if (document.readyState === 'loading') {
         initializeAuditPagination()
     } catch (e) {
         console.error('❌ initializeAuditPagination() failed:', e)
+    }
+    
+    // Initialize session timeout activity tracking
+    try {
+        initializeActivityTracking()
+    } catch (e) {
+        console.error('❌ initializeActivityTracking() failed:', e)
     }
 
 }
