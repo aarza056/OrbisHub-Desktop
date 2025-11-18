@@ -108,6 +108,15 @@
     try {
       // Users
       for (const user of users) {
+        // Hash password if it's not already hashed (doesn't contain ':')
+        let passwordToStore = user.password;
+        if (passwordToStore && !passwordToStore.includes(':')) {
+          const hashResult = await window.electronAPI.hashPassword(passwordToStore);
+          if (hashResult.success) {
+            passwordToStore = hashResult.hash;
+          }
+        }
+        
         await db.execute(
           `IF EXISTS (SELECT 1 FROM Users WHERE id = @param0)
              UPDATE Users SET username = @param1, password = @param2, name = @param3, email = @param4, role = @param5, position = @param6, squad = @param7, lastLogin = @param8, lastActivity = @param9, ip = @param10, isActive = @param11, changePasswordOnLogin = @param12 WHERE id = @param0
@@ -116,7 +125,7 @@
           [
             { value: user.id },
             { value: user.username },
-            { value: user.password },
+            { value: passwordToStore },
             { value: user.name },
             { value: user.email },
             { value: user.role },

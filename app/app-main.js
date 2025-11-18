@@ -1703,7 +1703,7 @@ if (addUserBtn && createUserModal) {
 }
 
 if (createUserBtn) {
-    createUserBtn.addEventListener('click', (e) => {
+    createUserBtn.addEventListener('click', async (e) => {
         e.preventDefault()
         const name = document.getElementById('userName').value.trim()
         const username = document.getElementById('userUsername').value.trim()
@@ -1714,13 +1714,21 @@ if (createUserBtn) {
         const squad = document.getElementById('userSquad').value.trim()
         const role = document.getElementById('userRole').value
         if (!name || !email || !username || !password) return
+        
+        // Hash password before storing
+        const hashResult = await window.electronAPI.hashPassword(password)
+        if (!hashResult || !hashResult.success) {
+            alert('Failed to secure password')
+            return
+        }
+        
         const db = store.readSync()
         db.users = db.users || []
         db.users.unshift({ 
             id: uid(), 
             name,
             username,
-            password,
+            password: hashResult.hash,
             changePasswordOnLogin: changePassword,
             email,
             position: position || '—',
@@ -1755,7 +1763,7 @@ const saveEditUserBtn = document.getElementById('saveEditUserBtn')
 if (saveEditUserBtn) {
     const editUserForm = editUserModal.querySelector('form')
     if (editUserForm) {
-        editUserForm.addEventListener('submit', (e) => {
+        editUserForm.addEventListener('submit', async (e) => {
             e.preventDefault()
             const id = document.getElementById('editUserId').value
             const name = document.getElementById('editUserName').value.trim()
@@ -1782,7 +1790,13 @@ if (saveEditUserBtn) {
                 
                 user.name = name
                 user.username = username
-                if (password) user.password = password // Only update if not empty
+                if (password) {
+                    // Hash password before storing if provided
+                    const hashResult = await window.electronAPI.hashPassword(password)
+                    if (hashResult && hashResult.success) {
+                        user.password = hashResult.hash
+                    }
+                }
                 user.changePasswordOnLogin = changePassword
                 user.email = email
                 user.position = position || '—'
@@ -3951,41 +3965,32 @@ if (loginForm) {
         
         try {
             // Authenticate against SQL database (database-first approach)
-
-
-
+            // First get user by username only
             const userQuery = await window.electronAPI.dbQuery(
-                'SELECT * FROM Users WHERE username = @param0 AND password = @param1',
-                [{ value: username }, { value: password }]
-            )
-
-            // Also check if user exists at all (for debugging)
-            const checkUserExists = await window.electronAPI.dbQuery(
-                'SELECT username, id FROM Users WHERE username = @param0',
+                'SELECT * FROM Users WHERE username = @param0',
                 [{ value: username }]
-            )
-
-            // Check all users in database (for debugging)
-            const allUsers = await window.electronAPI.dbQuery(
-                'SELECT username, id FROM Users',
-                []
             )
 
             if (!userQuery || !userQuery.success || !userQuery.data || userQuery.data.length === 0) {
                 if (loadingScreen) {
                     loadingScreen.classList.remove('is-visible')
                 }
-                
-                // More helpful error message
-                if (checkUserExists && checkUserExists.data && checkUserExists.data.length > 0) {
-                    showLoginError('Invalid password for user: ' + username)
-                } else {
-                    showLoginError('User not found. Please contact your system administrator.')
-                }
+                showLoginError('User not found. Please contact your system administrator.')
                 return
             }
             
             const dbUser = userQuery.data[0]
+            
+            // Verify password hash
+            const verifyResult = await window.electronAPI.verifyPassword(password, dbUser.password)
+            
+            if (!verifyResult || !verifyResult.success || !verifyResult.valid) {
+                if (loadingScreen) {
+                    loadingScreen.classList.remove('is-visible')
+                }
+                showLoginError('Invalid password for user: ' + username)
+                return
+            }
 
             // Convert database user format to app format
             const user = {
@@ -4105,10 +4110,17 @@ if (changePasswordBtn) {
         
         // Update user password in database
         try {
+            // Hash the new password before storing
+            const hashResult = await window.electronAPI.hashPassword(newPassword)
+            if (!hashResult || !hashResult.success) {
+                showError('Failed to secure password')
+                return
+            }
+            
             const updateResult = await window.electronAPI.dbExecute(
                 'UPDATE Users SET password = @param0, changePasswordOnLogin = 0 WHERE id = @param1',
                 [
-                    { name: 'param0', type: 'NVarChar', value: newPassword },
+                    { name: 'param0', type: 'NVarChar', value: hashResult.hash },
                     { name: 'param1', type: 'NVarChar', value: userId }
                 ]
             )
@@ -4135,7 +4147,7 @@ if (changePasswordBtn) {
             const db = store.readSync()
             const cachedUser = db.users.find(u => u.id === userId)
             if (cachedUser) {
-                cachedUser.password = newPassword
+                cachedUser.password = hashResult.hash
                 cachedUser.changePasswordOnLogin = false
                 store.write(db)
             }
@@ -8882,6 +8894,12 @@ async function runMigrations() {
 
 async function createDefaultAdmin() {
     try {
+        // Hash the default admin password
+        const hashResult = await window.electronAPI.hashPassword('admin')
+        if (!hashResult || !hashResult.success) {
+            throw new Error('Failed to hash default admin password')
+        }
+        
         // Create default admin user in database
         const adminId = uid()
         await window.electronAPI.dbExecute(
@@ -8890,7 +8908,7 @@ async function createDefaultAdmin() {
             [
                 { value: adminId },
                 { value: 'admin' },
-                { value: 'admin' },
+                { value: hashResult.hash },
                 { value: 'Administrator' },
                 { value: 'admin@orbishub.com' },
                 { value: 'Super Admin' },

@@ -5,6 +5,56 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const sql = require('mssql');
+const crypto = require('crypto');
+
+// Encryption key for messages (should be stored securely in production)
+const ENCRYPTION_KEY = crypto.scryptSync('OrbisHub-Message-Encryption-Key', 'salt', 32);
+const IV_LENGTH = 16;
+
+// Message encryption/decryption utilities
+function encryptMessage(text) {
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
+    let encrypted = cipher.update(text, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    return iv.toString('hex') + ':' + encrypted;
+}
+
+function decryptMessage(encryptedText) {
+    if (!encryptedText || !encryptedText.includes(':')) {
+        // Legacy plain text message
+        return encryptedText;
+    }
+    try {
+        const parts = encryptedText.split(':');
+        const iv = Buffer.from(parts[0], 'hex');
+        const encrypted = parts[1];
+        const decipher = crypto.createDecipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        return decrypted;
+    } catch (error) {
+        // Return original if decryption fails (legacy plain text)
+        return encryptedText;
+    }
+}
+
+// Password hashing utilities
+function hashPassword(password) {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+    return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, hashedPassword) {
+    if (!hashedPassword || !hashedPassword.includes(':')) {
+        // Legacy plain text password - return true for migration
+        return password === hashedPassword;
+    }
+    const [salt, hash] = hashedPassword.split(':');
+    const verifyHash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+    return hash === verifyHash;
+}
 
 // Disable cache to avoid permission errors
 app.commandLine.appendSwitch('disable-http-cache');
@@ -635,6 +685,42 @@ ipcMain.handle('db-execute', async (event, query, params = []) => {
         };
     } catch (error) {
         console.error('Database execute error:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Hash password
+ipcMain.handle('hash-password', async (event, password) => {
+    try {
+        return { success: true, hash: hashPassword(password) };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// Verify password
+ipcMain.handle('verify-password', async (event, password, hashedPassword) => {
+    try {
+        return { success: true, valid: verifyPassword(password, hashedPassword) };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// Encrypt message
+ipcMain.handle('encrypt-message', async (event, message) => {
+    try {
+        return { success: true, encrypted: encryptMessage(message) };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// Decrypt message
+ipcMain.handle('decrypt-message', async (event, encryptedMessage) => {
+    try {
+        return { success: true, decrypted: decryptMessage(encryptedMessage) };
+    } catch (error) {
         return { success: false, error: error.message };
     }
 });

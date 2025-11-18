@@ -90,6 +90,13 @@
     const msgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const tbl = MESSAGES_TABLE || '[dbo].Messages';
 
+    // Encrypt message content before storing
+    const encryptResult = await window.electronAPI.encryptMessage(content);
+    if (!encryptResult || !encryptResult.success) {
+      return { success: false, error: 'Failed to encrypt message content' };
+    }
+    const encryptedContent = encryptResult.encrypted;
+
     let insert;
     if (hasAttachment && attachmentData) {
       insert = await db.execute(
@@ -99,7 +106,7 @@
           { value: msgId },
           { value: sId },
           { value: rId },
-          { value: content },
+          { value: encryptedContent },
           { value: 1 },
           { value: attachmentName },
           { value: attachmentSize },
@@ -114,7 +121,7 @@
           { value: msgId },
           { value: sId },
           { value: rId },
-          { value: content },
+          { value: encryptedContent },
         ]
       );
     }
@@ -140,6 +147,8 @@
     const tbl = MESSAGES_TABLE || '[dbo].Messages';
     const curId = String(currentUserId).trim();
     const othId = otherUserId != null ? String(otherUserId).trim() : null;
+
+    let messages = [];
 
     if (!othId || curId === othId) {
       let q = await db.query(
@@ -177,26 +186,9 @@
         );
         if (q2.success) q = q2;
       }
-      return q.success && Array.isArray(q.data) ? q.data : [];
-    }
-
-    let q = await db.query(
-      `SELECT m.Id, m.SenderId, m.RecipientId, m.Content, m.SentAt, m.[Read],
-              ISNULL(m.HasAttachment, 0) AS HasAttachment,
-              m.AttachmentName,
-              m.AttachmentSize,
-              m.AttachmentType,
-              u.name AS SenderName, u.username AS SenderUsername
-       FROM ${tbl} m
-       LEFT JOIN Users u ON m.SenderId = u.id
-       WHERE (m.SenderId = @param0 AND m.RecipientId = @param1)
-          OR (m.SenderId = @param1 AND m.RecipientId = @param0)
-       ORDER BY m.SentAt ASC`,
-      [{ value: curId }, { value: othId }]
-    );
-
-    if (!q.success || !q.data || q.data.length === 0) {
-      q = await db.query(
+      messages = q.success && Array.isArray(q.data) ? q.data : [];
+    } else {
+      let q = await db.query(
         `SELECT m.Id, m.SenderId, m.RecipientId, m.Content, m.SentAt, m.[Read],
                 ISNULL(m.HasAttachment, 0) AS HasAttachment,
                 m.AttachmentName,
@@ -204,15 +196,44 @@
                 m.AttachmentType,
                 u.name AS SenderName, u.username AS SenderUsername
          FROM ${tbl} m
-         LEFT JOIN Users u ON LOWER(LTRIM(RTRIM(m.SenderId))) = LOWER(LTRIM(RTRIM(u.id)))
-         WHERE (LOWER(LTRIM(RTRIM(m.SenderId))) = LOWER(LTRIM(RTRIM(@param0))) AND LOWER(LTRIM(RTRIM(m.RecipientId))) = LOWER(LTRIM(RTRIM(@param1))))
-            OR (LOWER(LTRIM(RTRIM(m.SenderId))) = LOWER(LTRIM(RTRIM(@param1))) AND LOWER(LTRIM(RTRIM(m.RecipientId))) = LOWER(LTRIM(RTRIM(@param0))))
+         LEFT JOIN Users u ON m.SenderId = u.id
+         WHERE (m.SenderId = @param0 AND m.RecipientId = @param1)
+            OR (m.SenderId = @param1 AND m.RecipientId = @param0)
          ORDER BY m.SentAt ASC`,
         [{ value: curId }, { value: othId }]
       );
+
+      if (!q.success || !q.data || q.data.length === 0) {
+        q = await db.query(
+          `SELECT m.Id, m.SenderId, m.RecipientId, m.Content, m.SentAt, m.[Read],
+                  ISNULL(m.HasAttachment, 0) AS HasAttachment,
+                  m.AttachmentName,
+                  m.AttachmentSize,
+                  m.AttachmentType,
+                  u.name AS SenderName, u.username AS SenderUsername
+           FROM ${tbl} m
+           LEFT JOIN Users u ON LOWER(LTRIM(RTRIM(m.SenderId))) = LOWER(LTRIM(RTRIM(u.id)))
+           WHERE (LOWER(LTRIM(RTRIM(m.SenderId))) = LOWER(LTRIM(RTRIM(@param0))) AND LOWER(LTRIM(RTRIM(m.RecipientId))) = LOWER(LTRIM(RTRIM(@param1))))
+              OR (LOWER(LTRIM(RTRIM(m.SenderId))) = LOWER(LTRIM(RTRIM(@param1))) AND LOWER(LTRIM(RTRIM(m.RecipientId))) = LOWER(LTRIM(RTRIM(@param0))))
+           ORDER BY m.SentAt ASC`,
+          [{ value: curId }, { value: othId }]
+        );
+      }
+
+      messages = q.success && Array.isArray(q.data) ? q.data : [];
     }
 
-    return q.success && Array.isArray(q.data) ? q.data : [];
+    // Decrypt message content
+    for (let msg of messages) {
+      if (msg.Content) {
+        const decryptResult = await window.electronAPI.decryptMessage(msg.Content);
+        if (decryptResult && decryptResult.success) {
+          msg.Content = decryptResult.decrypted;
+        }
+      }
+    }
+
+    return messages;
   }
 
   async function markRead(userId, otherUserId) {
