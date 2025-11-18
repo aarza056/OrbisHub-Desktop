@@ -259,6 +259,25 @@
 </form>
 </dialog>
 
+<!-- Exit Confirmation Modal -->
+<dialog id="exitConfirmModal" class="modal modal-confirm">
+<form method="dialog" class="card">
+<div class="modal-icon modal-icon-danger">
+  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="15" y1="9" x2="9" y2="15"></line>
+    <line x1="9" y1="9" x2="15" y2="15"></line>
+  </svg>
+</div>
+<h2 style="margin-top: 16px;">Close OrbisHub Desktop?</h2>
+<p class="muted" style="margin-bottom: 24px;">Are you sure you want to close the application? All your data is saved automatically.</p>
+<menu class="row end">
+<button type="submit" value="cancel" class="btn btn-ghost">Cancel</button>
+<button id="confirmExitBtn" type="submit" value="confirm" class="btn btn-danger">Close Application</button>
+</menu>
+</form>
+</dialog>
+
 <!-- Environment Details Modal -->
 <dialog id="envDetailsModal" class="modal">
 <form method="dialog" class="card" style="max-width: 700px; min-width: 600px;">

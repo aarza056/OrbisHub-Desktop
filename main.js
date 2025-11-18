@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const { exec } = require('child_process');
 const path = require('path');
@@ -62,7 +62,6 @@ app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
 app.commandLine.appendSwitch('disable-software-rasterizer');
 
 let mainWindow;
-let tray;
 let dbPool = null;
 let poolConnectPromise = null;
 let dbConfig = null;
@@ -117,42 +116,14 @@ function createWindow() {
     });
 
     mainWindow.on('close', (event) => {
-        if (!app.isQuitting) {
-            event.preventDefault();
-            mainWindow.hide();
-        }
-        return false;
+        event.preventDefault();
+        
+        // Send event to renderer to show custom modal
+        mainWindow.webContents.send('show-exit-confirmation');
     });
 }
 
-// Create system tray
-function createTray() {
-    tray = new Tray(path.join(__dirname, 'assets/tray-icon.png'));
-    
-    const contextMenu = Menu.buildFromTemplate([
-        {
-            label: 'Open OrbisHub',
-            click: () => {
-                mainWindow.show();
-            }
-        },
-        { type: 'separator' },
-        {
-            label: 'Quit',
-            click: () => {
-                app.isQuitting = true;
-                app.quit();
-            }
-        }
-    ]);
 
-    tray.setContextMenu(contextMenu);
-    tray.setToolTip('OrbisHub Desktop');
-    
-    tray.on('click', () => {
-        mainWindow.show();
-    });
-}
 
 // Best-effort cleanup of Chromium caches that may block startup on some systems
 async function clearChromiumCaches() {
@@ -1379,11 +1350,16 @@ ipcMain.handle('get-app-version', () => {
     return app.getVersion();
 });
 
+// Handle exit confirmation
+ipcMain.handle('confirm-exit', () => {
+    mainWindow.destroy();
+    app.quit();
+});
+
 // App lifecycle
 app.whenReady().then(async () => {
     await clearChromiumCaches();
     createWindow();
-    createTray();
     
     // Initialize auto-updater
     initializeAutoUpdater();
@@ -1396,9 +1372,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-        // Don't quit, just hide to tray
-    }
+    app.quit();
 });
 
 app.on('before-quit', async () => {

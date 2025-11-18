@@ -9143,6 +9143,61 @@ function initializeAutoUpdater() {
     })
 }
 
+// ========== EXIT CONFIRMATION MODAL ==========
+const exitConfirmModal = document.getElementById('exitConfirmModal')
+const confirmExitBtn = document.getElementById('confirmExitBtn')
+
+// Listen for exit confirmation event from main process
+window.addEventListener('show-exit-modal', () => {
+    if (exitConfirmModal) {
+        try {
+            exitConfirmModal.showModal()
+            exitConfirmModal.querySelector('button[value="confirm"]')?.focus()
+        } catch (e) {
+            exitConfirmModal.setAttribute('open', '')
+        }
+    }
+})
+
+// Handle exit confirmation
+if (confirmExitBtn && exitConfirmModal) {
+    confirmExitBtn.addEventListener('click', async () => {
+        try {
+            exitConfirmModal.close()
+        } catch (e) {
+            exitConfirmModal.removeAttribute('open')
+        }
+        
+        // Confirm exit to main process
+        if (window.electronAPI && window.electronAPI.confirmExit) {
+            await window.electronAPI.confirmExit()
+        }
+    })
+    
+    // Cancel button
+    const cancelBtn = exitConfirmModal.querySelector('button[value="cancel"]')
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            try {
+                exitConfirmModal.close()
+            } catch (e) {
+                exitConfirmModal.removeAttribute('open')
+            }
+        })
+    }
+    
+    // Backdrop click
+    exitConfirmModal.addEventListener('click', (e) => {
+        if (e.target === exitConfirmModal) {
+            try {
+                exitConfirmModal.close()
+            } catch (e) {
+                exitConfirmModal.removeAttribute('open')
+            }
+        }
+    })
+}
+
 // Helper function to format bytes
 function formatBytes(bytes, decimals = 2) {
     if (bytes === 0) return '0 Bytes'
