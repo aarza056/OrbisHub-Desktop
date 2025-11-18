@@ -500,6 +500,41 @@ function uid(prefix = '') {
 }
 window.uid = uid
 
+// Password validation function
+function validatePassword(password) {
+    const errors = []
+    
+    // Minimum length of 8 characters
+    if (password.length < 8) {
+        errors.push('Password must be at least 8 characters long')
+    }
+    
+    // At least one uppercase letter
+    if (!/[A-Z]/.test(password)) {
+        errors.push('Password must contain at least one uppercase letter')
+    }
+    
+    // At least one lowercase letter
+    if (!/[a-z]/.test(password)) {
+        errors.push('Password must contain at least one lowercase letter')
+    }
+    
+    // At least one number
+    if (!/[0-9]/.test(password)) {
+        errors.push('Password must contain at least one number')
+    }
+    
+    // At least one special character
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+        errors.push('Password must contain at least one special character (!@#$%^&* etc.)')
+    }
+    
+    return {
+        isValid: errors.length === 0,
+        errors: errors
+    }
+}
+
 // Audit logging function - delegates to services/audit.js
 async function logAudit(action, entityType, entityName, details = {}) {
     try {
@@ -2024,6 +2059,22 @@ if (createUserBtn) {
         const role = document.getElementById('userRole').value
         if (!name || !email || !username || !password) return
         
+        // Validate password
+        const validation = validatePassword(password)
+        if (!validation.isValid) {
+            const errorDiv = document.getElementById('createUserPasswordError')
+            const errorList = document.getElementById('createUserPasswordErrorList')
+            if (errorDiv && errorList) {
+                errorList.innerHTML = validation.errors.map(err => `<li>${err}</li>`).join('')
+                errorDiv.style.display = 'block'
+            }
+            return
+        }
+        
+        // Hide error if validation passes
+        const errorDiv = document.getElementById('createUserPasswordError')
+        if (errorDiv) errorDiv.style.display = 'none'
+        
         // Hash password before storing
         const hashResult = await window.electronAPI.hashPassword(password)
         if (!hashResult || !hashResult.success) {
@@ -2031,9 +2082,7 @@ if (createUserBtn) {
             return
         }
         
-        const db = store.readSync()
-        db.users = db.users || []
-        db.users.unshift({ 
+        const newUser = { 
             id: uid(), 
             name,
             username,
@@ -2047,11 +2096,35 @@ if (createUserBtn) {
             lastActivity: Date.now(),
             ip: '—',
             isActive: true
-        })
+        }
+        
+        const db = store.readSync()
+        db.users = db.users || []
+        db.users.unshift(newUser)
         store.write(db)
         
-        // Audit log
+        // Sync to database
+        try {
+            await window.Data.syncAll({ users: db.users })
+        } catch (error) {
+            console.error('Failed to sync user to database:', error)
+        }
+        
+        // Audit log for user creation
         logAudit('create', 'user', name, { username, email, role })
+        
+        // Audit log for password set
+        await window.Audit.log({
+            id: uid(),
+            action: 'password_set',
+            entityType: 'user',
+            entityName: name,
+            user: window.sessionUser ? window.sessionUser.name : 'System',
+            username: window.sessionUser ? window.sessionUser.username : 'system',
+            timestamp: new Date().toISOString(),
+            ip: getLocalIP(),
+            details: { targetUser: username, reason: 'User creation' }
+        })
         
         // clear inputs
         document.getElementById('userName').value = ''
@@ -2062,7 +2135,9 @@ if (createUserBtn) {
         document.getElementById('userPosition').value = ''
         document.getElementById('userSquad').value = ''
         document.getElementById('userRole').value = 'Admin'
-        renderUsers()
+        
+        // Refresh user list and close modal
+        await renderUsers()
         closeCreateUserModal()
     })
 }
@@ -2100,10 +2175,39 @@ if (saveEditUserBtn) {
                 user.name = name
                 user.username = username
                 if (password) {
+                    // Validate password
+                    const validation = validatePassword(password)
+                    if (!validation.isValid) {
+                        const errorDiv = document.getElementById('editUserPasswordError')
+                        const errorList = document.getElementById('editUserPasswordErrorList')
+                        if (errorDiv && errorList) {
+                            errorList.innerHTML = validation.errors.map(err => `<li>${err}</li>`).join('')
+                            errorDiv.style.display = 'block'
+                        }
+                        return
+                    }
+                    
+                    // Hide error if validation passes
+                    const errorDiv = document.getElementById('editUserPasswordError')
+                    if (errorDiv) errorDiv.style.display = 'none'
+                    
                     // Hash password before storing if provided
                     const hashResult = await window.electronAPI.hashPassword(password)
                     if (hashResult && hashResult.success) {
                         user.password = hashResult.hash
+                        
+                        // Audit log for password change
+                        await window.Audit.log({
+                            id: uid(),
+                            action: 'password_changed',
+                            entityType: 'user',
+                            entityName: name,
+                            user: window.sessionUser ? window.sessionUser.name : 'Admin',
+                            username: window.sessionUser ? window.sessionUser.username : 'admin',
+                            timestamp: new Date().toISOString(),
+                            ip: getLocalIP(),
+                            details: { targetUser: username, changedBy: window.sessionUser ? window.sessionUser.username : 'admin' }
+                        })
                     }
                 }
                 user.changePasswordOnLogin = changePassword
@@ -4550,8 +4654,10 @@ if (changePasswordBtn) {
             return
         }
         
-        if (newPassword.length < 4) {
-            showError('Password must be at least 4 characters')
+        // Validate password complexity
+        const validation = validatePassword(newPassword)
+        if (!validation.isValid) {
+            showError('Password requirements:\n' + validation.errors.join('\n'))
             return
         }
         
@@ -4598,6 +4704,19 @@ if (changePasswordBtn) {
                 cachedUser.changePasswordOnLogin = false
                 store.write(db)
             }
+            
+            // Audit log for password change
+            await window.Audit.log({
+                id: uid(),
+                action: 'password_changed',
+                entityType: 'user',
+                entityName: user.name,
+                user: user.username,
+                username: user.username,
+                timestamp: new Date().toISOString(),
+                ip: getLocalIP(),
+                details: { reason: 'User self-service password change' }
+            })
             
             // Close modal and log in
             if (changePasswordModal) {

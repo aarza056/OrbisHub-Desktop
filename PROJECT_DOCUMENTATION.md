@@ -55,16 +55,24 @@ CREATE TABLE [dbo].[Users] (
     [Username] NVARCHAR(100) NOT NULL UNIQUE,
     [Password] NVARCHAR(255) NOT NULL,
     [Email] NVARCHAR(100),
-    [CreatedAt] DATETIME DEFAULT GETDATE()
+    [CreatedAt] DATETIME DEFAULT GETDATE(),
+    [failedLoginAttempts] INT DEFAULT 0,
+    [lockedUntil] BIGINT DEFAULT NULL,
+    [lastFailedLogin] BIGINT DEFAULT NULL,
+    [changePasswordOnLogin] BIT DEFAULT 0
 )
 ```
 
 **Fields:**
 - `Id`: Unique identifier (format: `user_<timestamp>_<random>`)
 - `Username`: Unique username
-- `Password`: Hashed password
+- `Password`: Hashed password (bcrypt)
 - `Email`: User email address
 - `CreatedAt`: Account creation timestamp
+- `failedLoginAttempts`: Counter for failed login attempts
+- `lockedUntil`: Timestamp (ms) when account lockout expires
+- `lastFailedLogin`: Timestamp (ms) of last failed login attempt
+- `changePasswordOnLogin`: Flag requiring password change on next login
 
 #### 2. Messages Table
 ```sql
@@ -101,6 +109,39 @@ CREATE TABLE [dbo].[Messages] (
 **Indexes:**
 - Primary Key on `Id`
 - Foreign Keys on `SenderId` and `RecipientId`
+
+#### 3. AuditLogs Table
+```sql
+CREATE TABLE [dbo].[AuditLogs] (
+    [id] NVARCHAR(100) PRIMARY KEY,
+    [action] NVARCHAR(50) NOT NULL,
+    [entityType] NVARCHAR(50),
+    [entityName] NVARCHAR(255),
+    [user] NVARCHAR(255),
+    [username] NVARCHAR(255),
+    [timestamp] NVARCHAR(50),
+    [ip] NVARCHAR(50),
+    [details] NVARCHAR(MAX)
+)
+```
+
+**Fields:**
+- `id`: Unique audit log identifier
+- `action`: Action performed (e.g., 'login_success', 'login_failed', 'password_changed', 'password_set', 'create', 'update', 'delete')
+- `entityType`: Type of entity affected (e.g., 'user', 'server', 'environment')
+- `entityName`: Name of the entity
+- `user`: Display name of user who performed the action
+- `username`: Username of user who performed the action
+- `timestamp`: ISO timestamp of the action
+- `ip`: IP address of the user
+- `details`: JSON string with additional context (failed attempts, lockout status, target user, etc.)
+
+**Security Events Logged:**
+- Successful logins (`login_success`)
+- Failed login attempts (`login_failed`) with failed attempt count and lockout status
+- Password changes (`password_changed`) with who made the change
+- Password set on user creation (`password_set`)
+- Account lockouts (included in `login_failed` details)
 
 ---
 
@@ -313,6 +354,18 @@ CREATE TABLE [dbo].[Messages] (
 - Login with username/password
 - Session management (localStorage)
 - Password hashing (bcrypt)
+- **Account Lockout**: Automatic lockout after 5 failed login attempts (30-minute lockout period)
+- **Session Timeout**: Automatic logout after 10 minutes of inactivity with 2-minute warning
+- **Password Complexity**: Enforced password rules requiring:
+  - Minimum 8 characters
+  - At least one uppercase letter
+  - At least one lowercase letter
+  - At least one number
+  - At least one special character (!@#$%^&* etc.)
+- **Password Change Logging**: All password changes are logged in AuditLogs with:
+  - `password_set` action for new user creation
+  - `password_changed` action for password updates
+  - Details including who made the change and reason
 
 ### 2. Direct Messaging
 - Send text messages to other users
