@@ -23,7 +23,10 @@
         lastActivity: u.lastActivity || Date.now(),
         ip: u.ip || '—',
         isActive: u.isActive !== undefined ? u.isActive : true,
-        changePasswordOnLogin: u.changePasswordOnLogin !== undefined ? u.changePasswordOnLogin : false
+        changePasswordOnLogin: u.changePasswordOnLogin !== undefined ? u.changePasswordOnLogin : false,
+        failedLoginAttempts: u.failedLoginAttempts || 0,
+        lockedUntil: u.lockedUntil || null,
+        lastFailedLogin: u.lastFailedLogin || null
       })) : [];
 
       const servers = serversQ.success && serversQ.data ? serversQ.data.map(s => {
@@ -119,9 +122,9 @@
         
         await db.execute(
           `IF EXISTS (SELECT 1 FROM Users WHERE id = @param0)
-             UPDATE Users SET username = @param1, password = @param2, name = @param3, email = @param4, role = @param5, position = @param6, squad = @param7, lastLogin = @param8, lastActivity = @param9, ip = @param10, isActive = @param11, changePasswordOnLogin = @param12 WHERE id = @param0
+             UPDATE Users SET username = @param1, password = @param2, name = @param3, email = @param4, role = @param5, position = @param6, squad = @param7, lastLogin = @param8, lastActivity = @param9, ip = @param10, isActive = @param11, changePasswordOnLogin = @param12, failedLoginAttempts = @param13, lockedUntil = @param14, lastFailedLogin = @param15 WHERE id = @param0
            ELSE
-             INSERT INTO Users (id, username, password, name, email, role, position, squad, lastLogin, lastActivity, ip, isActive, changePasswordOnLogin, created_at) VALUES (@param0, @param1, @param2, @param3, @param4, @param5, @param6, @param7, @param8, @param9, @param10, @param11, @param12, GETDATE())`,
+             INSERT INTO Users (id, username, password, name, email, role, position, squad, lastLogin, lastActivity, ip, isActive, changePasswordOnLogin, failedLoginAttempts, lockedUntil, lastFailedLogin, created_at) VALUES (@param0, @param1, @param2, @param3, @param4, @param5, @param6, @param7, @param8, @param9, @param10, @param11, @param12, @param13, @param14, @param15, GETDATE())`,
           [
             { value: user.id },
             { value: user.username },
@@ -135,7 +138,10 @@
             { value: typeof user.lastActivity === 'number' ? user.lastActivity : Date.now() },
             { value: user.ip || '—' },
             { value: user.isActive ? 1 : 0 },
-            { value: user.changePasswordOnLogin ? 1 : 0 }
+            { value: user.changePasswordOnLogin ? 1 : 0 },
+            { value: user.failedLoginAttempts || 0 },
+            { value: user.lockedUntil || null },
+            { value: user.lastFailedLogin || null }
           ]
         );
       }

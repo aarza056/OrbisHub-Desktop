@@ -14,20 +14,237 @@ const API_BASE_URL = ''
 // Session management (in-memory only)
 let currentUser = null
 
+// Session timeout settings
+const SESSION_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes in milliseconds
+const SESSION_WARNING_MS = 2 * 60 * 1000 // Show warning 2 minutes before timeout
+let sessionTimeoutTimer = null
+let sessionWarningTimer = null
+let lastActivityTime = Date.now()
+
 function getSession() {
     return currentUser
 }
 
 function setSession(user) {
     currentUser = user
+    // Start session timeout tracking when user logs in
+    if (user) {
+        startSessionTimeout()
+    }
 }
 
 function clearSession() {
     currentUser = null
+    stopSessionTimeout()
 }
 
 function isAuthenticated() {
     return currentUser !== null
+}
+
+// ========== SESSION TIMEOUT MANAGEMENT ==========
+function startSessionTimeout() {
+    // Clear any existing timers
+    stopSessionTimeout()
+    
+    lastActivityTime = Date.now()
+    
+    // Set warning timer (8 minutes - 2 minutes before logout)
+    sessionWarningTimer = setTimeout(() => {
+        showSessionWarning()
+    }, SESSION_TIMEOUT_MS - SESSION_WARNING_MS)
+    
+    // Set logout timer (10 minutes)
+    sessionTimeoutTimer = setTimeout(() => {
+        handleSessionTimeout()
+    }, SESSION_TIMEOUT_MS)
+}
+
+function stopSessionTimeout() {
+    if (sessionTimeoutTimer) {
+        clearTimeout(sessionTimeoutTimer)
+        sessionTimeoutTimer = null
+    }
+    if (sessionWarningTimer) {
+        clearTimeout(sessionWarningTimer)
+        sessionWarningTimer = null
+    }
+    hideSessionWarning()
+}
+
+function resetSessionTimeout() {
+    if (!currentUser) return // Don't reset if not logged in
+    
+    const now = Date.now()
+    const timeSinceLastActivity = now - lastActivityTime
+    
+    // Only reset if it's been at least 1 second since last reset (prevent excessive resets)
+    if (timeSinceLastActivity < 1000) return
+    
+    lastActivityTime = now
+    startSessionTimeout()
+}
+
+function showSessionWarning() {
+    // Create warning toast
+    const warningDiv = document.createElement('div')
+    warningDiv.id = 'sessionWarningToast'
+    warningDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: white;
+        padding: 20px 24px;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        z-index: 10001;
+        max-width: 400px;
+        animation: slideIn 0.3s ease;
+        border: 2px solid #fbbf24;
+    `
+    
+    warningDiv.innerHTML = `
+        <div style="display: flex; align-items: start; gap: 12px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <div style="flex: 1;">
+                <div style="font-weight: 600; font-size: 16px; margin-bottom: 6px;">Session Expiring Soon</div>
+                <div style="font-size: 14px; opacity: 0.95; line-height: 1.4;">
+                    Your session will expire in <strong>2 minutes</strong> due to inactivity. Move your mouse or press any key to stay logged in.
+                </div>
+                <button id="sessionWarningDismiss" style="
+                    margin-top: 12px;
+                    padding: 6px 12px;
+                    background: rgba(255,255,255,0.2);
+                    border: 1px solid rgba(255,255,255,0.3);
+                    border-radius: 6px;
+                    color: white;
+                    cursor: pointer;
+                    font-size: 13px;
+                    font-weight: 500;
+                    transition: all 0.2s;
+                ">
+                    Stay Logged In
+                </button>
+            </div>
+        </div>
+    `
+    
+    document.body.appendChild(warningDiv)
+    
+    // Dismiss button handler
+    const dismissBtn = document.getElementById('sessionWarningDismiss')
+    if (dismissBtn) {
+        dismissBtn.addEventListener('click', () => {
+            resetSessionTimeout()
+            hideSessionWarning()
+        })
+        dismissBtn.addEventListener('mouseenter', (e) => {
+            e.target.style.background = 'rgba(255,255,255,0.3)'
+        })
+        dismissBtn.addEventListener('mouseleave', (e) => {
+            e.target.style.background = 'rgba(255,255,255,0.2)'
+        })
+    }
+}
+
+function hideSessionWarning() {
+    const warningDiv = document.getElementById('sessionWarningToast')
+    if (warningDiv) {
+        warningDiv.remove()
+    }
+}
+
+async function handleSessionTimeout() {
+    if (!currentUser) return
+    
+    // Log the timeout event
+    await logAudit('logout', 'session', currentUser.name, { 
+        reason: 'Session timeout due to inactivity',
+        username: currentUser.username,
+        duration: SESSION_TIMEOUT_MS / 1000 / 60 + ' minutes'
+    })
+    
+    // Show timeout message
+    const timeoutDiv = document.createElement('div')
+    timeoutDiv.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: var(--panel);
+        color: var(--text);
+        padding: 32px;
+        border-radius: 16px;
+        box-shadow: 0 12px 48px rgba(0,0,0,0.5);
+        z-index: 10002;
+        max-width: 400px;
+        text-align: center;
+        border: 2px solid var(--border);
+    `
+    
+    timeoutDiv.innerHTML = `
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" style="margin: 0 auto 20px;">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        <div style="font-size: 20px; font-weight: 600; margin-bottom: 12px; color: var(--text);">Session Expired</div>
+        <div style="font-size: 14px; color: var(--muted); line-height: 1.5;">
+            Your session has expired due to 10 minutes of inactivity. Please log in again to continue.
+        </div>
+        <button id="timeoutOkBtn" style="
+            margin-top: 24px;
+            padding: 10px 24px;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+        ">OK</button>
+    `
+    
+    document.body.appendChild(timeoutDiv)
+    
+    // OK button handler
+    const okBtn = document.getElementById('timeoutOkBtn')
+    if (okBtn) {
+        okBtn.addEventListener('click', () => {
+            timeoutDiv.remove()
+            // Log out and return to login screen
+            clearSession()
+            showLoginScreen()
+        })
+    }
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        if (timeoutDiv.parentNode) {
+            timeoutDiv.remove()
+            clearSession()
+            showLoginScreen()
+        }
+    }, 5000)
+}
+
+// Track user activity to reset session timeout
+function initializeActivityTracking() {
+    // Track various user activities
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click']
+    
+    activityEvents.forEach(eventType => {
+        document.addEventListener(eventType, () => {
+            if (currentUser) {
+                resetSessionTimeout()
+            }
+        }, { passive: true })
+    })
 }
 
 // Get local IP address (cached)
@@ -297,6 +514,18 @@ async function logAudit(action, entityType, entityName, details = {}) {
             timestamp: new Date().toISOString(),
             ip: getLocalIP?.() || '127.0.0.1',
             details
+        }
+        
+        // Update user's last activity timestamp in database if this is a real user action
+        if (currentUser && action !== 'logout' && window.electronAPI) {
+            try {
+                await window.electronAPI.dbExecute(
+                    'UPDATE Users SET lastActivity = @param0 WHERE id = @param1',
+                    [{ value: Date.now() }, { value: currentUser.id }]
+                )
+            } catch (e) {
+                console.warn('Failed to update lastActivity:', e)
+            }
         }
         if (window.Audit && window.Audit.log) {
             const res = await window.Audit.log(entry)
@@ -880,14 +1109,51 @@ db.jobs.forEach(j => jobList.appendChild(jobRow(j)))
 // --- Admin / Users (simple CRUD for demo) ---
 // Track which user is pending deletion (was previously implicit)
 let userToDelete = null
-function renderUsers() {
+async function renderUsers() {
     const userListEl = document.getElementById('userList')
     if (!userListEl) return
-    const db = store.readSync()
-    if (!userListEl) return
-    userListEl.innerHTML = ''
-    const users = db.users || []
-    users.forEach(u => userListEl.appendChild(userRow(u)))
+    
+    userListEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--muted);">Loading users...</div>'
+    
+    try {
+        // Load users from database to get lockout information
+        const userQuery = await window.electronAPI.dbQuery('SELECT * FROM Users ORDER BY name', [])
+        
+        if (!userQuery || !userQuery.success || !userQuery.data) {
+            console.error('Failed to load users from database')
+            const db = store.readSync()
+            const users = db.users || []
+            userListEl.innerHTML = ''
+            users.forEach(u => userListEl.appendChild(userRow(u)))
+            return
+        }
+        
+        // Convert database format to app format
+        const users = userQuery.data.map(dbUser => ({
+            id: dbUser.id,
+            username: dbUser.username,
+            password: dbUser.password,
+            name: dbUser.name || dbUser.username,
+            email: dbUser.email || '',
+            role: dbUser.role || 'viewer',
+            position: dbUser.position || '',
+            squad: dbUser.squad || '',
+            lastLogin: dbUser.lastLogin,
+            lastActivity: dbUser.lastActivity,
+            ip: dbUser.ip || '',
+            isActive: dbUser.isActive,
+            changePasswordOnLogin: dbUser.changePasswordOnLogin,
+            failedLoginAttempts: dbUser.failedLoginAttempts || 0,
+            lockedUntil: dbUser.lockedUntil,
+            lastFailedLogin: dbUser.lastFailedLogin
+        }))
+        
+        userListEl.innerHTML = ''
+        users.forEach(u => userListEl.appendChild(userRow(u)))
+    } catch (error) {
+        console.error('Error loading users:', error)
+        userListEl.innerHTML = '<div style="padding:20px; text-align:center; color:#ef4444;">Failed to load users</div>'
+    }
 }
 
 function userRow(u) {
@@ -902,12 +1168,19 @@ function userRow(u) {
     const statusColor = isOnline ? '#10b981' : '#6b7280'
     const statusText = isOnline ? 'Online' : 'Offline'
     
+    // Check if account is locked
+    const isLocked = u.lockedUntil && u.lockedUntil > Date.now()
+    const lockStatus = isLocked ? `<span style="color:#ef4444; font-weight:600;">🔒 Locked (${u.failedLoginAttempts || 0} failed attempts)</span>` : ''
+    const remainingMinutes = isLocked ? Math.ceil((u.lockedUntil - Date.now()) / 60000) : 0
+    const lockInfo = isLocked ? `<div style="color:#ef4444; font-size:11px; margin-top:2px;">Unlocks in ${remainingMinutes} minute(s)</div>` : ''
+    
     el.innerHTML = `
         <div style="min-width:240px">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
                 <div style="width:10px; height:10px; border-radius:50%; background:${statusColor}; box-shadow:0 0 8px ${statusColor};"></div>
                 <strong>${u.name}</strong> ${u.username ? `<span class="muted">(@${u.username})</span>` : ''}
                 <span style="font-size:11px; color:${statusColor}; font-weight:500;">${statusText}</span>
+                ${lockStatus}
             </div>
             <div class="muted">${u.email}</div>
             <div class="muted" style="font-size:12px; margin-top:4px;">
@@ -916,9 +1189,11 @@ function userRow(u) {
             <div class="muted" style="font-size:12px; margin-top:2px;">
                 Last login: ${lastLogin} | IP: ${u.ip || '—'} ${passwordStatus}
             </div>
+            ${lockInfo}
         </div>
         <div class="badge">${u.role}</div>
         <div style="flex:1"></div>
+        ${isLocked ? `<button class="btn" data-id="${u.id}" data-action="unlock" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none;">Unlock Account</button>` : ''}
         <button class="btn btn-ghost" data-id="${u.id}" data-action="edit">Edit</button>
         <button class="btn btn-ghost" data-id="${u.id}" data-action="delete">Delete</button>
     `
@@ -938,6 +1213,38 @@ function userRow(u) {
     
     const edit = el.querySelector('button[data-action="edit"]')
     if (edit) edit.addEventListener('click', () => openEditUser(u))
+    
+    // Unlock button handler
+    const unlock = el.querySelector('button[data-action="unlock"]')
+    if (unlock) {
+        unlock.addEventListener('click', async () => {
+            try {
+                unlock.disabled = true
+                unlock.textContent = 'Unlocking...'
+                
+                // Reset failed attempts and unlock
+                await window.electronAPI.dbExecute(
+                    'UPDATE Users SET failedLoginAttempts = 0, lockedUntil = NULL, lastFailedLogin = NULL WHERE id = @param0',
+                    [{ value: u.id }]
+                )
+                
+                // Log unlock action
+                await logAudit('unlock', 'user', u.name, { 
+                    username: u.username,
+                    unlockedBy: currentUser?.name || 'Admin',
+                    previousFailedAttempts: u.failedLoginAttempts || 0
+                })
+                
+                ToastManager.success('Account Unlocked', `${u.name}'s account has been unlocked`, 3000)
+                renderUsers()
+            } catch (error) {
+                console.error('Failed to unlock account:', error)
+                ToastManager.error('Unlock Failed', error.message, 3000)
+                unlock.disabled = false
+                unlock.textContent = 'Unlock Account'
+            }
+        })
+    }
     
     return el
 }
@@ -3993,7 +4300,15 @@ function signOut() {
     }
 }
 
-function performSignOut() {
+async function performSignOut() {
+    // Log the logout action before clearing session
+    if (currentUser) {
+        await logAudit('logout', 'session', currentUser.name, { 
+            username: currentUser.username,
+            reason: 'User initiated logout'
+        })
+    }
+    
     clearSession()
     showLoginScreen()
     // Clear form
@@ -4001,6 +4316,10 @@ function performSignOut() {
     // Reset to default view
     showView('summary')
 }
+
+// Account lockout configuration
+const MAX_FAILED_ATTEMPTS = 5
+const LOCKOUT_DURATION_MS = 30 * 60 * 1000 // 30 minutes
 
 if (loginForm) {
     loginForm.addEventListener('submit', async (e) => {
@@ -4037,15 +4356,73 @@ if (loginForm) {
             }
             
             const dbUser = userQuery.data[0]
+            const currentTime = Date.now()
+            
+            // Check if account is locked
+            if (dbUser.lockedUntil && dbUser.lockedUntil > currentTime) {
+                const remainingMinutes = Math.ceil((dbUser.lockedUntil - currentTime) / 60000)
+                if (loadingScreen) {
+                    loadingScreen.classList.remove('is-visible')
+                }
+                showLoginError(`Account is locked due to too many failed login attempts. Please try again in ${remainingMinutes} minute(s).`)
+                return
+            }
+            
+            // Auto-unlock if lockout period has expired
+            if (dbUser.lockedUntil && dbUser.lockedUntil <= currentTime) {
+                await window.electronAPI.dbExecute(
+                    'UPDATE Users SET failedLoginAttempts = 0, lockedUntil = NULL WHERE id = @param0',
+                    [{ value: dbUser.id }]
+                )
+            }
             
             // Verify password hash
             const verifyResult = await window.electronAPI.verifyPassword(password, dbUser.password)
             
             if (!verifyResult || !verifyResult.success || !verifyResult.valid) {
+                // Failed login attempt
+                const newFailedAttempts = (dbUser.failedLoginAttempts || 0) + 1
+                const isNowLocked = newFailedAttempts >= MAX_FAILED_ATTEMPTS
+                const lockedUntil = isNowLocked ? currentTime + LOCKOUT_DURATION_MS : null
+                
+                // Update failed attempts and possibly lock the account
+                await window.electronAPI.dbExecute(
+                    'UPDATE Users SET failedLoginAttempts = @param0, lastFailedLogin = @param1, lockedUntil = @param2 WHERE id = @param3',
+                    [
+                        { value: newFailedAttempts },
+                        { value: currentTime },
+                        { value: lockedUntil },
+                        { value: dbUser.id }
+                    ]
+                )
+                
+                // Log the failed attempt
+                await window.Audit.log({
+                    id: uid(),
+                    action: 'login_failed',
+                    entityType: 'user',
+                    entityName: username,
+                    user: username,
+                    username: username,
+                    timestamp: new Date().toISOString(),
+                    ip: getLocalIP(),
+                    details: { 
+                        failedAttempts: newFailedAttempts,
+                        locked: isNowLocked,
+                        reason: 'Invalid password'
+                    }
+                })
+                
                 if (loadingScreen) {
                     loadingScreen.classList.remove('is-visible')
                 }
-                showLoginError('Invalid password for user: ' + username)
+                
+                if (isNowLocked) {
+                    showLoginError(`Account locked due to ${MAX_FAILED_ATTEMPTS} failed login attempts. Please try again in 30 minutes.`)
+                } else {
+                    const attemptsLeft = MAX_FAILED_ATTEMPTS - newFailedAttempts
+                    showLoginError(`Invalid password. ${attemptsLeft} attempt(s) remaining before account lockout.`)
+                }
                 return
             }
 
@@ -4066,9 +4443,9 @@ if (loginForm) {
                 changePasswordOnLogin: dbUser.changePasswordOnLogin !== undefined ? dbUser.changePasswordOnLogin : false
             }
             
-            // Update user's IP and last login info in database
+            // Update user's IP and last login info in database, and reset failed attempts
             await window.electronAPI.dbExecute(
-                `UPDATE Users SET ip = @param0, lastLogin = @param1, lastActivity = @param2 WHERE id = @param3`,
+                `UPDATE Users SET ip = @param0, lastLogin = @param1, lastActivity = @param2, failedLoginAttempts = 0, lockedUntil = NULL WHERE id = @param3`,
                 [
                     { value: getLocalIP() },
                     { value: Date.now() },
@@ -4076,6 +4453,19 @@ if (loginForm) {
                     { value: user.id }
                 ]
             )
+            
+            // Log successful login
+            await window.Audit.log({
+                id: uid(),
+                action: 'login_success',
+                entityType: 'user',
+                entityName: user.name,
+                user: user.name,
+                username: user.username,
+                timestamp: new Date().toISOString(),
+                ip: getLocalIP(),
+                details: { role: user.role }
+            })
             
             // Check if password change required
             if (user.changePasswordOnLogin) {
@@ -4769,6 +5159,13 @@ if (document.readyState === 'loading') {
         } catch (e) {
             console.error('❌ initializeAuditPagination() failed:', e)
         }
+        
+        // Initialize session timeout activity tracking
+        try {
+            initializeActivityTracking()
+        } catch (e) {
+            console.error('❌ initializeActivityTracking() failed:', e)
+        }
 
     })
 } else {
@@ -4797,6 +5194,13 @@ if (document.readyState === 'loading') {
         initializeAuditPagination()
     } catch (e) {
         console.error('❌ initializeAuditPagination() failed:', e)
+    }
+    
+    // Initialize session timeout activity tracking
+    try {
+        initializeActivityTracking()
+    } catch (e) {
+        console.error('❌ initializeActivityTracking() failed:', e)
     }
 
 }
@@ -9140,6 +9544,61 @@ function initializeAutoUpdater() {
     // Display current version in footer
     window.electronAPI.getAppVersion().then(version => {
 
+    })
+}
+
+// ========== EXIT CONFIRMATION MODAL ==========
+const exitConfirmModal = document.getElementById('exitConfirmModal')
+const confirmExitBtn = document.getElementById('confirmExitBtn')
+
+// Listen for exit confirmation event from main process
+window.addEventListener('show-exit-modal', () => {
+    if (exitConfirmModal) {
+        try {
+            exitConfirmModal.showModal()
+            exitConfirmModal.querySelector('button[value="confirm"]')?.focus()
+        } catch (e) {
+            exitConfirmModal.setAttribute('open', '')
+        }
+    }
+})
+
+// Handle exit confirmation
+if (confirmExitBtn && exitConfirmModal) {
+    confirmExitBtn.addEventListener('click', async () => {
+        try {
+            exitConfirmModal.close()
+        } catch (e) {
+            exitConfirmModal.removeAttribute('open')
+        }
+        
+        // Confirm exit to main process
+        if (window.electronAPI && window.electronAPI.confirmExit) {
+            await window.electronAPI.confirmExit()
+        }
+    })
+    
+    // Cancel button
+    const cancelBtn = exitConfirmModal.querySelector('button[value="cancel"]')
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            try {
+                exitConfirmModal.close()
+            } catch (e) {
+                exitConfirmModal.removeAttribute('open')
+            }
+        })
+    }
+    
+    // Backdrop click
+    exitConfirmModal.addEventListener('click', (e) => {
+        if (e.target === exitConfirmModal) {
+            try {
+                exitConfirmModal.close()
+            } catch (e) {
+                exitConfirmModal.removeAttribute('open')
+            }
+        }
     })
 }
 

@@ -1,6 +1,11 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 // Expose protected methods to renderer
+// Listen for exit confirmation request from main process
+ipcRenderer.on('show-exit-confirmation', () => {
+    window.dispatchEvent(new CustomEvent('show-exit-modal'));
+});
+
 contextBridge.exposeInMainWorld('electronAPI', {
     // RDP Connection
     connectRDP: (server, credential, rdpContent) => 
@@ -59,7 +64,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
     downloadUpdate: () => ipcRenderer.invoke('download-update'),
     installUpdate: () => ipcRenderer.invoke('install-update'),
+    // Get app version
     getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+    
+    // Confirm exit
+    confirmExit: () => ipcRenderer.invoke('confirm-exit'),
     onUpdateAvailable: (callback) => {
         ipcRenderer.on('update-available', (event, data) => callback(data));
     },
