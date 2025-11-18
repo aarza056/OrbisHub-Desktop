@@ -36,11 +36,22 @@ function createWindow() {
             preload: path.join(__dirname, 'preload.js')
         },
         frame: true,
+        autoHideMenuBar: true,
         backgroundColor: '#0a0a0a',
         show: false
     });
 
     mainWindow.loadFile('app/index.html');
+
+    // Hide menu bar (Windows/Linux). Keep macOS default menu.
+    try {
+        if (process.platform !== 'darwin') {
+            Menu.setApplicationMenu(null);
+            mainWindow.setMenuBarVisibility(false);
+        }
+    } catch (e) {
+        console.warn('Menu hide failed:', e.message);
+    }
 
     // Open DevTools with F12 or Ctrl+Shift+I (for debugging in production)
     mainWindow.webContents.on('before-input-event', (event, input) => {
