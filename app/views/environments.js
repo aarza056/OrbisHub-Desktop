@@ -484,6 +484,13 @@ async function fetchServerUptime(server) {
       port: server.os === 'Linux' ? (server.port || 22) : (server.port || 5985)
     })
     if (res && res.success) return res.seconds
+    // Attach error tooltip to help diagnose N/A state
+    if (res && res.error) {
+      try {
+        const row = document.querySelector(`.uptime-row[data-server-id="${server.id}"] .uptime-value`)
+        if (row) row.title = String(res.error)
+      } catch {}
+    }
     return null
   } catch (e) {
     return null

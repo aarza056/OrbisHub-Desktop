@@ -372,33 +372,87 @@ ipcMain.handle('get-server-uptime', async (event, { host, osType = 'Windows', us
         }
 
         if (isWindows) {
-            // Use CIM to get LastBootUpTime and compute uptime seconds
             const user = psEscape(username || '');
             const pass = psEscape(password || '');
             const hasCreds = !!(user && pass);
-            const credBlock = hasCreds ? `
+
+            // 1) Try CIM (WSMan)
+            const cimCredBlock = hasCreds ? `
                 $sec = ConvertTo-SecureString \"${pass}\" -AsPlainText -Force; 
                 $cred = New-Object System.Management.Automation.PSCredential(\"${user}\", $sec);
                 $params = @{ ComputerName='${host}'; Credential=$cred }
             ` : `$params = @{ ComputerName='${host}' }`;
-            const ps = `
+            const cimPs = `
                 try {
-                    ${credBlock}
+                    ${cimCredBlock}
                     $os = Get-CimInstance Win32_OperatingSystem @params -ErrorAction Stop;
                     $boot = $os.LastBootUpTime;
                     $ts = New-TimeSpan -Start $boot -End (Get-Date);
                     [math]::Floor($ts.TotalSeconds)
                 } catch { -1 }
             `;
-            const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command \"${ps.replace(/\n/g,' ').replace(/\s+/g,' ').trim()}\"`;
-            return await new Promise((resolve) => {
-                exec(cmd, { timeout: 6000 }, (err, stdout) => {
+            const cimCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command \"${cimPs.replace(/\n/g,' ').replace(/\s+/g,' ').trim()}\"`;
+            const cimRes = await new Promise((resolve) => {
+                exec(cimCmd, { timeout: 6000 }, (err, stdout, stderr) => {
                     const out = (stdout || '').toString().trim();
                     const seconds = parseInt(out, 10);
-                    if (!isNaN(seconds) && seconds >= 0) return resolve({ success: true, seconds });
-                    resolve({ success: false, error: 'Uptime query failed', stdout: out, code: err?.code || 0 });
+                    if (!isNaN(seconds) && seconds >= 0) return resolve({ ok: true, seconds });
+                    resolve({ ok: false, err: err?.message || stderr || 'CIM failed', out });
                 });
             });
+            if (cimRes.ok) return { success: true, seconds: cimRes.seconds };
+
+            // 2) Try WMI (DCOM) via Get-WmiObject
+            const wmiCredBlock = hasCreds ? `
+                $sec = ConvertTo-SecureString \"${pass}\" -AsPlainText -Force; 
+                $cred = New-Object System.Management.Automation.PSCredential(\"${user}\", $sec);
+                $os = Get-WmiObject -Class Win32_OperatingSystem -ComputerName \"${host}\" -Credential $cred -ErrorAction Stop
+            ` : `$os = Get-WmiObject -Class Win32_OperatingSystem -ComputerName \"${host}\" -ErrorAction Stop`;
+            const wmiPs = `
+                try {
+                    ${wmiCredBlock}
+                    $boot = [Management.ManagementDateTimeConverter]::ToDateTime($os.LastBootUpTime);
+                    $ts = New-TimeSpan -Start $boot -End (Get-Date);
+                    [math]::Floor($ts.TotalSeconds)
+                } catch { -1 }
+            `;
+            const wmiCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command \"${wmiPs.replace(/\n/g,' ').replace(/\s+/g,' ').trim()}\"`;
+            const wmiRes = await new Promise((resolve) => {
+                exec(wmiCmd, { timeout: 6000 }, (err, stdout, stderr) => {
+                    const out = (stdout || '').toString().trim();
+                    const seconds = parseInt(out, 10);
+                    if (!isNaN(seconds) && seconds >= 0) return resolve({ ok: true, seconds });
+                    resolve({ ok: false, err: err?.message || stderr || 'WMI failed', out });
+                });
+            });
+            if (wmiRes.ok) return { success: true, seconds: wmiRes.seconds };
+
+            // 3) Try legacy WMIC CLI (DCOM)
+            const wmicUser = hasCreds ? `/user:"${username}"` : '';
+            const wmicPass = hasCreds ? `/password:"${password}"` : '';
+            const wmicCmd = `wmic /node:"${host}" ${wmicUser} ${wmicPass} path win32_operatingsystem get lastbootuptime /value`;
+            const wmicRes = await new Promise((resolve) => {
+                exec(wmicCmd, { timeout: 6000 }, (err, stdout, stderr) => {
+                    const out = (stdout || '').toString();
+                    const match = /LastBootUpTime\s*=\s*([0-9]{14})/i.exec(out);
+                    if (match) {
+                        const s = match[1];
+                        const yyyy = parseInt(s.slice(0,4));
+                        const MM = parseInt(s.slice(4,6)) - 1;
+                        const dd = parseInt(s.slice(6,8));
+                        const HH = parseInt(s.slice(8,10));
+                        const mm = parseInt(s.slice(10,12));
+                        const ss = parseInt(s.slice(12,14));
+                        const boot = new Date(Date.UTC(yyyy, MM, dd, HH, mm, ss));
+                        const seconds = Math.floor((Date.now() - boot.getTime()) / 1000);
+                        return resolve({ ok: true, seconds });
+                    }
+                    resolve({ ok: false, err: err?.message || stderr || 'WMIC parse failed', out });
+                });
+            });
+            if (wmicRes.ok) return { success: true, seconds: wmicRes.seconds };
+
+            return { success: false, error: `Windows uptime failed: ${wmiRes.err || cimRes.err || 'unknown error'}` };
         }
 
         // Linux via plink (PuTTY) if available
