@@ -880,14 +880,51 @@ db.jobs.forEach(j => jobList.appendChild(jobRow(j)))
 // --- Admin / Users (simple CRUD for demo) ---
 // Track which user is pending deletion (was previously implicit)
 let userToDelete = null
-function renderUsers() {
+async function renderUsers() {
     const userListEl = document.getElementById('userList')
     if (!userListEl) return
-    const db = store.readSync()
-    if (!userListEl) return
-    userListEl.innerHTML = ''
-    const users = db.users || []
-    users.forEach(u => userListEl.appendChild(userRow(u)))
+    
+    userListEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--muted);">Loading users...</div>'
+    
+    try {
+        // Load users from database to get lockout information
+        const userQuery = await window.electronAPI.dbQuery('SELECT * FROM Users ORDER BY name', [])
+        
+        if (!userQuery || !userQuery.success || !userQuery.data) {
+            console.error('Failed to load users from database')
+            const db = store.readSync()
+            const users = db.users || []
+            userListEl.innerHTML = ''
+            users.forEach(u => userListEl.appendChild(userRow(u)))
+            return
+        }
+        
+        // Convert database format to app format
+        const users = userQuery.data.map(dbUser => ({
+            id: dbUser.id,
+            username: dbUser.username,
+            password: dbUser.password,
+            name: dbUser.name || dbUser.username,
+            email: dbUser.email || '',
+            role: dbUser.role || 'viewer',
+            position: dbUser.position || '',
+            squad: dbUser.squad || '',
+            lastLogin: dbUser.lastLogin,
+            lastActivity: dbUser.lastActivity,
+            ip: dbUser.ip || '',
+            isActive: dbUser.isActive,
+            changePasswordOnLogin: dbUser.changePasswordOnLogin,
+            failedLoginAttempts: dbUser.failedLoginAttempts || 0,
+            lockedUntil: dbUser.lockedUntil,
+            lastFailedLogin: dbUser.lastFailedLogin
+        }))
+        
+        userListEl.innerHTML = ''
+        users.forEach(u => userListEl.appendChild(userRow(u)))
+    } catch (error) {
+        console.error('Error loading users:', error)
+        userListEl.innerHTML = '<div style="padding:20px; text-align:center; color:#ef4444;">Failed to load users</div>'
+    }
 }
 
 function userRow(u) {
@@ -902,12 +939,19 @@ function userRow(u) {
     const statusColor = isOnline ? '#10b981' : '#6b7280'
     const statusText = isOnline ? 'Online' : 'Offline'
     
+    // Check if account is locked
+    const isLocked = u.lockedUntil && u.lockedUntil > Date.now()
+    const lockStatus = isLocked ? `<span style="color:#ef4444; font-weight:600;">🔒 Locked (${u.failedLoginAttempts || 0} failed attempts)</span>` : ''
+    const remainingMinutes = isLocked ? Math.ceil((u.lockedUntil - Date.now()) / 60000) : 0
+    const lockInfo = isLocked ? `<div style="color:#ef4444; font-size:11px; margin-top:2px;">Unlocks in ${remainingMinutes} minute(s)</div>` : ''
+    
     el.innerHTML = `
         <div style="min-width:240px">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
                 <div style="width:10px; height:10px; border-radius:50%; background:${statusColor}; box-shadow:0 0 8px ${statusColor};"></div>
                 <strong>${u.name}</strong> ${u.username ? `<span class="muted">(@${u.username})</span>` : ''}
                 <span style="font-size:11px; color:${statusColor}; font-weight:500;">${statusText}</span>
+                ${lockStatus}
             </div>
             <div class="muted">${u.email}</div>
             <div class="muted" style="font-size:12px; margin-top:4px;">
@@ -916,9 +960,11 @@ function userRow(u) {
             <div class="muted" style="font-size:12px; margin-top:2px;">
                 Last login: ${lastLogin} | IP: ${u.ip || '—'} ${passwordStatus}
             </div>
+            ${lockInfo}
         </div>
         <div class="badge">${u.role}</div>
         <div style="flex:1"></div>
+        ${isLocked ? `<button class="btn" data-id="${u.id}" data-action="unlock" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none;">Unlock Account</button>` : ''}
         <button class="btn btn-ghost" data-id="${u.id}" data-action="edit">Edit</button>
         <button class="btn btn-ghost" data-id="${u.id}" data-action="delete">Delete</button>
     `
@@ -938,6 +984,38 @@ function userRow(u) {
     
     const edit = el.querySelector('button[data-action="edit"]')
     if (edit) edit.addEventListener('click', () => openEditUser(u))
+    
+    // Unlock button handler
+    const unlock = el.querySelector('button[data-action="unlock"]')
+    if (unlock) {
+        unlock.addEventListener('click', async () => {
+            try {
+                unlock.disabled = true
+                unlock.textContent = 'Unlocking...'
+                
+                // Reset failed attempts and unlock
+                await window.electronAPI.dbExecute(
+                    'UPDATE Users SET failedLoginAttempts = 0, lockedUntil = NULL, lastFailedLogin = NULL WHERE id = @param0',
+                    [{ value: u.id }]
+                )
+                
+                // Log unlock action
+                await logAudit('unlock', 'user', u.name, { 
+                    username: u.username,
+                    unlockedBy: currentUser?.name || 'Admin',
+                    previousFailedAttempts: u.failedLoginAttempts || 0
+                })
+                
+                ToastManager.success('Account Unlocked', `${u.name}'s account has been unlocked`, 3000)
+                renderUsers()
+            } catch (error) {
+                console.error('Failed to unlock account:', error)
+                ToastManager.error('Unlock Failed', error.message, 3000)
+                unlock.disabled = false
+                unlock.textContent = 'Unlock Account'
+            }
+        })
+    }
     
     return el
 }
@@ -4002,6 +4080,10 @@ function performSignOut() {
     showView('summary')
 }
 
+// Account lockout configuration
+const MAX_FAILED_ATTEMPTS = 5
+const LOCKOUT_DURATION_MS = 30 * 60 * 1000 // 30 minutes
+
 if (loginForm) {
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault()
@@ -4037,15 +4119,73 @@ if (loginForm) {
             }
             
             const dbUser = userQuery.data[0]
+            const currentTime = Date.now()
+            
+            // Check if account is locked
+            if (dbUser.lockedUntil && dbUser.lockedUntil > currentTime) {
+                const remainingMinutes = Math.ceil((dbUser.lockedUntil - currentTime) / 60000)
+                if (loadingScreen) {
+                    loadingScreen.classList.remove('is-visible')
+                }
+                showLoginError(`Account is locked due to too many failed login attempts. Please try again in ${remainingMinutes} minute(s).`)
+                return
+            }
+            
+            // Auto-unlock if lockout period has expired
+            if (dbUser.lockedUntil && dbUser.lockedUntil <= currentTime) {
+                await window.electronAPI.dbExecute(
+                    'UPDATE Users SET failedLoginAttempts = 0, lockedUntil = NULL WHERE id = @param0',
+                    [{ value: dbUser.id }]
+                )
+            }
             
             // Verify password hash
             const verifyResult = await window.electronAPI.verifyPassword(password, dbUser.password)
             
             if (!verifyResult || !verifyResult.success || !verifyResult.valid) {
+                // Failed login attempt
+                const newFailedAttempts = (dbUser.failedLoginAttempts || 0) + 1
+                const isNowLocked = newFailedAttempts >= MAX_FAILED_ATTEMPTS
+                const lockedUntil = isNowLocked ? currentTime + LOCKOUT_DURATION_MS : null
+                
+                // Update failed attempts and possibly lock the account
+                await window.electronAPI.dbExecute(
+                    'UPDATE Users SET failedLoginAttempts = @param0, lastFailedLogin = @param1, lockedUntil = @param2 WHERE id = @param3',
+                    [
+                        { value: newFailedAttempts },
+                        { value: currentTime },
+                        { value: lockedUntil },
+                        { value: dbUser.id }
+                    ]
+                )
+                
+                // Log the failed attempt
+                await window.Audit.log({
+                    id: uid(),
+                    action: 'login_failed',
+                    entityType: 'user',
+                    entityName: username,
+                    user: username,
+                    username: username,
+                    timestamp: new Date().toISOString(),
+                    ip: getLocalIP(),
+                    details: { 
+                        failedAttempts: newFailedAttempts,
+                        locked: isNowLocked,
+                        reason: 'Invalid password'
+                    }
+                })
+                
                 if (loadingScreen) {
                     loadingScreen.classList.remove('is-visible')
                 }
-                showLoginError('Invalid password for user: ' + username)
+                
+                if (isNowLocked) {
+                    showLoginError(`Account locked due to ${MAX_FAILED_ATTEMPTS} failed login attempts. Please try again in 30 minutes.`)
+                } else {
+                    const attemptsLeft = MAX_FAILED_ATTEMPTS - newFailedAttempts
+                    showLoginError(`Invalid password. ${attemptsLeft} attempt(s) remaining before account lockout.`)
+                }
                 return
             }
 
@@ -4066,9 +4206,9 @@ if (loginForm) {
                 changePasswordOnLogin: dbUser.changePasswordOnLogin !== undefined ? dbUser.changePasswordOnLogin : false
             }
             
-            // Update user's IP and last login info in database
+            // Update user's IP and last login info in database, and reset failed attempts
             await window.electronAPI.dbExecute(
-                `UPDATE Users SET ip = @param0, lastLogin = @param1, lastActivity = @param2 WHERE id = @param3`,
+                `UPDATE Users SET ip = @param0, lastLogin = @param1, lastActivity = @param2, failedLoginAttempts = 0, lockedUntil = NULL WHERE id = @param3`,
                 [
                     { value: getLocalIP() },
                     { value: Date.now() },
@@ -4076,6 +4216,19 @@ if (loginForm) {
                     { value: user.id }
                 ]
             )
+            
+            // Log successful login
+            await window.Audit.log({
+                id: uid(),
+                action: 'login_success',
+                entityType: 'user',
+                entityName: user.name,
+                user: user.name,
+                username: user.username,
+                timestamp: new Date().toISOString(),
+                ip: getLocalIP(),
+                details: { role: user.role }
+            })
             
             // Check if password change required
             if (user.changePasswordOnLogin) {

@@ -742,8 +742,27 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
                 ip NVARCHAR(50),
                 isActive BIT DEFAULT 1,
                 changePasswordOnLogin BIT DEFAULT 0,
+                failedLoginAttempts INT DEFAULT 0,
+                lockedUntil BIGINT DEFAULT NULL,
+                lastFailedLogin BIGINT DEFAULT NULL,
                 created_at DATETIME DEFAULT GETDATE()
             )
+            
+            -- Add lockout columns if they don't exist (for existing tables)
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Users') AND name = 'failedLoginAttempts')
+            BEGIN
+                ALTER TABLE Users ADD failedLoginAttempts INT DEFAULT 0
+            END
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Users') AND name = 'lockedUntil')
+            BEGIN
+                ALTER TABLE Users ADD lockedUntil BIGINT DEFAULT NULL
+            END
+            
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Users') AND name = 'lastFailedLogin')
+            BEGIN
+                ALTER TABLE Users ADD lastFailedLogin BIGINT DEFAULT NULL
+            END
         `);
         migrations.push('Users table created');
         
