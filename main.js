@@ -5,6 +5,56 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const sql = require('mssql');
+const crypto = require('crypto');
+
+// Encryption key for messages (should be stored securely in production)
+const ENCRYPTION_KEY = crypto.scryptSync('OrbisHub-Message-Encryption-Key', 'salt', 32);
+const IV_LENGTH = 16;
+
+// Message encryption/decryption utilities
+function encryptMessage(text) {
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
+    let encrypted = cipher.update(text, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    return iv.toString('hex') + ':' + encrypted;
+}
+
+function decryptMessage(encryptedText) {
+    if (!encryptedText || !encryptedText.includes(':')) {
+        // Legacy plain text message
+        return encryptedText;
+    }
+    try {
+        const parts = encryptedText.split(':');
+        const iv = Buffer.from(parts[0], 'hex');
+        const encrypted = parts[1];
+        const decipher = crypto.createDecipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        return decrypted;
+    } catch (error) {
+        // Return original if decryption fails (legacy plain text)
+        return encryptedText;
+    }
+}
+
+// Password hashing utilities
+function hashPassword(password) {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+    return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, hashedPassword) {
+    if (!hashedPassword || !hashedPassword.includes(':')) {
+        // Legacy plain text password - return true for migration
+        return password === hashedPassword;
+    }
+    const [salt, hash] = hashedPassword.split(':');
+    const verifyHash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+    return hash === verifyHash;
+}
 
 // Disable cache to avoid permission errors
 app.commandLine.appendSwitch('disable-http-cache');
@@ -36,11 +86,22 @@ function createWindow() {
             preload: path.join(__dirname, 'preload.js')
         },
         frame: true,
+        autoHideMenuBar: true,
         backgroundColor: '#0a0a0a',
         show: false
     });
 
     mainWindow.loadFile('app/index.html');
+
+    // Hide menu bar (Windows/Linux). Keep macOS default menu.
+    try {
+        if (process.platform !== 'darwin') {
+            Menu.setApplicationMenu(null);
+            mainWindow.setMenuBarVisibility(false);
+        }
+    } catch (e) {
+        console.warn('Menu hide failed:', e.message);
+    }
 
     // Open DevTools with F12 or Ctrl+Shift+I (for debugging in production)
     mainWindow.webContents.on('before-input-event', (event, input) => {
@@ -372,33 +433,87 @@ ipcMain.handle('get-server-uptime', async (event, { host, osType = 'Windows', us
         }
 
         if (isWindows) {
-            // Use CIM to get LastBootUpTime and compute uptime seconds
             const user = psEscape(username || '');
             const pass = psEscape(password || '');
             const hasCreds = !!(user && pass);
-            const credBlock = hasCreds ? `
+
+            // 1) Try CIM (WSMan)
+            const cimCredBlock = hasCreds ? `
                 $sec = ConvertTo-SecureString \"${pass}\" -AsPlainText -Force; 
                 $cred = New-Object System.Management.Automation.PSCredential(\"${user}\", $sec);
                 $params = @{ ComputerName='${host}'; Credential=$cred }
             ` : `$params = @{ ComputerName='${host}' }`;
-            const ps = `
+            const cimPs = `
                 try {
-                    ${credBlock}
+                    ${cimCredBlock}
                     $os = Get-CimInstance Win32_OperatingSystem @params -ErrorAction Stop;
                     $boot = $os.LastBootUpTime;
                     $ts = New-TimeSpan -Start $boot -End (Get-Date);
                     [math]::Floor($ts.TotalSeconds)
                 } catch { -1 }
             `;
-            const cmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command \"${ps.replace(/\n/g,' ').replace(/\s+/g,' ').trim()}\"`;
-            return await new Promise((resolve) => {
-                exec(cmd, { timeout: 6000 }, (err, stdout) => {
+            const cimCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command \"${cimPs.replace(/\n/g,' ').replace(/\s+/g,' ').trim()}\"`;
+            const cimRes = await new Promise((resolve) => {
+                exec(cimCmd, { timeout: 6000 }, (err, stdout, stderr) => {
                     const out = (stdout || '').toString().trim();
                     const seconds = parseInt(out, 10);
-                    if (!isNaN(seconds) && seconds >= 0) return resolve({ success: true, seconds });
-                    resolve({ success: false, error: 'Uptime query failed', stdout: out, code: err?.code || 0 });
+                    if (!isNaN(seconds) && seconds >= 0) return resolve({ ok: true, seconds });
+                    resolve({ ok: false, err: err?.message || stderr || 'CIM failed', out });
                 });
             });
+            if (cimRes.ok) return { success: true, seconds: cimRes.seconds };
+
+            // 2) Try WMI (DCOM) via Get-WmiObject
+            const wmiCredBlock = hasCreds ? `
+                $sec = ConvertTo-SecureString \"${pass}\" -AsPlainText -Force; 
+                $cred = New-Object System.Management.Automation.PSCredential(\"${user}\", $sec);
+                $os = Get-WmiObject -Class Win32_OperatingSystem -ComputerName \"${host}\" -Credential $cred -ErrorAction Stop
+            ` : `$os = Get-WmiObject -Class Win32_OperatingSystem -ComputerName \"${host}\" -ErrorAction Stop`;
+            const wmiPs = `
+                try {
+                    ${wmiCredBlock}
+                    $boot = [Management.ManagementDateTimeConverter]::ToDateTime($os.LastBootUpTime);
+                    $ts = New-TimeSpan -Start $boot -End (Get-Date);
+                    [math]::Floor($ts.TotalSeconds)
+                } catch { -1 }
+            `;
+            const wmiCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command \"${wmiPs.replace(/\n/g,' ').replace(/\s+/g,' ').trim()}\"`;
+            const wmiRes = await new Promise((resolve) => {
+                exec(wmiCmd, { timeout: 6000 }, (err, stdout, stderr) => {
+                    const out = (stdout || '').toString().trim();
+                    const seconds = parseInt(out, 10);
+                    if (!isNaN(seconds) && seconds >= 0) return resolve({ ok: true, seconds });
+                    resolve({ ok: false, err: err?.message || stderr || 'WMI failed', out });
+                });
+            });
+            if (wmiRes.ok) return { success: true, seconds: wmiRes.seconds };
+
+            // 3) Try legacy WMIC CLI (DCOM)
+            const wmicUser = hasCreds ? `/user:"${username}"` : '';
+            const wmicPass = hasCreds ? `/password:"${password}"` : '';
+            const wmicCmd = `wmic /node:"${host}" ${wmicUser} ${wmicPass} path win32_operatingsystem get lastbootuptime /value`;
+            const wmicRes = await new Promise((resolve) => {
+                exec(wmicCmd, { timeout: 6000 }, (err, stdout, stderr) => {
+                    const out = (stdout || '').toString();
+                    const match = /LastBootUpTime\s*=\s*([0-9]{14})/i.exec(out);
+                    if (match) {
+                        const s = match[1];
+                        const yyyy = parseInt(s.slice(0,4));
+                        const MM = parseInt(s.slice(4,6)) - 1;
+                        const dd = parseInt(s.slice(6,8));
+                        const HH = parseInt(s.slice(8,10));
+                        const mm = parseInt(s.slice(10,12));
+                        const ss = parseInt(s.slice(12,14));
+                        const boot = new Date(Date.UTC(yyyy, MM, dd, HH, mm, ss));
+                        const seconds = Math.floor((Date.now() - boot.getTime()) / 1000);
+                        return resolve({ ok: true, seconds });
+                    }
+                    resolve({ ok: false, err: err?.message || stderr || 'WMIC parse failed', out });
+                });
+            });
+            if (wmicRes.ok) return { success: true, seconds: wmicRes.seconds };
+
+            return { success: false, error: `Windows uptime failed: ${wmiRes.err || cimRes.err || 'unknown error'}` };
         }
 
         // Linux via plink (PuTTY) if available
@@ -570,6 +685,42 @@ ipcMain.handle('db-execute', async (event, query, params = []) => {
         };
     } catch (error) {
         console.error('Database execute error:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Hash password
+ipcMain.handle('hash-password', async (event, password) => {
+    try {
+        return { success: true, hash: hashPassword(password) };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// Verify password
+ipcMain.handle('verify-password', async (event, password, hashedPassword) => {
+    try {
+        return { success: true, valid: verifyPassword(password, hashedPassword) };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// Encrypt message
+ipcMain.handle('encrypt-message', async (event, message) => {
+    try {
+        return { success: true, encrypted: encryptMessage(message) };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// Decrypt message
+ipcMain.handle('decrypt-message', async (event, encryptedMessage) => {
+    try {
+        return { success: true, decrypted: decryptMessage(encryptedMessage) };
+    } catch (error) {
         return { success: false, error: error.message };
     }
 });

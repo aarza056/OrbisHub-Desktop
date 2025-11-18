@@ -78,17 +78,38 @@ body {
     overflow: hidden;
 }
 
+/* Sidebar position switcher */
+body .sidebar,
+body #appSidebar { grid-column: 1; }
+body .main,
+body #appMain { grid-column: 2; }
+body.sidebar-right { grid-template-columns: minmax(0, 1fr) 260px; }
+body.sidebar-right .sidebar,
+body.sidebar-right #appSidebar { grid-column: 2; border-right: none; border-left: 1px solid var(--border); box-shadow: -1px 0 0 0 color-mix(in oklab, var(--border) 50%, transparent); }
+body.sidebar-right .main,
+body.sidebar-right #appMain { grid-column: 1; max-width: none; margin: 0; }
+
+/* Force proper layout when sidebar is on the right */
+body.sidebar-right .main,
+body.sidebar-right #appMain,
+body.sidebar-right .views,
+body.sidebar-right .view.is-visible {
+  width: 100%;
+  min-width: 0;
+}
+
 .main {
   height: 100vh;
   width: 100%;
-  max-width: var(--max-width);
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   padding: 0;
   position: relative;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
+  min-width: 0; /* Prevent grid overflow */
 }
 
 .topbar {
@@ -105,6 +126,26 @@ body {
   flex-shrink: 0;
   box-sizing: border-box;
 }
+
+/* Ensure views container is properly positioned */
+.views {
+	position: relative;
+	padding: 0;
+	flex: 1;
+	overflow: visible;
+	min-height: 0;
+	min-width: 0; /* Prevent grid overflow */
+	width: 100%;
+	z-index: 1; /* Ensure views render above background */
+}
+body.compact-mode { --content-padding: 14px; }
+body.compact-mode .topbar { padding: 8px var(--content-padding); height: 60px; }
+body.compact-mode .brand { height: 60px; }
+body.compact-mode .grid { gap: 14px; }
+body.compact-mode .row { gap: 6px; }
+body.compact-mode .nav { gap: 16px; padding-bottom: 60px; }
+body.compact-mode .nav__btn { padding: 8px 10px; }
+body.compact-mode .card { padding: 10px; border-radius: 12px; }
 
 /* User menu */
 .user-menu {
@@ -1213,6 +1254,8 @@ body {
 	flex: 1;
 	overflow: visible;
 	min-height: 0;
+	min-width: 0; /* Prevent grid overflow */
+	width: 100%;
 }
 
 /* Animated views: we position them on top of each other and animate opacity/translate */
@@ -1224,11 +1267,16 @@ body {
   box-sizing: border-box;
   overflow-y: auto;
   overflow-x: hidden;
+  height: 100%;
+  position: relative;
+  background: var(--bg); /* Ensure view has background */
 }
 
 /* Only show the active view */
 .view.is-visible {
   display: block !important;
+  opacity: 1;
+  visibility: visible;
 }
 
 

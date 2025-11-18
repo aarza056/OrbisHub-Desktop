@@ -20,6 +20,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     dbQuery: (query, params) => ipcRenderer.invoke('db-query', query, params),
     dbExecute: (query, params) => ipcRenderer.invoke('db-execute', query, params),
     
+    // Password hashing
+    hashPassword: (password) => ipcRenderer.invoke('hash-password', password),
+    verifyPassword: (password, hashedPassword) => ipcRenderer.invoke('verify-password', password, hashedPassword),
+    
+    // Message encryption
+    encryptMessage: (message) => ipcRenderer.invoke('encrypt-message', message),
+    decryptMessage: (encryptedMessage) => ipcRenderer.invoke('decrypt-message', encryptedMessage),
+    
     // Server utilities
     testServer: (ipAddress, serverName, port = 3389) => 
         ipcRenderer.invoke('test-server', { ipAddress, serverName, port }),
