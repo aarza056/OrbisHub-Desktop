@@ -3598,6 +3598,14 @@ async function showView(name, updateUrl = true) {
                     console.log(`✅ Loaded ${db.environments.length} environments from database`)
                 }
                 break
+            
+            case 'settings':
+                // Ensure storage usage UI is current when opening Settings
+                try {
+                    updateStorageUsage()
+                    const s = readSettings(); applySettings(s); populateSettingsForm(s)
+                } catch {}
+                break
                 
             case 'messages':
                 // Load messaging view with users and conversations
@@ -6452,6 +6460,150 @@ window.alert = function(message) {
     }
 }
 
+// Application Settings
+let __autoRefreshTimer = null
+
+function getDefaultSettings() {
+    return {
+        compactMode: false,
+        fontSize: 'medium',
+        desktopNotifications: true,
+        errorNotifications: true,
+        soundEffects: false,
+        autoRefresh: false,
+        refreshInterval: 60,
+        autoBackup: false,
+        dataRetentionDays: 30,
+        exportFormat: 'json',
+        autoLock: false,
+        sessionTimeout: 15,
+        showPasswords: false,
+        auditLogging: true,
+        animations: true,
+        lazyLoading: true,
+        itemsPerPage: 50,
+        cacheDuration: 300
+    }
+}
+
+function readSettings() {
+    const db = store.readSync()
+    db.settings = { ...getDefaultSettings(), ...(db.settings || {}) }
+    store.write(db, true)
+    return db.settings
+}
+
+function saveSettings(patch) {
+    const db = store.readSync()
+    db.settings = { ...getDefaultSettings(), ...(db.settings || {}), ...(patch || {}) }
+    store.write(db)
+    return db.settings
+}
+
+function applySettings(settings) {
+    try {
+        console.log('🔧 applySettings called with:', settings)
+        const body = document.body
+        if (!body) {
+            console.error('❌ document.body not found!')
+            return
+        }
+        
+        // Compact mode
+        body.classList.toggle('compact-mode', !!settings.compactMode)
+        console.log('📦 Compact mode:', settings.compactMode)
+        
+        // Font size (apply to both root and body to override static rules)
+        const fontMap = { small: '13px', medium: '14px', large: '16px' }
+        const size = fontMap[settings.fontSize] || '14px'
+        document.documentElement.style.fontSize = size
+        body.style.fontSize = size
+        console.log('🔤 Font size applied:', size)
+        // Desktop notifications permission
+        if (settings.desktopNotifications && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+            try { Notification.requestPermission().catch(() => {}) } catch {}
+        }
+        // Animations toggle (expects CSS to honor .no-animations)
+        body.classList.toggle('no-animations', settings.animations === false)
+
+        // Auto-refresh handling
+        if (__autoRefreshTimer) { clearInterval(__autoRefreshTimer); __autoRefreshTimer = null }
+        if (settings.autoRefresh) {
+            const intervalMs = Math.max(5, Number(settings.refreshInterval || 60)) * 1000
+            const tick = async () => {
+                // Refresh the currently visible view in a lightweight way
+                const visible = document.querySelector('.view.is-visible')
+                if (!visible) return
+                try {
+                    if (visible.id === 'view-summary') updateSummaryDashboard()
+                    else if (visible.id === 'view-environments') window.renderEnvs && window.renderEnvs(document.getElementById('search')?.value || '')
+                    else if (visible.id === 'view-servers') renderServers && renderServers()
+                    else if (visible.id === 'view-admin-audit') renderAuditLogs && renderAuditLogs()
+                } catch {}
+            }
+            __autoRefreshTimer = setInterval(tick, intervalMs)
+        }
+    } catch {}
+}
+
+function populateSettingsForm(settings) {
+    const byId = (id) => document.getElementById(id)
+    const setChecked = (id, v) => { const el = byId(id); if (el) el.checked = !!v }
+    const setValue = (id, v) => { const el = byId(id); if (el) el.value = String(v) }
+    setChecked('settingsCompactMode', settings.compactMode)
+    setValue('settingsFontSize', settings.fontSize)
+    setChecked('settingsDesktopNotifications', settings.desktopNotifications)
+    setChecked('settingsErrorNotifications', settings.errorNotifications)
+    setChecked('settingsSoundEffects', settings.soundEffects)
+    setChecked('settingsAutoRefresh', settings.autoRefresh)
+    setValue('settingsRefreshInterval', settings.refreshInterval)
+    setChecked('settingsAutoBackup', settings.autoBackup)
+    setValue('settingsDataRetention', settings.dataRetentionDays)
+    setValue('settingsExportFormat', settings.exportFormat)
+    setChecked('settingsAutoLock', settings.autoLock)
+    setValue('settingsSessionTimeout', settings.sessionTimeout)
+    setChecked('settingsShowPasswords', settings.showPasswords)
+    setChecked('settingsAuditLogging', settings.auditLogging)
+    setChecked('settingsAnimations', settings.animations)
+    setChecked('settingsLazyLoading', settings.lazyLoading)
+    setValue('settingsItemsPerPage', settings.itemsPerPage)
+    setValue('settingsCacheDuration', settings.cacheDuration)
+}
+
+function bindSettingsControls() {
+    const onChange = (id, getVal) => {
+        const el = document.getElementById(id)
+        if (!el) return
+        el.addEventListener('change', () => {
+            console.log(`⚙️ Setting changed: ${id}`)
+            const newSettings = getVal(el)
+            console.log('📝 New setting value:', newSettings)
+            const settings = saveSettings(newSettings)
+            console.log('💾 All settings after save:', settings)
+            applySettings(settings)
+            ToastManager?.success?.('Settings Updated', 'Your change has been saved', 2000)
+        })
+    }
+    onChange('settingsCompactMode', el => ({ compactMode: !!el.checked }))
+    onChange('settingsFontSize', el => ({ fontSize: el.value }))
+    onChange('settingsDesktopNotifications', el => ({ desktopNotifications: !!el.checked }))
+    onChange('settingsErrorNotifications', el => ({ errorNotifications: !!el.checked }))
+    onChange('settingsSoundEffects', el => ({ soundEffects: !!el.checked }))
+    onChange('settingsAutoRefresh', el => ({ autoRefresh: !!el.checked }))
+    onChange('settingsRefreshInterval', el => ({ refreshInterval: Number(el.value) }))
+    onChange('settingsAutoBackup', el => ({ autoBackup: !!el.checked }))
+    onChange('settingsDataRetention', el => ({ dataRetentionDays: Number(el.value) }))
+    onChange('settingsExportFormat', el => ({ exportFormat: el.value }))
+    onChange('settingsAutoLock', el => ({ autoLock: !!el.checked }))
+    onChange('settingsSessionTimeout', el => ({ sessionTimeout: Number(el.value) }))
+    onChange('settingsShowPasswords', el => ({ showPasswords: !!el.checked }))
+    onChange('settingsAuditLogging', el => ({ auditLogging: !!el.checked }))
+    onChange('settingsAnimations', el => ({ animations: !!el.checked }))
+    onChange('settingsLazyLoading', el => ({ lazyLoading: !!el.checked }))
+    onChange('settingsItemsPerPage', el => ({ itemsPerPage: Number(el.value) }))
+    onChange('settingsCacheDuration', el => ({ cacheDuration: Number(el.value) }))
+}
+
 // Settings Page Functionality
 function initSettings() {
     // Theme toggle
@@ -6465,6 +6617,12 @@ function initSettings() {
 
     // Storage usage
     updateStorageUsage()
+
+    // Load/apply settings and bind controls
+    const settings = readSettings()
+    applySettings(settings)
+    populateSettingsForm(settings)
+    bindSettingsControls()
 
     // Export data
     const exportDataBtn = document.getElementById('exportDataBtn')

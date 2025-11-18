@@ -518,3 +518,28 @@ function updateEnvUptimes(envCardEl, servers) {
     }
   })
 }
+
+// Periodically refresh uptimes when Environments view is visible
+;(function setupUptimeAutoRefresh() {
+  try {
+    const refresh = () => {
+      const view = document.getElementById('view-environments')
+      if (!view || !view.classList.contains('is-visible')) return
+      const db = store.readSync()
+      const environments = db.environments || []
+      environments.forEach(env => {
+        const card = document.querySelector(`.env[data-env-id="${env.id}"]`)
+        if (!card) return
+        const mappedServerIds = env.mappedServers || []
+        if (!mappedServerIds.length) return
+        const servers = (db.servers || []).filter(s => mappedServerIds.includes(s.id))
+        if (servers.length) updateEnvUptimes(card, servers)
+      })
+    }
+    // Initial slight delay to allow first render, then every 60s
+    setTimeout(refresh, 1500)
+    setInterval(refresh, 60_000)
+  } catch (e) {
+    // noop
+  }
+})()
