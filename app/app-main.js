@@ -1,8 +1,6 @@
 // Simple router between views
 // Updated: 2025-11-10 - Login system v2
 
-console.log('📦 app-main.js loaded')
-
 // Defensive: some environments emit stray ondrag handlers referencing `dragEvent`
 // Provide a no-op to avoid console spam if present in DOM attributes.
 if (typeof window !== 'undefined' && typeof window.dragEvent === 'undefined') {
@@ -39,10 +37,10 @@ async function initLocalIP() {
     try {
         if (window.electronAPI && window.electronAPI.getLocalIP) {
             cachedLocalIP = await window.electronAPI.getLocalIP()
-            console.log('Local IP:', cachedLocalIP)
+
         }
     } catch (e) {
-        console.log('Could not get local IP:', e)
+
     }
 }
 
@@ -80,20 +78,18 @@ const store = {
             const isConnected = await this.checkDatabaseConnection()
             
             if (!isConnected) {
-                console.warn('⚠️ Database unavailable')
+
                 return memoryCache || this.getEmptyDb()
             }
-            
-            console.log('📊 Loading data from database...')
+
             const dbData = await this.loadFromDatabase()
             
             if (dbData) {
-                console.log('✅ Data loaded from database')
+
                 memoryCache = dbData
                 return dbData
             }
-            
-            console.log('🆕 No data found, returning empty structure')
+
             return memoryCache || this.getEmptyDb()
             
         } catch (e) {
@@ -242,7 +238,7 @@ async function cleanupAuditLogs(keepCount = 100) {
             const removed = db.auditLogs.length - keepCount
             db.auditLogs = db.auditLogs.slice(0, keepCount)
             await store.write(db)
-            console.log(`Cleaned up ${removed} old audit log entries`)
+
             return removed
         }
         return 0
@@ -255,19 +251,18 @@ async function cleanupAuditLogs(keepCount = 100) {
 // Emergency database cleanup
 async function emergencyStorageCleanup() {
     try {
-        console.log('Running emergency storage cleanup...')
+
         const db = store.readSync()
         
         // Remove all audit logs
         if (db.auditLogs) {
             const count = db.auditLogs.length
             db.auditLogs = []
-            console.log(`Removed ${count} audit logs`)
+
         }
         
         store.write(db)
         const usage = getStorageUsage()
-        console.log(`Storage cleanup complete. Now using ${usage.sizeMB}MB (${usage.percentUsed}%)`)
         return true
     } catch (e) {
         console.error('Emergency cleanup failed:', e)
@@ -312,7 +307,7 @@ async function logAudit(action, entityType, entityName, details = {}) {
                 // Trim to reasonable recent size in memory
                 if (db.auditLogs.length > 1000) db.auditLogs.length = 1000
             } else {
-                console.warn('Audit log DB write failed:', res?.error)
+
             }
         }
     } catch (e) {
@@ -635,7 +630,6 @@ let serverToDelete = null
 // Test server connectivity using backend API
 async function testServerConnection(ipAddress, serverName, port = 3389) {
     try {
-        console.log(`🔍 Testing connection to ${serverName} (${ipAddress})...`)
         
         const response = await fetch(`${API_BASE_URL}/api/test-server`, {
             method: 'POST',
@@ -651,21 +645,19 @@ async function testServerConnection(ipAddress, serverName, port = 3389) {
         })
         
         const result = await response.json()
-        
-        console.log(`📊 Connection test result for ${serverName}:`, result)
-        
+
         if (result.success && result.reachable) {
-            console.log(`✅ ${serverName} is reachable`)
+
             return true
         } else {
-            console.warn(`❌ ${serverName} is not reachable: ${result.message || 'Unknown error'}`)
+
             if (result.debug) {
-                console.log('Debug output:', result.debug.stdout)
+
             }
             return false
         }
     } catch (error) {
-        console.warn(`⚠️ Connection test failed for ${serverName}:`, error.message)
+
         // If backend is not available or timeout, return true to not block server creation
         return true
     }
@@ -767,7 +759,7 @@ kdcproxyname:s:`
 
     // Launch RDP using Electron IPC
     try {
-        console.log('🖥️ Launching RDP connection to:', server.displayName)
+
         if (window.electronAPI && window.electronAPI.connectRDP) {
             const result = await window.electronAPI.connectRDP(
                 { displayName: server.displayName, ipAddress: server.ipAddress, hostname: server.hostname, port: server.port || 3389 },
@@ -1037,8 +1029,7 @@ async function testIntegrationConnection(integration, buttonEl) {
     
     try {
         // Call backend API to test integration connection
-        console.log('Testing integration connection:', integration.name)
-        
+
         const response = await fetch(`${API_BASE_URL}/api/test-integration`, {
             method: 'POST',
             headers: {
@@ -1233,9 +1224,7 @@ async function renderCredentials(filter = '') {
     
     const q = (filter || '').toLowerCase()
     credListEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--muted);">Loading credentials...</div>'
-    
-    console.log('📋 Loading credentials from database...')
-    
+
     // Load from database
     let credentials = []
     try {
@@ -1244,15 +1233,12 @@ async function renderCredentials(filter = '') {
         
         if (result.success && result.data) {
             credentials = result.data.credentials || []
-            console.log('📋 Loaded from database:', credentials.length, 'credentials')
-            
-            
+
             const db = store.readSync()
             db.credentials = credentials
             
         } else {
-            
-            console.log('⚠️ Database load failed')
+
             const db = store.readSync()
             credentials = db.credentials || []
         }
@@ -1354,9 +1340,7 @@ let auditPagination = {
 async function renderAuditLogs(searchQuery = '', actionFilter = '', entityFilter = '') {
     const tbody = document.getElementById('auditLogsTableBody')
     if (!tbody) return
-    
-    console.log('📋 Loading audit logs from database...')
-    
+
     let logs = []
     try {
         const response = await fetch(`${API_BASE_URL}/api/load-data`)
@@ -1364,9 +1348,7 @@ async function renderAuditLogs(searchQuery = '', actionFilter = '', entityFilter
         
         if (result.success && result.data) {
             logs = result.data.auditLogs || []
-            console.log('📋 Loaded from database:', logs.length, 'audit logs')
-            
-            
+
             const db = store.readSync()
             db.auditLogs = logs
             
@@ -2192,9 +2174,7 @@ if (saveCredBtn) {
             password,
             description
         }
-        
-        console.log('➕ Saving credential to database:', newCred)
-        
+
         // Save directly to database
         try {
             const response = await fetch(`${API_BASE_URL}/api/sync-data`, {
@@ -2206,12 +2186,9 @@ if (saveCredBtn) {
             })
             
             const result = await response.json()
-            console.log('✅ Database save result:', result)
-            
+
             if (result.success) {
-                console.log('✅ Credential saved to database')
-                
-                
+
                 const db = store.readSync()
                 db.credentials = db.credentials || []
                 db.credentials.push(newCred)
@@ -2256,9 +2233,7 @@ if (saveEditCredBtn) {
         const description = document.getElementById('editCredDescription').value.trim()
         
         if (!id || !name) return
-        
-        console.log('✏️ Updating credential in database:', id)
-        
+
         try {
             const db = store.readSync()
             const credential = db.credentials.find(x => x.id === id)
@@ -2291,12 +2266,9 @@ if (saveEditCredBtn) {
             })
             
             const result = await response.json()
-            console.log('✅ Database update result:', result)
-            
+
             if (result.success) {
-                console.log('✅ Credential updated in database')
-                
-                
+
                 store.write(db, true) // Skip sync - we already updated DB
                 
                 // Credential updated in database
@@ -2339,9 +2311,7 @@ if (confirmDeleteCredBtn) {
             if (idx >= 0) {
                 const credName = db.credentials[idx].name
                 const credId = db.credentials[idx].id
-                
-                console.log('🗑️ Deleting credential:', credName, 'ID:', credId)
-                
+
                 // 1) Unassign credential from servers and environments first (to satisfy FK constraints)
                 const updatedServers = []
                 if (Array.isArray(db.servers)) {
@@ -2356,7 +2326,7 @@ if (confirmDeleteCredBtn) {
                 // If in use, persist the reference clear before deleting the row
                 if (updatedServers.length > 0) {
                     try {
-                        console.log('🔄 Clearing credential references in DB...', { servers: updatedServers.length })
+
                         const syncRes = await fetch(`${API_BASE_URL}/api/sync-data`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -2380,10 +2350,9 @@ if (confirmDeleteCredBtn) {
                 }
 
                 // 2) Now delete the credential row
-                console.log('📡 Calling deleteFromDatabase...')
+
                 try {
                     const result = await store.deleteFromDatabase('credential', credId)
-                    console.log('✅ Database delete result:', JSON.stringify(result))
                     
                     if (!result || !result.success) {
                         console.error('❌ Database delete failed:', JSON.stringify(result))
@@ -2391,8 +2360,7 @@ if (confirmDeleteCredBtn) {
                         closeDeleteCredentialModal()
                         return // Stop if database delete failed
                     }
-                    
-                    console.log('✅ Credential successfully deleted from database')
+
                 } catch (error) {
                     console.error('❌ Failed to delete credential from database:', error)
                     alert('Failed to delete credential from database: ' + error.message)
@@ -2407,7 +2375,7 @@ if (confirmDeleteCredBtn) {
                 // Credential deleted from database
                 
                 // Reload credentials from database
-                console.log('🔄 Reloading credentials from database...')
+
                 try {
                     const reloadResponse = await fetch(`${API_BASE_URL}/api/load-data`)
                     const reloadData = await reloadResponse.json()
@@ -2415,10 +2383,10 @@ if (confirmDeleteCredBtn) {
                         const dbReload = store.readSync()
                         dbReload.credentials = reloadData.data.credentials
                         store.write(dbReload, true)
-                        console.log('✅ Credentials reloaded from database')
+
                     }
                 } catch (reloadError) {
-                    console.warn('⚠️ Could not reload credentials from database:', reloadError)
+
                 }
                 
                 // Audit log
@@ -2489,11 +2457,9 @@ if (saveServerBtn) {
         const type = document.getElementById('serverType').value
         const os = (document.getElementById('serverOS')?.value) || 'Windows'
         const group = document.getElementById('serverGroup').value.trim()
-        
-        console.log('🔍 Server form values:', { displayName, hostname, ip, type, os, group })
-        
+
         if (!displayName || !hostname || !ip || !type) {
-            console.warn('❌ Missing required fields')
+
             return
         }
         
@@ -2522,7 +2488,7 @@ if (saveServerBtn) {
             newServer.port = testPort
             
             // Save to database FIRST
-            console.log('💾 Saving server to database...')
+
             try {
                 const response = await fetch(`${API_BASE_URL}/api/sync-data`, {
                     method: 'POST',
@@ -2535,7 +2501,7 @@ if (saveServerBtn) {
                 if (!dbResult.success) {
                     throw new Error(dbResult.error || 'Failed to save to database')
                 }
-                console.log('✅ Server saved to database')
+
             } catch (dbError) {
                 console.error('❌ Database save failed:', dbError)
                 throw new Error('Failed to save server to database: ' + dbError.message)
@@ -2554,9 +2520,7 @@ if (saveServerBtn) {
                 group: group || 'Ungrouped',
                 connectionTest: isReachable ? 'success' : 'failed'
             })
-            
-            console.log('✅ Server created successfully:', displayName)
-            
+
             // Show appropriate toast based on connection test
             if (isReachable) {
                 ToastManager.success(
@@ -2627,7 +2591,7 @@ if (saveEditServerBtn) {
                 }
                 
                 // Always test connection on save (not just when IP changes)
-                console.log(`🔍 Testing connection for ${displayName}...`)
+
                 const testPort = os === 'Linux' ? 22 : (server.port || 3389)
                 const isReachable = await testServerConnection(ip, displayName, testPort)
                 server.health = isReachable ? 'ok' : 'error'
@@ -2642,7 +2606,7 @@ if (saveEditServerBtn) {
                 server.port = testPort
                 
                 // Sync to database FIRST
-                console.log('💾 Updating server in database...')
+
                 try {
                     const response = await fetch(`${API_BASE_URL}/api/sync-data`, {
                         method: 'POST',
@@ -2655,7 +2619,7 @@ if (saveEditServerBtn) {
                     if (!dbResult.success) {
                         throw new Error(dbResult.error || 'Failed to update in database')
                     }
-                    console.log('✅ Server updated in database')
+
                 } catch (dbError) {
                     console.error('❌ Database update failed:', dbError)
                     throw new Error('Failed to update server in database: ' + dbError.message)
@@ -2709,21 +2673,18 @@ if (confirmDeleteServerBtn) {
             if (idx >= 0) {
                 const serverName = db.servers[idx].displayName
                 const serverId = db.servers[idx].id
-                
-                console.log('🗑️ Deleting server:', serverName, 'ID:', serverId)
-                
+
                 // Delete from database FIRST
-                console.log('📡 Calling deleteFromDatabase...')
+
                 try {
                     const result = await store.deleteFromDatabase('server', serverId)
-                    console.log('✅ Database delete result:', JSON.stringify(result))
                     if (!result || !result.success) {
                         console.error('❌ Database delete failed:', JSON.stringify(result))
                         alert('Failed to delete server from database: ' + (result?.error || 'Unknown error'))
                         closeDeleteServerModal()
                         return // Stop if database delete failed
                     }
-                    console.log('✅ Server successfully deleted from database')
+
                 } catch (error) {
                     console.error('❌ Failed to delete server from database:', error)
                     alert('Failed to delete server from database: ' + error.message)
@@ -2738,7 +2699,7 @@ if (confirmDeleteServerBtn) {
                 // Server deleted from database
                 
                 // Reload servers from database
-                console.log('🔄 Reloading servers from database...')
+
                 try {
                     const reloadResponse = await fetch(`${API_BASE_URL}/api/load-data`)
                     const reloadData = await reloadResponse.json()
@@ -2746,10 +2707,10 @@ if (confirmDeleteServerBtn) {
                         // [Removed - database-only architecture]
                         freshDb.servers = reloadData.data.servers
                         store.write(freshDb, true) // Skip sync - we just loaded from DB
-                        console.log('✅ Servers reloaded from database')
+
                     }
                 } catch (reloadError) {
-                    console.warn('⚠️ Could not reload servers from database:', reloadError)
+
                 }
                 
                 // Audit log
@@ -2848,12 +2809,12 @@ if (confirmClearAuditBtn) {
                 
                 const result = await response.json()
                 if (result.success) {
-                    console.log('✅ Audit logs cleared from database')
+
                 } else {
-                    console.warn('⚠️ Failed to clear audit logs from database:', result.error)
+
                 }
             } catch (dbError) {
-                console.warn('⚠️ Could not clear audit logs from database:', dbError.message)
+
                 // Continue anyway
             }
             
@@ -2880,10 +2841,9 @@ if (confirmClearAuditBtn) {
 async function renderAllViews() {
     // Load data from database (database-first approach)
     try {
-        console.log('🔄 Loading data from database...')
+
         const db = await store.read()
-        
-        console.log('✅ Data loaded successfully')
+
     } catch (error) {
         console.error('❌ Failed to load data:', error)
     }
@@ -2902,23 +2862,23 @@ async function renderAllViews() {
     
     // Render all views using cached data
     try {
-        console.log('🔄 Starting app initialization...')
+
         window.renderEnvs && window.renderEnvs()
-        console.log('✅ Environments rendered')
+
         renderServers()
-        console.log('✅ Servers rendered')
+
         renderJobs()
-        console.log('✅ Jobs rendered')
+
         renderUsers()
-        console.log('✅ Users rendered')
+
         await renderCredentials()
-        console.log('✅ Credentials rendered')
+
         await renderAuditLogs()
-        console.log('✅ Audit logs rendered')
+
         // Builds/Scripts removed; skip rendering those views
         renderIntegrations()
-        console.log('✅ Integrations rendered')
-        console.log('🎉 App initialization complete!')
+
+
     } catch (error) {
         console.error('❌ Error initializing app data:', error)
         // Still show the app even if some data fails to load
@@ -3537,8 +3497,7 @@ async function showView(name, updateUrl = true) {
 
     // Auto-refresh data from database when switching views
     try {
-        console.log(`🔄 Auto-refreshing data for view: ${actual}`)
-        
+
         switch (actual) {
             case 'summary':
                 updateSummaryDashboard()
@@ -3553,7 +3512,7 @@ async function showView(name, updateUrl = true) {
                     db.servers = serversResult.data.servers || []
                     store.write(db, true) // Skip sync back to DB
                     renderServers()
-                    console.log(`✅ Loaded ${db.servers.length} servers from database`)
+
                 }
                 break
                 
@@ -3566,20 +3525,20 @@ async function showView(name, updateUrl = true) {
                     db.users = usersResult.data.users || []
                     store.write(db, true)
                     renderUsers()
-                    console.log(`✅ Loaded ${db.users.length} users from database`)
+
                 }
                 break
                 
             case 'credentials':
                 // Load fresh credential data from database
                 await renderCredentials() // This function already loads from DB
-                console.log('✅ Credentials refreshed from database')
+
                 break
                 
             case 'audit-logs':
                 // Load fresh audit logs from database
                 await renderAuditLogs()
-                console.log('✅ Audit logs refreshed from database')
+
                 break
                 
             // case 'builds':
@@ -3595,7 +3554,7 @@ async function showView(name, updateUrl = true) {
                     db.environments = envsResult.data.environments || []
                     store.write(db, true)
                     window.renderEnvs && window.renderEnvs()
-                    console.log(`✅ Loaded ${db.environments.length} environments from database`)
+
                 }
                 break
             
@@ -3610,7 +3569,7 @@ async function showView(name, updateUrl = true) {
             case 'messages':
                 // Load messaging view with users and conversations
                 await initializeMessagingView()
-                console.log('✅ Messaging view initialized')
+
                 // Start unread polling and conversation polling if already selected
                 startUnreadPolling()
                 try { loadUnreadCount() } catch {}
@@ -3620,7 +3579,7 @@ async function showView(name, updateUrl = true) {
                 break
         }
     } catch (error) {
-        console.warn('⚠️ Auto-refresh failed:', error.message)
+
         // Continue anyway - use cached data
     }
     
@@ -3658,8 +3617,7 @@ function initializeFromUrl() {
 
 // Handle URL actions (edit, delete, etc.)
 function handleUrlAction(view, action, id) {
-    console.log(`📍 URL Action: ${action} ${view} with id: ${id}`)
-    
+
     // Map view to entity type
     const entityMap = {
         'servers': 'server',
@@ -3993,31 +3951,26 @@ if (loginForm) {
         
         try {
             // Authenticate against SQL database (database-first approach)
-            console.log('🔍 Authenticating against database...')
-            console.log('📝 Username:', username)
-            console.log('📝 Password length:', password.length)
-            
+
+
+
             const userQuery = await window.electronAPI.dbQuery(
                 'SELECT * FROM Users WHERE username = @param0 AND password = @param1',
                 [{ value: username }, { value: password }]
             )
-            
-            console.log('📊 User query result:', userQuery)
-            
+
             // Also check if user exists at all (for debugging)
             const checkUserExists = await window.electronAPI.dbQuery(
                 'SELECT username, id FROM Users WHERE username = @param0',
                 [{ value: username }]
             )
-            console.log('🔍 User exists check:', checkUserExists)
-            
+
             // Check all users in database (for debugging)
             const allUsers = await window.electronAPI.dbQuery(
                 'SELECT username, id FROM Users',
                 []
             )
-            console.log('👥 All users in database:', allUsers)
-            
+
             if (!userQuery || !userQuery.success || !userQuery.data || userQuery.data.length === 0) {
                 if (loadingScreen) {
                     loadingScreen.classList.remove('is-visible')
@@ -4033,8 +3986,7 @@ if (loginForm) {
             }
             
             const dbUser = userQuery.data[0]
-            console.log('✅ Login successful using database')
-            
+
             // Convert database user format to app format
             const user = {
                 id: dbUser.id,
@@ -4275,7 +4227,7 @@ async function checkSystemConfiguration(showNotification = false) {
         }
     } catch (error) {
         databaseStatus = false
-        console.log('Database status check failed:', error.message)
+
         const dbInfoDiv = document.getElementById('currentDbConnectionInfo')
         if (dbInfoDiv) dbInfoDiv.style.display = 'none'
     }
@@ -4712,26 +4664,19 @@ function initAuth() {
     }
 }
 
-console.log('🔍 About to check document.readyState:', document.readyState)
-
 // Call initialization when DOM is ready
 if (document.readyState === 'loading') {
-    console.log('⏳ DOM is loading, waiting for DOMContentLoaded...')
+
     document.addEventListener('DOMContentLoaded', () => {
-        console.log('✅ DOMContentLoaded fired!')
+
         // Log storage usage on startup
         const usage = getStorageUsage()
-        console.log(`Storage usage: ${usage.sizeMB}MB / ${usage.limitMB}MB (${usage.percentUsed}%)`)
         if (usage.percentUsed > 80) {
-            console.warn('Storage is over 80% full. Consider cleaning up old data.')
+
         }
-        
-        console.log('🚀 Initializing components...')
-        
+
         try {
-            console.log('1️⃣ Calling initAuth()...')
             initAuth()
-            console.log('✅ initAuth() completed')
         } catch (e) {
             console.error('❌ initAuth() failed:', e)
         }
@@ -4739,38 +4684,28 @@ if (document.readyState === 'loading') {
         // Skipping initBuildModal()
         
         try {
-            console.log('3️⃣ Calling initRefreshButtons()...')
             initRefreshButtons()
-            console.log('✅ initRefreshButtons() completed')
         } catch (e) {
             console.error('❌ initRefreshButtons() failed:', e)
         }
         
         try {
-            console.log('4️⃣ Calling initStatusMonitoring()...')
             initStatusMonitoring()
-            console.log('✅ initStatusMonitoring() completed')
         } catch (e) {
             console.error('❌ initStatusMonitoring() failed:', e)
         }
         
         try {
-            console.log('5️⃣ Calling initializeAuditPagination()...')
             initializeAuditPagination()
-            console.log('✅ initializeAuditPagination() completed')
         } catch (e) {
             console.error('❌ initializeAuditPagination() failed:', e)
         }
-        
-        console.log('✅ All components initialized')
+
     })
 } else {
-    console.log('✅ DOM already loaded, initializing immediately...')
-    
+
     try {
-        console.log('1️⃣ Calling initAuth()...')
         initAuth()
-        console.log('✅ initAuth() completed')
     } catch (e) {
         console.error('❌ initAuth() failed:', e)
     }
@@ -4778,30 +4713,23 @@ if (document.readyState === 'loading') {
     // No initBuildModal()
     
     try {
-        console.log('3️⃣ Calling initRefreshButtons()...')
         initRefreshButtons()
-        console.log('✅ initRefreshButtons() completed')
     } catch (e) {
         console.error('❌ initRefreshButtons() failed:', e)
     }
     
     try {
-        console.log('4️⃣ Calling initStatusMonitoring()...')
         initStatusMonitoring()
-        console.log('✅ initStatusMonitoring() completed')
     } catch (e) {
         console.error('❌ initStatusMonitoring() failed:', e)
     }
     
     try {
-        console.log('5️⃣ Calling initializeAuditPagination()...')
         initializeAuditPagination()
-        console.log('✅ initializeAuditPagination() completed')
     } catch (e) {
         console.error('❌ initializeAuditPagination() failed:', e)
     }
-    
-    console.log('✅ All components initialized')
+
 }
 
 // initBuildModal not used
@@ -4839,9 +4767,7 @@ function initRefreshButtons() {
                     const db = store.readSync()
                     db.users = result.data.users || []
                     await store.write(db)
-                    
-                    console.log(`✅ Loaded ${db.users.length} users from database`)
-                    
+
                     // Re-render users
                     renderUsers()
                     
@@ -4878,7 +4804,7 @@ let dbStatusCheck = null
 
 function initStatusMonitoring() {
     // Disabled
-    console.log('Status monitoring disabled')
+
 }
 
 async function checkServerStatus() {
@@ -4894,7 +4820,7 @@ async function checkServerStatus() {
         if (response.ok) {
             // Server is online
             indicator.style.display = 'none'
-            console.log('✅ Node.js Server: Online')
+
         } else {
             throw new Error('Server responded with error')
         }
@@ -4902,7 +4828,7 @@ async function checkServerStatus() {
         // Server is offline
         indicator.style.display = 'flex'
         indicator.title = 'Node.js Server Offline - Click for details'
-        console.log('❌ Node.js Server: Offline')
+
     }
 }
 
@@ -4921,7 +4847,7 @@ async function checkDatabaseStatus() {
             indicator.title = 'No Database Connections Configured - Click for details'
             indicator.classList.remove('status-indicator--error')
             indicator.classList.add('status-indicator--warning')
-            console.log('⚠️ Database: Not configured')
+
             return
         }
         
@@ -4943,7 +4869,7 @@ async function checkDatabaseStatus() {
         if (result.success) {
             // Database is connected
             indicator.style.display = 'none'
-            console.log('✅ Database: Connected')
+
         } else {
             throw new Error(result.error || 'Database connection failed')
         }
@@ -4953,7 +4879,7 @@ async function checkDatabaseStatus() {
         indicator.title = 'Database Connection Failed - Click for details'
         indicator.classList.remove('status-indicator--warning')
         indicator.classList.add('status-indicator--error')
-        console.log('❌ Database: Connection failed')
+
     }
 }
 
@@ -5361,28 +5287,18 @@ function initAIChat() {
     const aiChatInput = document.getElementById('aiChatInput')
     const aiChatSend = document.getElementById('aiChatSend')
     const aiChatMessages = document.getElementById('aiChatMessages')
-    
-    console.log('🤖 Initializing AI Chat...', {
-        aiChatWidget: !!aiChatWidget,
-        aiChatToggle: !!aiChatToggle,
-        closeChatBtn: !!closeChatBtn,
-        aiChatInput: !!aiChatInput,
-        aiChatSend: !!aiChatSend,
-        aiChatMessages: !!aiChatMessages
-    })
 
     let chatHistory = []
 
     // If chat UI is completely absent, skip initialization quietly
     if (!aiChatWidget && !aiChatToggle && !assistantTopBtn && !closeChatBtn && !aiChatInput && !aiChatSend && !aiChatMessages) {
-        console.log('⏭️ AI Chat UI not present; skipping initAIChat()')
         return
     }
 
     // Toggle chat widget
     if (aiChatToggle) {
         aiChatToggle.addEventListener('click', () => {
-            console.log('🤖 Chat toggle clicked')
+
             aiChatWidget.classList.toggle('is-open')
             if (aiChatWidget.classList.contains('is-open')) {
                 aiChatInput.focus()
@@ -5390,7 +5306,7 @@ function initAIChat() {
         })
     } else {
         // Not an error on pages without the toggle; just skip
-        console.log('⏭️ aiChatToggle button not found; skipping toggle wiring')
+
     }
 
     // Topbar Assistant button opens the chat
@@ -5403,7 +5319,7 @@ function initAIChat() {
 
     if (closeChatBtn) {
         closeChatBtn.addEventListener('click', () => {
-            console.log('🤖 Chat close clicked')
+
             aiChatWidget.classList.remove('is-open')
         })
     }
@@ -5412,9 +5328,7 @@ function initAIChat() {
     function sendMessage() {
         const message = aiChatInput.value.trim()
         if (!message) return
-        
-        console.log('🤖 Sending message:', message)
-        
+
         // Add user message to chat
         addUserMessage(message)
         chatHistory.push({ role: 'user', content: message })
@@ -6417,8 +6331,7 @@ function showSkeletonLoader(container) {
 
 // 6. INITIALIZE ALL ENHANCEMENTS
 function initModernUI() {
-    console.log('🎨 Initializing modern UI enhancements...')
-    
+
     // Initialize command palette
     CommandPalette.init()
     
@@ -6444,8 +6357,7 @@ function initModernUI() {
             setTimeout(() => hint.remove(), 300)
         }, 3000)
     }, 1000)
-    
-    console.log('✅ Modern UI enhancements loaded!')
+
 }
 
 // Override existing notification functions to use toast system
@@ -6502,7 +6414,7 @@ function saveSettings(patch) {
 
 function applySettings(settings) {
     try {
-        console.log('🔧 applySettings called with:', settings)
+
         const body = document.body
         if (!body) {
             console.error('❌ document.body not found!')
@@ -6511,14 +6423,13 @@ function applySettings(settings) {
         
         // Compact mode
         body.classList.toggle('compact-mode', !!settings.compactMode)
-        console.log('📦 Compact mode:', settings.compactMode)
-        
+
         // Font size (apply to both root and body to override static rules)
         const fontMap = { small: '13px', medium: '14px', large: '16px' }
         const size = fontMap[settings.fontSize] || '14px'
         document.documentElement.style.fontSize = size
         body.style.fontSize = size
-        console.log('🔤 Font size applied:', size)
+
         // Desktop notifications permission
         if (settings.desktopNotifications && typeof Notification !== 'undefined' && Notification.permission === 'default') {
             try { Notification.requestPermission().catch(() => {}) } catch {}
@@ -6575,11 +6486,11 @@ function bindSettingsControls() {
         const el = document.getElementById(id)
         if (!el) return
         el.addEventListener('change', () => {
-            console.log(`⚙️ Setting changed: ${id}`)
+
             const newSettings = getVal(el)
-            console.log('📝 New setting value:', newSettings)
+
             const settings = saveSettings(newSettings)
-            console.log('💾 All settings after save:', settings)
+
             applySettings(settings)
             ToastManager?.success?.('Settings Updated', 'Your change has been saved', 2000)
         })
@@ -6793,7 +6704,7 @@ function getCurrentUserId() {
 function initMessaging() {
     // Prevent duplicate initialization
     if (messagingInitialized) {
-        console.log('⚠️ Messaging already initialized, skipping duplicate')
+
         return
     }
     
@@ -6803,9 +6714,7 @@ function initMessaging() {
         console.error('❌ Cannot initialize messaging: No user ID found')
         return
     }
-    
-    console.log('🔌 Initializing messaging for user:', userId)
-    
+
     // Connect to Socket.IO server
     socket = io(`${API_BASE_URL}`)
     
@@ -6814,21 +6723,19 @@ function initMessaging() {
     
     // Join with current user ID
     socket.on('connect', () => {
-        console.log('✅ Connected to messaging server')
+
         socket.emit('join', userId)
         loadUnreadCount()
     })
     
     // Handle new messages
     socket.on('new-message', (message) => {
-        console.log('📨 New message received:', message)
-        
+
         const session = getSession()
         const currentUserId = session?.id || session?.Id || null
         
         // Skip if this is our own message (we already displayed it when sending)
         if (message.SenderId === currentUserId) {
-            console.log('⏭️ Skipping own message display (already shown)')
             return
         }
         
@@ -6901,7 +6808,7 @@ function initMessaging() {
 
     // Handle channel messages
     socket.on('channel-message', (message) => {
-        console.log('📢 Channel message received:', message)
+
         // Only display if we're viewing this channel
         if (currentChannelId === message.channelId) {
             displayChannelMessage(message)
@@ -6925,7 +6832,7 @@ function initMessaging() {
     
     // Handle messages marked as read
     socket.on('messages-read', (data) => {
-        console.log('✅ Messages marked as read by', data.userId)
+
     })
     
     // Setup message button
@@ -6993,7 +6900,7 @@ let messageModalSetup = false
 function setupMessageModal() {
     // Prevent duplicate event listeners
     if (messageModalSetup) {
-        console.log('⚠️ Message modal already setup, skipping duplicate')
+
         return
     }
     
@@ -7043,8 +6950,7 @@ function setupMessageModal() {
     }
     
     messageModalSetup = true
-    console.log('✅ Message modal setup complete')
-    
+
     // Search users
     if (searchUsers) {
         searchUsers.addEventListener('input', (e) => {
@@ -7227,10 +7133,8 @@ async function initializeMessagingView() {
                 const userId = u.id || u.Id
                 return userId !== currentUserId
             })
-            
-            console.log(`📨 Current user ID: ${currentUserId}`)
-            console.log(`📨 Total users: ${users.length}, Other users: ${otherUsers.length}`)
-            
+
+
             // If no other users exist, allow "Notes to self" conversation for testing
             if (otherUsers.length === 0) {
                 otherUsers = [{ id: currentUserId, name: 'You (self)', username: 'self', isActive: true }]
@@ -7246,8 +7150,7 @@ async function initializeMessagingView() {
                 // No recipients, ensure send UI is disabled
                 updateSendButtonState(false)
             }
-            
-            console.log(`✅ Loaded ${otherUsers.length} users for messaging`)
+
         }
         
         // Setup event listeners
@@ -7398,7 +7301,7 @@ async function loadMessagesForNewView(userId, opts = {}) {
         
         const container = document.getElementById('messagesChatBody')
         if (!container) {
-            console.warn('[MessagesUI] Container not found')
+
             return
         }
 
@@ -7630,7 +7533,7 @@ let messagingListenersSetup = false;
 function setupMessagingEventListeners() {
     // Prevent duplicate event listeners
     if (messagingListenersSetup) {
-        console.log('⚠️ Messaging event listeners already setup')
+
         return
     }
     messagingListenersSetup = true
@@ -7912,8 +7815,7 @@ async function sendMessageFromNewView() {
         const result = await response.json()
         
         if (result.success && result.message) {
-            console.log('✅ Message sent successfully')
-            
+
             // Clear input
             textarea.value = ''
             textarea.style.height = 'auto'
@@ -8288,7 +8190,7 @@ async function loadChannels() {
         
         // Check if response is ok
         if (!response.ok) {
-            console.warn('⚠️ Failed to load channels:', response.status)
+
             const container = document.getElementById('channelsContainer')
             if (container) {
                 container.innerHTML = '<div style="padding:20px; text-align:center; color:var(--muted);">Unable to load channels. Please try again later.</div>'
@@ -8300,7 +8202,7 @@ async function loadChannels() {
         
         // Ensure channels is an array
         if (!Array.isArray(channels)) {
-            console.warn('⚠️ Channels response is not an array:', channels)
+
             const container = document.getElementById('channelsContainer')
             if (container) {
                 container.innerHTML = '<div style="padding:20px; text-align:center; color:var(--muted);">No channels yet. Create one to get started!</div>'
@@ -8633,7 +8535,7 @@ function setupCreateChannelModal() {
 
 // Initialize everything
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('📋 DOMContentLoaded at line 10618 - Initializing messaging and setup...')
+
     setupMessageModal()
     setupChannelTabs()
     setupCreateChannelModal()
@@ -8644,7 +8546,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (uid) {
             initMessaging()
         } else {
-            console.log('⏭️ No logged-in user; skipping initMessaging()')
         }
     } catch (e) {
         console.error('❌ initMessaging() guard failed:', e)
@@ -8679,30 +8580,25 @@ let wizardConfig = {
 }
 
 async function initializeSetupWizard() {
-    console.log('🔍 Checking database configuration...')
-    
+
     // Check if database is configured
     const dbConfig = await window.electronAPI.getDbConfig()
-    console.log('📊 DB Config:', dbConfig)
-    
+
     if (!dbConfig || !dbConfig.connected) {
-        console.log('⚠️ Database not configured, showing setup wizard')
+
         showSetupWizard()
         return
     }
     
     // Test if connection works
     const testResult = await window.electronAPI.testDbConnection(dbConfig)
-    console.log('🧪 Connection test:', testResult)
-    
+
     if (!testResult || !testResult.success) {
-        console.log('❌ Database connection failed, showing setup wizard')
+
         showSetupWizard()
         return
     }
-    
-    console.log('✅ Database is configured and working')
-    
+
     // Database is ready - show login screen
     showLoginScreen()
 }
@@ -8809,10 +8705,9 @@ async function testSetupConnection() {
     testBtn.innerHTML = '<div class="spinner-ring" style="width:16px; height:16px; border-width:2px; margin-right:8px;"></div> Testing...'
     
     try {
-        console.log('🧪 Testing connection with config:', wizardConfig)
+
         const result = await window.electronAPI.testDbConnection(wizardConfig)
-        console.log('📊 Test result:', result)
-        
+
         if (result && result.success) {
             showSetupStatus('✅ Connection successful! Click Next to continue.', 'success')
             nextBtn.disabled = false
@@ -8907,10 +8802,9 @@ async function createDatabaseAndMigrate() {
     
     try {
         // Try to create database (will fail gracefully if it exists)
-        console.log('📦 Attempting to create database...')
+
         const createResult = await window.electronAPI.createDatabase(wizardConfig)
-        console.log('📊 Create DB result:', createResult)
-        
+
         if (createResult && createResult.error && !createResult.error.includes('already exists')) {
             throw new Error(createResult.error)
         }
@@ -8941,11 +8835,9 @@ async function runMigrations() {
     try {
         statusText.textContent = 'Creating database schema...'
         progressFill.style.width = '20%'
-        
-        console.log('🔧 Running migrations...')
+
         const migrationResult = await window.electronAPI.runMigrations(wizardConfig)
-        console.log('📊 Migration result:', migrationResult)
-        
+
         if (!migrationResult || !migrationResult.success) {
             throw new Error(migrationResult?.error || 'Migration failed')
         }
@@ -8972,9 +8864,7 @@ async function runMigrations() {
             ...wizardConfig,
             connected: true
         })
-        
-        console.log('💾 Config saved:', saveResult)
-        
+
         progressFill.style.width = '100%'
         statusText.textContent = 'Setup complete!'
         
@@ -9013,8 +8903,7 @@ async function createDefaultAdmin() {
                 { value: 1 } // Force password change on first login
             ]
         )
-        
-        console.log('✅ Default admin user created')
+
     } catch (error) {
         console.error('Failed to create default admin:', error)
         throw error
@@ -9175,7 +9064,7 @@ function initializeAutoUpdater() {
     
     // Display current version in footer
     window.electronAPI.getAppVersion().then(version => {
-        console.log(`🚀 OrbisHub Desktop v${version}`)
+
     })
 }
 
