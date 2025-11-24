@@ -71,23 +71,37 @@
         };
       }) : [];
 
-      const credentials = credsQ.success && credsQ.data ? credsQ.data.map(c => {
+      const credentials = credsQ.success && credsQ.data ? await Promise.all(credsQ.data.map(async c => {
         let extra = {};
         try {
           if (typeof c.description === 'string' && c.description.trim().startsWith('{')) {
             extra = JSON.parse(c.description);
           }
         } catch {}
+        
+        // Decrypt password if it's encrypted (contains ':')
+        let decryptedPassword = c.password;
+        if (c.password && c.password.includes(':')) {
+          try {
+            const decryptResult = await window.electronAPI.decryptMessage(c.password);
+            if (decryptResult.success) {
+              decryptedPassword = decryptResult.decrypted;
+            }
+          } catch (err) {
+            console.warn('Failed to decrypt credential password:', err);
+          }
+        }
+        
         return {
           id: c.id,
           name: c.name,
           username: c.username,
-          password: c.password,
+          password: decryptedPassword,
           domain: c.domain || '',
           type: extra.type || 'Username/Password',
           description: (typeof c.description === 'string' && !c.description.trim().startsWith('{')) ? (c.description || '') : (extra.note || '')
         };
-      }) : [];
+      })) : [];
 
       const auditLogs = logsQ.success && logsQ.data ? logsQ.data.map(a => ({
         id: a.id,
@@ -172,6 +186,20 @@
       // Credentials
       for (const cred of credentials) {
         const descJson = JSON.stringify({ type: cred.type || 'Username/Password', note: cred.description || '' });
+        
+        // Encrypt password if it's not already encrypted (doesn't contain ':')
+        let passwordToStore = cred.password;
+        if (passwordToStore && !passwordToStore.includes(':')) {
+          try {
+            const encryptResult = await window.electronAPI.encryptMessage(passwordToStore);
+            if (encryptResult.success) {
+              passwordToStore = encryptResult.encrypted;
+            }
+          } catch (err) {
+            console.warn('Failed to encrypt credential password, storing as-is:', err);
+          }
+        }
+        
         await db.execute(
           `IF EXISTS (SELECT 1 FROM Credentials WHERE id = @param0)
              UPDATE Credentials SET name = @param1, username = @param2, password = @param3, domain = @param4, description = @param5 WHERE id = @param0
@@ -181,7 +209,7 @@
             { value: cred.id },
             { value: cred.name },
             { value: cred.username },
-            { value: cred.password },
+            { value: passwordToStore },
             { value: cred.domain || '' },
             { value: descJson }
           ]
