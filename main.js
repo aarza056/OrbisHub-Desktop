@@ -271,6 +271,22 @@ async function getDbPool() {
 // RDP Connection
 ipcMain.handle('rdp-connect', async (event, { server, credential, rdpContent }) => {
     try {
+        // Decrypt the credential password if encrypted
+        let password = credential.password;
+        if (password && password.includes(':')) {
+            try {
+                password = decryptMessage(password);
+            } catch (decryptError) {
+                console.error('Failed to decrypt credential password:', decryptError);
+                return { success: false, error: 'Failed to decrypt credential password' };
+            }
+        }
+
+        // Validate that we have a password
+        if (!password) {
+            return { success: false, error: 'No password found in credential' };
+        }
+
         // Create temporary RDP file
         const tempDir = os.tmpdir();
         const fileName = `orbis_${server.displayName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.rdp`;
@@ -279,29 +295,65 @@ ipcMain.handle('rdp-connect', async (event, { server, credential, rdpContent }) 
         // Write RDP content to temp file
         fs.writeFileSync(filePath, rdpContent, 'utf8');
 
-        // Launch mstsc with the RDP file
-        const command = process.platform === 'win32' 
-            ? `mstsc "${filePath}"`
-            : `open "${filePath}"`;
+        // Build target name for Windows Credential Manager
+        // Format: TERMSRV/hostname or TERMSRV/ipaddress
+        const targetName = `TERMSRV/${server.ipAddress}`;
         
-        exec(command, (error) => {
-            // Clean up temp file after delay
-            setTimeout(() => {
-                try {
-                    if (fs.existsSync(filePath)) {
-                        fs.unlinkSync(filePath);
-                    }
-                } catch (cleanupError) {
-                    console.error('Cleanup error:', cleanupError);
+        // Build username with domain if provided
+        const fullUsername = credential.domain 
+            ? `${credential.domain}\\${credential.username}`
+            : credential.username;
+
+        // Store credentials in Windows Credential Manager using cmdkey
+        // This ensures RDP uses the exact credentials we provide, not cached ones
+        const cmdkeyAdd = `cmdkey /generic:"${targetName}" /user:"${fullUsername}" /pass:"${password}"`;
+        
+        return await new Promise((resolve) => {
+            // Add credentials to Windows Credential Manager
+            exec(cmdkeyAdd, (error, stdout, stderr) => {
+                if (error) {
+                    console.error('cmdkey add error:', error);
+                    console.error('stderr:', stderr);
+                    resolve({ success: false, error: `Failed to store credentials: ${error.message}` });
+                    return;
                 }
-            }, 5000);
 
-            if (error) {
-                console.error('MSTSC launch error:', error);
-            }
+                console.log('✓ Credentials stored in Windows Credential Manager for', targetName);
+
+                // Launch mstsc with the RDP file
+                const mstscCommand = `mstsc "${filePath}"`;
+                
+                exec(mstscCommand, (mstscError) => {
+                    if (mstscError) {
+                        console.error('MSTSC launch error:', mstscError);
+                    }
+
+                    // Clean up: Remove credentials from Credential Manager after a delay
+                    // Delay allows RDP to read the credentials before we remove them
+                    setTimeout(() => {
+                        const cmdkeyDelete = `cmdkey /delete:"${targetName}"`;
+                        exec(cmdkeyDelete, (delError) => {
+                            if (delError) {
+                                console.error('cmdkey delete error (non-critical):', delError.message);
+                            } else {
+                                console.log('✓ Credentials removed from Windows Credential Manager');
+                            }
+                        });
+
+                        // Also clean up temp RDP file
+                        try {
+                            if (fs.existsSync(filePath)) {
+                                fs.unlinkSync(filePath);
+                            }
+                        } catch (cleanupError) {
+                            console.error('RDP file cleanup error:', cleanupError);
+                        }
+                    }, 8000); // 8 second delay to ensure RDP has time to use credentials
+                });
+
+                resolve({ success: true });
+            });
         });
-
-        return { success: true };
     } catch (error) {
         console.error('RDP connection error:', error);
         return { success: false, error: error.message };
@@ -522,10 +574,20 @@ ipcMain.handle('get-server-uptime', async (event, { host, osType = 'Windows', us
 // SSH/PuTTY connection
 ipcMain.handle('ssh-connect', async (event, { server, credential }) => {
     try {
+        // Decrypt the credential password if encrypted
+        let password = credential.password;
+        if (password && password.includes(':')) {
+            try {
+                password = decryptMessage(password);
+            } catch (decryptError) {
+                console.error('Failed to decrypt credential password:', decryptError);
+                return { success: false, error: 'Failed to decrypt credential password' };
+            }
+        }
+
         const host = server.ipAddress || server.hostname;
         const port = server.port || 22;
         const user = credential.username;
-        const password = credential.password; // Note: passed to PuTTY with -pw
 
         // Try to locate PuTTY
         const puttyPaths = [
