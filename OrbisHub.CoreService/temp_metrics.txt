@@ -1,0 +1,13 @@
+﻿# Get system metrics
+function Get-SystemMetrics {
+    $cpu = (Get-Counter '\Processor(_Total)\% Processor Time' -ErrorAction SilentlyContinue).CounterSamples.CookedValue
+    $mem = Get-CimInstance -ClassName Win32_OperatingSystem
+    $memPercent = [math]::Round((($mem.TotalVisibleMemorySize - $mem.FreePhysicalMemory) / $mem.TotalVisibleMemorySize) * 100, 1)
+    $disk = Get-PSDrive C | Select-Object @{N='PercentUsed';E={[math]::Round(($_.Used / ($_.Used + $_.Free)) * 100, 1)}}
+    
+    return @{
+        cpuPercent = [math]::Round($cpu, 1)
+        memoryPercent = $memPercent
+        diskPercent = $disk.PercentUsed
+    }
+}

@@ -25,6 +25,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     dbQuery: (query, params) => ipcRenderer.invoke('db-query', query, params),
     dbExecute: (query, params) => ipcRenderer.invoke('db-execute', query, params),
     
+    // HTTP Requests (for Core Service API)
+    httpRequest: (url, options) => ipcRenderer.invoke('http-request', url, options),
+    
     // Password hashing
     hashPassword: (password) => ipcRenderer.invoke('hash-password', password),
     verifyPassword: (password, hashedPassword) => ipcRenderer.invoke('verify-password', password, hashedPassword),

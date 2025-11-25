@@ -681,6 +681,67 @@ ipcMain.handle('db-test-connection', async (event, config) => {
     }
 });
 
+// HTTP Request Handler for Core Service API
+ipcMain.handle('http-request', async (event, url, options = {}) => {
+    try {
+        const https = require('https');
+        const http = require('http');
+        
+        // Replace localhost with 127.0.0.1 to avoid IPv6 issues
+        const fixedUrl = url.replace('localhost', '127.0.0.1');
+        const urlObj = new URL(fixedUrl);
+        const client = urlObj.protocol === 'https:' ? https : http;
+        
+        return new Promise((resolve, reject) => {
+            const reqOptions = {
+                hostname: urlObj.hostname,
+                port: urlObj.port || (urlObj.protocol === 'https:' ? 443 : 80),
+                path: urlObj.pathname + urlObj.search,
+                method: options.method || 'GET',
+                headers: options.headers || {},
+                family: 4  // Force IPv4
+            };
+            
+            const req = client.request(reqOptions, (res) => {
+                let data = '';
+                res.on('data', (chunk) => data += chunk);
+                res.on('end', () => {
+                    try {
+                        const result = {
+                            ok: res.statusCode >= 200 && res.statusCode < 300,
+                            status: res.statusCode,
+                            statusText: res.statusMessage,
+                            data: data ? JSON.parse(data) : null
+                        };
+                        resolve(result);
+                    } catch (error) {
+                        resolve({
+                            ok: res.statusCode >= 200 && res.statusCode < 300,
+                            status: res.statusCode,
+                            statusText: res.statusMessage,
+                            data: data
+                        });
+                    }
+                });
+            });
+            
+            req.on('error', (error) => {
+                console.error('HTTP request error:', error);
+                resolve({ ok: false, status: 0, error: error.message });
+            });
+            
+            if (options.body) {
+                req.write(typeof options.body === 'string' ? options.body : JSON.stringify(options.body));
+            }
+            
+            req.end();
+        });
+    } catch (error) {
+        console.error('HTTP request setup error:', error);
+        return { ok: false, status: 0, error: error.message };
+    }
+});
+
 // Database Queries
 ipcMain.handle('db-query', async (event, query, params = []) => {
     try {
@@ -1442,6 +1503,134 @@ ipcMain.handle('get-app-version', () => {
 ipcMain.handle('confirm-exit', () => {
     mainWindow.destroy();
     app.quit();
+});
+
+// ========== ORBISAGENT API HANDLERS ==========
+
+// Agent registration endpoint
+ipcMain.handle('agent-register', async (event, agentData) => {
+    try {
+        const pool = await getDbPool();
+        await pool.request()
+            .input('id', sql.NVarChar, agentData.id)
+            .input('machineName', sql.NVarChar, agentData.machineName)
+            .input('os', sql.NVarChar, agentData.os)
+            .input('ipAddress', sql.NVarChar, agentData.ipAddress)
+            .input('status', sql.NVarChar, agentData.status || 'online')
+            .input('lastHeartbeat', sql.DateTime, new Date())
+            .input('version', sql.NVarChar, agentData.version || '1.0.0')
+            .input('metadata', sql.NVarChar, JSON.stringify(agentData.metadata || {}))
+            .query(`
+                MERGE Agents AS target
+                USING (SELECT @id AS id) AS source
+                ON target.id = source.id
+                WHEN MATCHED THEN
+                    UPDATE SET 
+                        lastHeartbeat = @lastHeartbeat, 
+                        status = @status, 
+                        ipAddress = @ipAddress,
+                        os = @os,
+                        version = @version,
+                        metadata = @metadata
+                WHEN NOT MATCHED THEN
+                    INSERT (id, machineName, os, ipAddress, status, lastHeartbeat, version, metadata)
+                    VALUES (@id, @machineName, @os, @ipAddress, @status, @lastHeartbeat, @version, @metadata);
+            `);
+        
+        return { success: true };
+    } catch (error) {
+        console.error('Agent registration failed:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Poll for pending jobs
+ipcMain.handle('agent-poll', async (event, agentId) => {
+    try {
+        const pool = await getDbPool();
+        const result = await pool.request()
+            .input('agentId', sql.NVarChar, agentId)
+            .query(`
+                SELECT * FROM AgentJobs 
+                WHERE agentId = @agentId AND status = 'pending'
+                ORDER BY createdAt
+            `);
+        
+        // Mark jobs as running
+        for (const job of result.recordset) {
+            await pool.request()
+                .input('id', sql.NVarChar, job.id)
+                .query(`UPDATE AgentJobs SET status = 'running', startedAt = GETDATE() WHERE id = @id`);
+        }
+        
+        return { success: true, jobs: result.recordset };
+    } catch (error) {
+        console.error('Agent poll failed:', error);
+        return { success: false, error: error.message, jobs: [] };
+    }
+});
+
+// Update job status
+ipcMain.handle('agent-job-status', async (event, { jobId, status, result: jobResult }) => {
+    try {
+        const pool = await getDbPool();
+        
+        if (status === 'running') {
+            await pool.request()
+                .input('id', sql.NVarChar, jobId)
+                .input('status', sql.NVarChar, status)
+                .query(`UPDATE AgentJobs SET status = @status, startedAt = GETDATE() WHERE id = @id`);
+        } else if (status === 'completed' || status === 'failed') {
+            await pool.request()
+                .input('id', sql.NVarChar, jobId)
+                .input('status', sql.NVarChar, status)
+                .input('result', sql.NVarChar, jobResult)
+                .query(`UPDATE AgentJobs SET status = @status, result = @result, completedAt = GETDATE() WHERE id = @id`);
+        }
+        
+        return { success: true };
+    } catch (error) {
+        console.error('Job status update failed:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Save agent metrics
+ipcMain.handle('agent-metrics', async (event, metricsData) => {
+    try {
+        const pool = await getDbPool();
+        const metricId = crypto.randomUUID();
+        
+        await pool.request()
+            .input('id', sql.NVarChar, metricId)
+            .input('agentId', sql.NVarChar, metricsData.agentId)
+            .input('timestamp', sql.DateTime, new Date())
+            .input('cpuPercent', sql.Float, metricsData.cpuPercent || 0)
+            .input('memoryPercent', sql.Float, metricsData.memoryPercent || 0)
+            .input('diskPercent', sql.Float, metricsData.diskPercent || 0)
+            .input('networkIn', sql.BigInt, metricsData.networkIn || 0)
+            .input('networkOut', sql.BigInt, metricsData.networkOut || 0)
+            .input('customMetrics', sql.NVarChar, JSON.stringify(metricsData.customMetrics || {}))
+            .query(`
+                INSERT INTO AgentMetrics (id, agentId, timestamp, cpuPercent, memoryPercent, diskPercent, networkIn, networkOut, customMetrics)
+                VALUES (@id, @agentId, @timestamp, @cpuPercent, @memoryPercent, @diskPercent, @networkIn, @networkOut, @customMetrics)
+            `);
+        
+        // Update agent heartbeat
+        await pool.request()
+            .input('agentId', sql.NVarChar, metricsData.agentId)
+            .input('metadata', sql.NVarChar, JSON.stringify({ 
+                cpuPercent: metricsData.cpuPercent,
+                memoryPercent: metricsData.memoryPercent,
+                diskPercent: metricsData.diskPercent
+            }))
+            .query(`UPDATE Agents SET lastHeartbeat = GETDATE(), metadata = @metadata WHERE id = @agentId`);
+        
+        return { success: true };
+    } catch (error) {
+        console.error('Metrics save failed:', error);
+        return { success: false, error: error.message };
+    }
 });
 
 // App lifecycle

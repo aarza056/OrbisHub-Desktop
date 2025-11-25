@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="../Functions/OrbisAgent/agent-ui.css" />
 </head>
 <body>
 
@@ -321,6 +322,15 @@
 
 <div class="nav__group">
   <div class="nav__label">System Administrators</div>
+  <button class="nav__btn" data-view="agents">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+      <line x1="8" y1="21" x2="16" y2="21"></line>
+      <line x1="12" y1="17" x2="12" y2="21"></line>
+      <circle cx="12" cy="10" r="3"></circle>
+    </svg>
+    Orbis Agents
+  </button>
   <button class="nav__btn" data-view="admin-users">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -670,6 +680,40 @@
         <h2>📚 Documentation</h2>
         <p class="muted">Complete guide to OrbisHub features</p>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- Agents Management -->
+<section id="view-agents" class="view">
+  <div class="view__header">
+    <h1>Agent Management</h1>
+    <div style="flex:1"></div>
+    <div style="display:flex; gap:12px;">
+      <span id="agentsOnlineCount" class="badge" style="background:#10b98120; color:#10b981; font-weight:600;">0 Online</span>
+      <span id="agentsOfflineCount" class="badge" style="background:#ef444420; color:#ef4444; font-weight:600;">0 Offline</span>
+      <button class="btn btn-ghost" onclick="AgentUI.showDeploymentGuide()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+          <line x1="12" y1="22.08" x2="12" y2="12"></line>
+        </svg>
+        Deploy Agent
+      </button>
+      <button id="refresh-agents-btn" class="btn" onclick="AgentUI.renderAgentsDashboard()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div id="agentsList" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(380px, 1fr)); gap:20px;">
+      <!-- Agent cards will be rendered here by AgentUI.renderAgentsDashboard() -->
     </div>
   </div>
 </section>
@@ -3311,6 +3355,190 @@ Channels
 </form>
 </dialog>
 
+<!-- OrbisAgent Modals -->
+<!-- Agent Details Modal -->
+<dialog id="agentDetailsModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Agent Details</h2>
+            <button class="modal-close" onclick="document.getElementById('agentDetailsModal').close()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <!-- Agent Info -->
+            <div class="agent-details-grid">
+                <div class="agent-detail-item">
+                    <div class="agent-detail-item__label">Machine Name</div>
+                    <div class="agent-detail-item__value" id="agentDetailName">—</div>
+                </div>
+                <div class="agent-detail-item">
+                    <div class="agent-detail-item__label">Operating System</div>
+                    <div class="agent-detail-item__value" id="agentDetailOS">—</div>
+                </div>
+                <div class="agent-detail-item">
+                    <div class="agent-detail-item__label">IP Address</div>
+                    <div class="agent-detail-item__value agent-detail-item__value--mono" id="agentDetailIP">—</div>
+                </div>
+                <div class="agent-detail-item">
+                    <div class="agent-detail-item__label">Status</div>
+                    <div class="agent-detail-item__value" id="agentDetailStatus">—</div>
+                </div>
+                <div class="agent-detail-item">
+                    <div class="agent-detail-item__label">Version</div>
+                    <div class="agent-detail-item__value" id="agentDetailVersion">—</div>
+                </div>
+                <div class="agent-detail-item">
+                    <div class="agent-detail-item__label">Last Seen</div>
+                    <div class="agent-detail-item__value" id="agentDetailLastSeen">—</div>
+                </div>
+            </div>
+            
+            <!-- Recent Jobs -->
+            <div>
+                <h3>Recent Jobs</h3>
+                <div id="agentDetailJobs" class="agent-jobs-list">
+                    <p class="muted" style="text-align:center; padding:20px;">Loading...</p>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="document.getElementById('agentDetailsModal').close()">Close</button>
+        </div>
+    </div>
+</dialog>
+
+<!-- Run Job Modal -->
+<dialog id="runJobModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Run Job on Agent</h2>
+            <button class="modal-close" onclick="document.getElementById('runJobModal').close()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p style="margin-bottom:20px; color:var(--muted);">
+                Execute a script or command on agent: <strong id="runJobAgentName" style="color:var(--text);">—</strong>
+            </p>
+            
+            <div>
+                <label for="jobType">Job Type</label>
+                <select id="jobType">
+                    <option value="script">PowerShell Script</option>
+                    <option value="command">Command</option>
+                    <option value="monitor">Monitor</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+            
+            <div>
+                <label for="jobScript">Script / Command</label>
+                <textarea id="jobScript" rows="10" placeholder="Enter PowerShell script or command here...&#10;&#10;Example:&#10;Get-Process | Where-Object {$_.CPU -gt 100}"></textarea>
+            </div>
+            
+            <div class="modal-info-box">
+                <strong>💡 Tip:</strong> Scripts execute in PowerShell context on the remote machine. Ensure proper syntax and permissions.
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="document.getElementById('runJobModal').close()">Cancel</button>
+            <button class="btn" onclick="AgentUI.submitJob()" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none;">
+                <span>▶</span> Submit Job
+            </button>
+        </div>
+    </div>
+</dialog>
+
+<!-- Agent Deployment Guide Modal -->
+<dialog id="agentDeploymentModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>🚀 OrbisAgent Deployment Guide</h2>
+            <button class="modal-close" onclick="document.getElementById('agentDeploymentModal').close()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div>
+                <h3>Quick Start</h3>
+                <p style="color:var(--muted); margin-bottom:20px;">Deploy OrbisAgent to your remote Windows machines in 3 simple steps:</p>
+                
+                <div class="deployment-steps">
+                    <div class="deployment-step">
+                        <div class="deployment-step__number deployment-step__number--1">1</div>
+                        <div class="deployment-step__content">
+                            <h4 class="deployment-step__title">Download Agent Script</h4>
+                            <p class="deployment-step__description">Copy the PowerShell agent script to your target machine.</p>
+                            <div class="code-block-wrapper">
+                                <code>Functions/OrbisAgent/agent-client.ps1</code>
+                                <button class="code-copy-btn" onclick="navigator.clipboard.writeText('Functions/OrbisAgent/agent-client.ps1'); this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy', 2000)">Copy</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="deployment-step">
+                        <div class="deployment-step__number deployment-step__number--2">2</div>
+                        <div class="deployment-step__content">
+                            <h4 class="deployment-step__title">Run Agent</h4>
+                            <p class="deployment-step__description">Execute with your OrbisHub server URL (replace with your actual server address).</p>
+                            <div class="code-block-wrapper">
+                                <code>.\\agent-client.ps1 -HubUrl "http://your-hub-server:3000"</code>
+                                <button class="code-copy-btn" onclick="navigator.clipboard.writeText('.\\\\agent-client.ps1 -HubUrl &quot;http://your-hub-server:3000&quot;'); this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy', 2000)">Copy</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="deployment-step">
+                        <div class="deployment-step__number deployment-step__number--3">3</div>
+                        <div class="deployment-step__content">
+                            <h4 class="deployment-step__title">Verify Connection</h4>
+                            <p class="deployment-step__description">Agent should appear in this dashboard within 30 seconds.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div>
+                <h3>Optional Parameters</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Description</th>
+                            <th>Default</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>-AgentId</td>
+                            <td style="color:var(--muted);">Unique identifier for this agent</td>
+                            <td>Computer name</td>
+                        </tr>
+                        <tr>
+                            <td>-PollInterval</td>
+                            <td style="color:var(--muted);">Seconds between job polls</td>
+                            <td>30</td>
+                        </tr>
+                        <tr>
+                            <td>-MetricsInterval</td>
+                            <td style="color:var(--muted);">Seconds between metric reports</td>
+                            <td>60</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="security-warning">
+                <div class="security-warning__header">
+                    <span class="security-warning__icon">⚠️</span>
+                    <strong class="security-warning__title">Security Note</strong>
+                </div>
+                <p class="security-warning__text">This initial implementation is designed for trusted internal networks. For production use, implement API key authentication, HTTPS encryption, and script validation.</p>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="document.getElementById('agentDeploymentModal').close()" style="background:linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color:white; border:none;">
+                <span>✓</span> Got It
+            </button>
+        </div>
+    </div>
+</dialog>
+
 <!-- Socket.IO removed for desktop app -->
 <script src="services/db.js"></script>
 <script src="services/messages.js"></script>
@@ -3321,6 +3549,9 @@ Channels
 <!-- Utilities -->
 <script src="utils/toast.js"></script>
 <script src="views/environments.js"></script>
+<!-- OrbisAgent Module -->
+<script src="../Functions/OrbisAgent/agent-api.js"></script>
+<script src="../Functions/OrbisAgent/agent-ui.js"></script>
 <!-- Core -->
 <script src="app-main.js"></script>
 </body>
