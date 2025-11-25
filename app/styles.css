@@ -5143,3 +5143,241 @@ SETUP WIZARD
   font-weight: 600;
   color: var(--text);
 }
+
+/* ============================================
+   RESPONSIVE STYLES FOR LOGIN & SETUP
+   ============================================ */
+
+/* Tablet and smaller screens */
+@media (max-width: 768px) {
+  /* Login Screen */
+  .login-container {
+    max-width: 90%;
+    padding: 32px 24px;
+    margin: 16px;
+  }
+
+  .login-brand {
+    font-size: 28px;
+  }
+
+  .login-tagline {
+    font-size: 13px;
+  }
+
+  .login-form {
+    max-width: 100%;
+  }
+
+  .login-header .brand__logo {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* Setup Wizard */
+  .setup-container {
+    max-width: 90%;
+    padding: 32px 24px;
+    margin: 16px;
+  }
+
+  .setup-header h1 {
+    font-size: 24px;
+  }
+
+  .setup-tagline {
+    font-size: 13px;
+  }
+
+  .setup-step-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .setup-step-number {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+
+  .setup-step-header h2 {
+    font-size: 20px;
+  }
+
+  .setup-form {
+    gap: 16px;
+  }
+
+  .setup-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .setup-actions button {
+    width: 100%;
+  }
+
+  .setup-header .brand__logo {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Mobile screens */
+@media (max-width: 480px) {
+  /* Login Screen */
+  .login-container {
+    max-width: 95%;
+    padding: 24px 20px;
+    margin: 12px;
+    border-radius: 12px;
+  }
+
+  .login-brand {
+    font-size: 24px;
+  }
+
+  .login-tagline {
+    font-size: 12px;
+  }
+
+  .login-header {
+    margin-bottom: 24px;
+  }
+
+  .login-header .brand__logo {
+    width: 36px;
+    height: 36px;
+  }
+
+  .login-form {
+    gap: 14px;
+  }
+
+  .login-form .label {
+    font-size: 12px;
+  }
+
+  .login-form .input {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .login-footer {
+    margin-top: 20px;
+    padding-top: 20px;
+  }
+
+  .login-footer .muted {
+    font-size: 11px;
+  }
+
+  /* Setup Wizard */
+  .setup-container {
+    max-width: 95%;
+    padding: 24px 20px;
+    margin: 12px;
+    border-radius: 12px;
+  }
+
+  .setup-header {
+    margin-bottom: 28px;
+  }
+
+  .setup-header h1 {
+    font-size: 20px;
+  }
+
+  .setup-tagline {
+    font-size: 12px;
+  }
+
+  .setup-header .brand__logo {
+    width: 36px;
+    height: 36px;
+  }
+
+  .setup-step-number {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  .setup-step-header h2 {
+    font-size: 18px;
+  }
+
+  .setup-form {
+    gap: 14px;
+  }
+
+  .setup-form .label {
+    font-size: 12px;
+  }
+
+  .setup-form .input,
+  .setup-form select {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .input-hint {
+    font-size: 11px;
+  }
+
+  .setup-actions {
+    margin-top: 24px;
+  }
+
+  .btn {
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+
+  .setup-complete-message {
+    padding: 24px 0;
+  }
+
+  .setup-complete-message h3 {
+    font-size: 20px;
+  }
+
+  .setup-complete-message p {
+    font-size: 13px;
+  }
+
+  .setup-credentials {
+    font-size: 13px;
+  }
+
+  .setup-warning {
+    font-size: 12px;
+  }
+}
+
+/* Very small screens (e.g., older phones) */
+@media (max-width: 360px) {
+  .login-container,
+  .setup-container {
+    max-width: 98%;
+    padding: 20px 16px;
+    margin: 8px;
+  }
+
+  .login-brand,
+  .setup-header h1 {
+    font-size: 20px;
+  }
+
+  .login-header .brand__logo,
+  .setup-header .brand__logo {
+    width: 32px;
+    height: 32px;
+  }
+
+  .btn {
+    padding: 9px 14px;
+    font-size: 13px;
+  }
+}
