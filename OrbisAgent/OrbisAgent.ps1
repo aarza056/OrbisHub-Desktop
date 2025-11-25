@@ -13,7 +13,8 @@ param(
 )
 
 # Configuration
-$script:AgentId = $null
+# Generate unique AgentId for this instance
+$script:AgentId = [Guid]::NewGuid().ToString()
 $script:CoreServiceUrl = $CoreServiceUrl
 $script:Running = $true
 $script:AgentVersion = "1.0.0"
@@ -65,9 +66,11 @@ function Get-SystemMetrics {
 
 function Register-Agent {
     Write-Log "Registering agent with Core Service..."
+    Write-Log "Agent ID: $script:AgentId"
     
     $machineInfo = Get-MachineInfo
     $body = @{
+        agentId = $script:AgentId
         machineName = $machineInfo.MachineName
         ipAddresses = $machineInfo.IpAddresses
         osVersion = $machineInfo.OsVersion
@@ -80,8 +83,7 @@ function Register-Agent {
             -Body $body `
             -ContentType "application/json"
         
-        $script:AgentId = $response.agentId
-        Write-Log "Agent registered successfully. AgentId: $script:AgentId" "SUCCESS"
+        Write-Log "Agent registered successfully. Status: $($response.status)" "SUCCESS"
         return $true
     } catch {
         Write-Log "Failed to register agent: $_" "ERROR"
@@ -120,11 +122,22 @@ function Get-NextJob {
         $response = Invoke-RestMethod -Uri "$script:CoreServiceUrl/api/agents/$script:AgentId/jobs/next" `
             -Method Get
         
-        if ($response.job -eq $null -or $response.jobId -eq $null) {
+        # API returns {job: null} when no jobs, or {jobId, type, payload} when there is a job
+        if ($response.job -eq $null -and $response.jobId -eq $null) {
             return $null
         }
         
-        return $response
+        # If response has jobId directly, return it
+        if ($response.jobId) {
+            return $response
+        }
+        
+        # Otherwise check if job property exists
+        if ($response.job) {
+            return $response.job
+        }
+        
+        return $null
     } catch {
         Write-Log "Failed to get next job: $_" "ERROR"
         return $null
@@ -144,6 +157,15 @@ function Invoke-JobExecution {
     
     try {
         switch ($Job.type) {
+            "PowerShell" {
+                $script = $Job.payload.script
+                Write-Log "Running PowerShell script: $script"
+                
+                $output = Invoke-Expression $script 2>&1 | Out-String
+                $result.output = $output
+                Write-Log "Script executed successfully"
+            }
+            
             "RunScript" {
                 $script = $Job.payload.script
                 $shell = $Job.payload.shell
@@ -250,11 +272,14 @@ function Start-AgentLoop {
             
             # Poll for jobs
             if (($now - $lastJobPoll).TotalSeconds -ge $JobPollIntervalSeconds) {
+                Write-Log "Polling for jobs..." "DEBUG"
                 $job = Get-NextJob
                 if ($job) {
                     Write-Log "Received job: $($job.jobId)"
                     $result = Invoke-JobExecution -Job $job
                     Send-JobResult -JobId $job.jobId -Result $result | Out-Null
+                } else {
+                    Write-Log "No jobs available" "DEBUG"
                 }
                 $lastJobPoll = $now
             }

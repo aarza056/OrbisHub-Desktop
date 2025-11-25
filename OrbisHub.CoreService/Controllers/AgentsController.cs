@@ -32,38 +32,43 @@ public class AgentsController : ControllerBase
                 return BadRequest(ModelState);
             }
 
-            // Check if agent with same machine name already exists
-            var existingAgent = await _agentRepository.GetByMachineNameAsync(request.MachineName);
+            // Use client-provided AgentId or generate new one
+            var agentId = request.AgentId ?? Guid.NewGuid();
+            
+            // Check if this specific agent already exists
+            var existingAgent = await _agentRepository.GetByIdAsync(agentId);
             
             if (existingAgent != null)
             {
-                // Update existing agent's heartbeat and return its ID
-                await _agentRepository.UpdateHeartbeatAsync(
-                    existingAgent.AgentId, 
-                    request.AgentVersion, 
-                    null,
-                    null);
+                // Update existing agent's information and heartbeat
+                existingAgent.IPAddress = request.IpAddresses != null ? string.Join(", ", request.IpAddresses) : null;
+                existingAgent.OSVersion = request.OsVersion;
+                existingAgent.AgentVersion = request.AgentVersion;
+                existingAgent.LastSeenUtc = DateTime.UtcNow;
+                
+                await _agentRepository.UpdateAsync(existingAgent);
 
                 _logger.LogInformation("Agent re-registered: {MachineName} with ID {AgentId}", 
-                    request.MachineName, existingAgent.AgentId);
+                    request.MachineName, agentId);
 
                 return Ok(new AgentRegistrationResponse
                 {
-                    AgentId = existingAgent.AgentId,
+                    AgentId = agentId,
                     Status = "re-registered"
                 });
             }
 
-            // Create new agent
+            // Create new agent with specified ID
             var agent = new Agent
             {
+                AgentId = agentId,
                 MachineName = request.MachineName,
                 IPAddress = request.IpAddresses != null ? string.Join(", ", request.IpAddresses) : null,
                 OSVersion = request.OsVersion,
                 AgentVersion = request.AgentVersion
             };
 
-            var agentId = await _agentRepository.CreateAsync(agent);
+            await _agentRepository.CreateAsync(agent);
 
             _logger.LogInformation("New agent registered: {MachineName} with ID {AgentId}", 
                 request.MachineName, agentId);

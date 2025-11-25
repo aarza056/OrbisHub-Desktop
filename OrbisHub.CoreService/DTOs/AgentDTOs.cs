@@ -4,6 +4,8 @@ namespace OrbisHub.CoreService.DTOs;
 
 public class AgentRegistrationRequest
 {
+    public Guid? AgentId { get; set; }
+    
     [Required]
     [StringLength(255, MinimumLength = 1)]
     public string MachineName { get; set; } = string.Empty;

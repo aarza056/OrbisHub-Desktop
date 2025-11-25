@@ -288,7 +288,7 @@ const AgentUI = {
         }
 
         // Clear form
-        document.getElementById('jobType').value = 'script'
+        document.getElementById('jobType').value = 'PowerShell'
         document.getElementById('jobScript').value = ''
 
         modal.showModal()
