@@ -67,6 +67,7 @@ let poolConnectPromise = null;
 let dbConfig = null;
 let messageCheckInterval = null;
 let lastCheckedMessageIds = new Set();
+let isInstallingUpdate = false; // Flag to bypass close confirmation when installing update
 
 // Config file paths (support legacy location under product name)
 const userDataDir = app.getPath('userData');
@@ -116,6 +117,11 @@ function createWindow() {
     });
 
     mainWindow.on('close', (event) => {
+        // Allow close if installing update
+        if (isInstallingUpdate) {
+            return;
+        }
+        
         event.preventDefault();
         
         // Send event to renderer to show custom modal
@@ -1424,6 +1430,7 @@ ipcMain.handle('download-update', async () => {
 });
 
 ipcMain.handle('install-update', () => {
+    isInstallingUpdate = true;
     autoUpdater.quitAndInstall(false, true);
 });
 
