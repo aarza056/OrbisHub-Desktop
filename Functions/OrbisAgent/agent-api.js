@@ -153,6 +153,11 @@ const AgentAPI = {
                 }
             };
             
+            // For RunScript type, add shell parameter (default to powershell)
+            if (jobData.type === 'RunScript') {
+                apiPayload.payload.shell = jobData.shell || 'powershell';
+            }
+            
             const result = await this.apiCall('/api/jobs/create', 'POST', apiPayload);
             return { success: true, jobId: result.jobId, status: result.status };
         } catch (error) {

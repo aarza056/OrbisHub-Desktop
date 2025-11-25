@@ -12,6 +12,7 @@ public interface IAgentRepository
     Task<Agent?> GetByMachineNameAsync(string machineName);
     Task<List<Agent>> GetAllAsync();
     Task<Guid> CreateAsync(Agent agent);
+    Task<bool> UpdateAsync(Agent agent);
     Task<bool> UpdateHeartbeatAsync(Guid agentId, string? agentVersion, string? currentUser, string? metadata);
     Task<bool> DeleteAsync(Guid agentId);
 }
@@ -82,7 +83,11 @@ public class AgentRepository : IAgentRepository
                 INSERT INTO Agents (AgentId, MachineName, IPAddress, OSVersion, AgentVersion, LastSeenUtc, CreatedUtc)
                 VALUES (@AgentId, @MachineName, @IPAddress, @OSVersion, @AgentVersion, @LastSeenUtc, @CreatedUtc)";
 
-            agent.AgentId = Guid.NewGuid();
+            // Use provided AgentId or generate new one
+            if (agent.AgentId == Guid.Empty)
+            {
+                agent.AgentId = Guid.NewGuid();
+            }
             agent.CreatedUtc = DateTime.UtcNow;
             agent.LastSeenUtc = DateTime.UtcNow;
 
@@ -93,6 +98,34 @@ public class AgentRepository : IAgentRepository
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating agent for machine {MachineName}", agent.MachineName);
+            throw;
+        }
+    }
+
+    public async Task<bool> UpdateAsync(Agent agent)
+    {
+        try
+        {
+            using var connection = new SqlConnection(_connectionString);
+            var sql = @"
+                UPDATE Agents 
+                SET MachineName = @MachineName,
+                    IPAddress = @IPAddress,
+                    OSVersion = @OSVersion,
+                    AgentVersion = @AgentVersion,
+                    Status = @Status,
+                    Metadata = @Metadata,
+                    LastSeenUtc = @LastSeenUtc
+                WHERE AgentId = @AgentId";
+
+            var rowsAffected = await connection.ExecuteAsync(sql, agent);
+            
+            _logger.LogInformation("Updated agent {AgentId}", agent.AgentId);
+            return rowsAffected > 0;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating agent {AgentId}", agent.AgentId);
             throw;
         }
     }
