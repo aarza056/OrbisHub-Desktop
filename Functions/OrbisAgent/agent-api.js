@@ -1,380 +1,240 @@
 // OrbisAgent API Module
-// Handles all agent-related backend communication with SQL Server
+// Handles all agent-related backend communication with Core Service
 // Author: OrbisHub Team
-// Created: 2025-11-25
+// Updated: 2025-11-25 - Migrated to Core Service API
 
 /**
  * Agent API Module
- * Provides database operations for agent management, jobs, and metrics
+ * Provides API operations for agent management via OrbisHub Core Service
  */
 
 const AgentAPI = {
+    // Core Service URL - can be configured
+    coreServiceUrl: 'http://127.0.0.1:5000',
+
     /**
-     * Register or update an agent in the database
+     * Set Core Service URL
+     * @param {string} url - Core Service URL
+     */
+    setCoreServiceUrl(url) {
+        this.coreServiceUrl = url;
+    },
+
+    /**
+     * Helper method for API calls
+     */
+    async apiCall(endpoint, method = 'GET', body = null) {
+        const options = {
+            method,
+            headers: { 'Content-Type': 'application/json' }
+        };
+        if (body) options.body = JSON.stringify(body);
+
+        try {
+            // Use Electron's IPC for HTTP requests if available, otherwise use fetch
+            if (window.electronAPI && window.electronAPI.httpRequest) {
+                const response = await window.electronAPI.httpRequest(
+                    `${this.coreServiceUrl}${endpoint}`,
+                    options
+                );
+                
+                if (!response.ok) {
+                    const errorMsg = response.data?.error || response.data?.message || `HTTP ${response.status}`;
+                    throw new Error(errorMsg);
+                }
+                return response.data;
+            } else {
+                // Fallback to fetch for non-Electron environments
+                const response = await fetch(`${this.coreServiceUrl}${endpoint}`, options);
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    throw new Error(error.error || `HTTP ${response.status}`);
+                }
+                return await response.json();
+            }
+        } catch (error) {
+            console.error(`API call failed: ${endpoint}`, error);
+            throw error;
+        }
+    },
+
+    /**
+     * Register or update an agent (NOT USED - agents register themselves)
+     * This is kept for compatibility but agents self-register via Core Service
      * @param {Object} agentData - Agent information
      * @returns {Promise<Object>} - Success status
      */
     async registerAgent(agentData) {
-        if (!window.electronAPI) {
-            throw new Error('Electron API not available')
-        }
-
-        try {
-            const result = await window.electronAPI.dbExecute(
-                `MERGE Agents AS target
-                USING (SELECT @param0 AS id) AS source
-                ON target.id = source.id
-                WHEN MATCHED THEN
-                    UPDATE SET 
-                        lastHeartbeat = @param5, 
-                        status = @param4, 
-                        ipAddress = @param3,
-                        os = @param2,
-                        version = @param6,
-                        metadata = @param7
-                WHEN NOT MATCHED THEN
-                    INSERT (id, machineName, os, ipAddress, status, lastHeartbeat, version, metadata)
-                    VALUES (@param0, @param1, @param2, @param3, @param4, @param5, @param6, @param7);`,
-                [
-                    { value: agentData.id },
-                    { value: agentData.machineName },
-                    { value: agentData.os },
-                    { value: agentData.ipAddress },
-                    { value: agentData.status || 'online' },
-                    { value: new Date().toISOString() },
-                    { value: agentData.version || '1.0.0' },
-                    { value: JSON.stringify(agentData.metadata || {}) }
-                ]
-            )
-
-            return { success: true, data: result }
-        } catch (error) {
-            console.error('Failed to register agent:', error)
-            return { success: false, error: error.message }
-        }
+        // Agents register themselves via OrbisAgent.ps1
+        // This method is kept for API compatibility
+        return { success: false, error: 'Agents self-register via Core Service' };
     },
 
     /**
-     * Get all agents from database
+     * Get all agents from Core Service
      * @returns {Promise<Array>} - List of agents
      */
     async getAllAgents() {
-        if (!window.electronAPI) {
-            throw new Error('Electron API not available')
-        }
-
         try {
-            const result = await window.electronAPI.dbQuery(
-                'SELECT * FROM Agents ORDER BY lastHeartbeat DESC',
-                []
-            )
-
-            if (result.success && result.data) {
-                return result.data.map(agent => ({
-                    ...agent,
-                    metadata: agent.metadata ? JSON.parse(agent.metadata) : {}
-                }))
-            }
-
-            return []
+            const response = await this.apiCall('/api/agents');
+            // Transform API response to match UI expectations
+            const agents = Array.isArray(response) ? response : (response.value || []);
+            return agents.map(agent => ({
+                id: agent.agentId,
+                machineName: agent.machineName,
+                ipAddress: agent.ipAddress,
+                os: agent.osVersion,
+                version: agent.agentVersion,
+                status: agent.status,
+                metadata: agent.metadata ? JSON.parse(agent.metadata) : {},
+                lastHeartbeat: agent.lastSeenUtc,
+                createdAt: agent.createdUtc
+            }));
         } catch (error) {
-            console.error('Failed to get agents:', error)
-            return []
+            console.error('Failed to get agents:', error);
+            return [];
         }
     },
 
     /**
-     * Get agent by ID
+     * Get agent by ID from Core Service
      * @param {string} agentId - Agent ID
      * @returns {Promise<Object|null>} - Agent data or null
      */
     async getAgentById(agentId) {
-        if (!window.electronAPI) {
-            throw new Error('Electron API not available')
-        }
-
         try {
-            const result = await window.electronAPI.dbQuery(
-                'SELECT * FROM Agents WHERE id = @param0',
-                [{ value: agentId }]
-            )
-
-            if (result.success && result.data && result.data.length > 0) {
-                const agent = result.data[0]
-                agent.metadata = agent.metadata ? JSON.parse(agent.metadata) : {}
-                return agent
-            }
-
-            return null
+            const agents = await this.getAllAgents();
+            return agents.find(a => a.id === agentId) || null;
         } catch (error) {
-            console.error('Failed to get agent:', error)
-            return null
+            console.error('Failed to get agent:', error);
+            return null;
         }
     },
 
     /**
      * Update agent status
+     * NOTE: Status updates happen automatically via heartbeats
+     * This method is kept for compatibility
      * @param {string} agentId - Agent ID
      * @param {string} status - New status (online, offline, error)
      * @returns {Promise<Object>} - Success status
      */
     async updateAgentStatus(agentId, status) {
-        if (!window.electronAPI) {
-            throw new Error('Electron API not available')
-        }
-
-        try {
-            await window.electronAPI.dbExecute(
-                'UPDATE Agents SET status = @param0, lastHeartbeat = @param1 WHERE id = @param2',
-                [
-                    { value: status },
-                    { value: new Date().toISOString() },
-                    { value: agentId }
-                ]
-            )
-
-            return { success: true }
-        } catch (error) {
-            console.error('Failed to update agent status:', error)
-            return { success: false, error: error.message }
-        }
+        // Status is managed by Core Service via heartbeats
+        console.log(`Agent status managed by Core Service heartbeats`);
+        return { success: true };
     },
 
     /**
      * Delete an agent
+     * NOTE: Agents cannot be deleted via Desktop client
+     * They auto-expire after 2 minutes without heartbeat
      * @param {string} agentId - Agent ID
      * @returns {Promise<Object>} - Success status
      */
     async deleteAgent(agentId) {
-        if (!window.electronAPI) {
-            throw new Error('Electron API not available')
-        }
-
-        try {
-            // Delete related data first
-            await window.electronAPI.dbExecute(
-                'DELETE FROM AgentMetrics WHERE agentId = @param0',
-                [{ value: agentId }]
-            )
-
-            await window.electronAPI.dbExecute(
-                'DELETE FROM AgentJobs WHERE agentId = @param0',
-                [{ value: agentId }]
-            )
-
-            await window.electronAPI.dbExecute(
-                'DELETE FROM Agents WHERE id = @param0',
-                [{ value: agentId }]
-            )
-
-            return { success: true }
-        } catch (error) {
-            console.error('Failed to delete agent:', error)
-            return { success: false, error: error.message }
-        }
+        console.log('Agents auto-expire after heartbeat timeout. Manual deletion not supported.');
+        return { success: false, error: 'Manual agent deletion not supported. Agents expire automatically.' };
     },
 
     /**
-     * Create a new job for an agent
-     * @param {Object} jobData - Job information
+     * Create a new job for an agent via Core Service
+     * @param {Object} jobData - Job information { agentId, type, script, createdBy }
      * @returns {Promise<Object>} - Created job
      */
     async createJob(jobData) {
-        if (!window.electronAPI) {
-            throw new Error('Electron API not available')
-        }
-
         try {
-            const jobId = uid('job')
+            // Transform UI format to API format
+            const apiPayload = {
+                agentId: jobData.agentId,
+                type: jobData.type || 'PowerShell',
+                payload: {
+                    script: jobData.script
+                }
+            };
             
-            await window.electronAPI.dbExecute(
-                `INSERT INTO AgentJobs (id, agentId, type, script, status, createdBy, createdAt)
-                VALUES (@param0, @param1, @param2, @param3, @param4, @param5, @param6)`,
-                [
-                    { value: jobId },
-                    { value: jobData.agentId },
-                    { value: jobData.type },
-                    { value: jobData.script },
-                    { value: 'pending' },
-                    { value: jobData.createdBy || 'System' },
-                    { value: new Date().toISOString() }
-                ]
-            )
-
-            return { success: true, jobId }
+            const result = await this.apiCall('/api/jobs/create', 'POST', apiPayload);
+            return { success: true, jobId: result.jobId, status: result.status };
         } catch (error) {
-            console.error('Failed to create job:', error)
-            return { success: false, error: error.message }
+            console.error('Failed to create job:', error);
+            return { success: false, error: error.message };
         }
     },
 
     /**
-     * Get pending jobs for an agent
+     * Get pending jobs for an agent (NOT USED)
+     * Agents poll Core Service directly for jobs
      * @param {string} agentId - Agent ID
      * @returns {Promise<Array>} - List of pending jobs
      */
     async getPendingJobs(agentId) {
-        if (!window.electronAPI) {
-            throw new Error('Electron API not available')
-        }
-
-        try {
-            const result = await window.electronAPI.dbQuery(
-                `SELECT * FROM AgentJobs 
-                WHERE agentId = @param0 AND status = 'pending'
-                ORDER BY createdAt`,
-                [{ value: agentId }]
-            )
-
-            return result.success && result.data ? result.data : []
-        } catch (error) {
-            console.error('Failed to get pending jobs:', error)
-            return []
-        }
+        console.log('Agents poll Core Service directly. Use getAgentJobs() instead.');
+        return [];
     },
 
     /**
-     * Get all jobs for an agent
+     * Get all jobs for an agent from Core Service
      * @param {string} agentId - Agent ID
      * @param {number} limit - Maximum number of jobs to return
      * @returns {Promise<Array>} - List of jobs
      */
     async getAgentJobs(agentId, limit = 50) {
-        if (!window.electronAPI) {
-            throw new Error('Electron API not available')
-        }
-
         try {
-            const result = await window.electronAPI.dbQuery(
-                `SELECT TOP (@param1) * FROM AgentJobs 
-                WHERE agentId = @param0
-                ORDER BY createdAt DESC`,
-                [
-                    { value: agentId },
-                    { value: limit }
-                ]
-            )
-
-            return result.success && result.data ? result.data : []
+            return await this.apiCall(`/api/agents/${agentId}/jobs`);
         } catch (error) {
-            console.error('Failed to get agent jobs:', error)
-            return []
+            console.error('Failed to get agent jobs:', error);
+            return [];
         }
     },
 
     /**
-     * Update job status
+     * Get job status by ID
+     * @param {string} jobId - Job ID
+     * @returns {Promise<Object|null>} - Job status or null
+     */
+    async getJobStatus(jobId) {
+        try {
+            return await this.apiCall(`/api/jobs/${jobId}`);
+        } catch (error) {
+            console.error('Failed to get job status:', error);
+            return null;
+        }
+    },
+
+    /**
+     * Update job status (NOT USED)
+     * Agents report job results directly to Core Service
      * @param {string} jobId - Job ID
      * @param {string} status - New status
      * @param {string} result - Job result/output
      * @returns {Promise<Object>} - Success status
      */
     async updateJobStatus(jobId, status, result = null) {
-        if (!window.electronAPI) {
-            throw new Error('Electron API not available')
-        }
-
-        try {
-            const now = new Date().toISOString()
-            
-            if (status === 'running') {
-                await window.electronAPI.dbExecute(
-                    'UPDATE AgentJobs SET status = @param0, startedAt = @param1 WHERE id = @param2',
-                    [
-                        { value: status },
-                        { value: now },
-                        { value: jobId }
-                    ]
-                )
-            } else if (status === 'completed' || status === 'failed') {
-                await window.electronAPI.dbExecute(
-                    'UPDATE AgentJobs SET status = @param0, result = @param1, completedAt = @param2 WHERE id = @param3',
-                    [
-                        { value: status },
-                        { value: result },
-                        { value: now },
-                        { value: jobId }
-                    ]
-                )
-            }
-
-            return { success: true }
-        } catch (error) {
-            console.error('Failed to update job status:', error)
-            return { success: false, error: error.message }
-        }
+        console.log('Agents report job results directly to Core Service');
+        return { success: false, error: 'Job status managed by Core Service' };
     },
 
     /**
-     * Save agent metrics
+     * Save agent metrics (NOT IMPLEMENTED YET)
+     * Future feature for agent monitoring
      * @param {Object} metricsData - Metrics data
      * @returns {Promise<Object>} - Success status
      */
     async saveMetrics(metricsData) {
-        if (!window.electronAPI) {
-            throw new Error('Electron API not available')
-        }
-
-        try {
-            const metricId = uid('metric')
-            
-            await window.electronAPI.dbExecute(
-                `INSERT INTO AgentMetrics (id, agentId, timestamp, cpuPercent, memoryPercent, diskPercent, networkIn, networkOut, customMetrics)
-                VALUES (@param0, @param1, @param2, @param3, @param4, @param5, @param6, @param7, @param8)`,
-                [
-                    { value: metricId },
-                    { value: metricsData.agentId },
-                    { value: new Date().toISOString() },
-                    { value: metricsData.cpuPercent || 0 },
-                    { value: metricsData.memoryPercent || 0 },
-                    { value: metricsData.diskPercent || 0 },
-                    { value: metricsData.networkIn || 0 },
-                    { value: metricsData.networkOut || 0 },
-                    { value: JSON.stringify(metricsData.customMetrics || {}) }
-                ]
-            )
-
-            return { success: true }
-        } catch (error) {
-            console.error('Failed to save metrics:', error)
-            return { success: false, error: error.message }
-        }
+        console.log('Metrics feature not yet implemented in Core Service');
+        return { success: false, error: 'Metrics not yet implemented' };
     },
 
     /**
-     * Get recent metrics for an agent
+     * Get recent metrics for an agent (NOT IMPLEMENTED YET)
+     * Future feature for agent monitoring
      * @param {string} agentId - Agent ID
      * @param {number} limit - Number of metrics to return
      * @returns {Promise<Array>} - List of metrics
      */
     async getAgentMetrics(agentId, limit = 100) {
-        if (!window.electronAPI) {
-            throw new Error('Electron API not available')
-        }
-
-        try {
-            const result = await window.electronAPI.dbQuery(
-                `SELECT TOP (@param1) * FROM AgentMetrics 
-                WHERE agentId = @param0
-                ORDER BY timestamp DESC`,
-                [
-                    { value: agentId },
-                    { value: limit }
-                ]
-            )
-
-            if (result.success && result.data) {
-                return result.data.map(metric => ({
-                    ...metric,
-                    customMetrics: metric.customMetrics ? JSON.parse(metric.customMetrics) : {}
-                }))
-            }
-
-            return []
-        } catch (error) {
-            console.error('Failed to get agent metrics:', error)
-            return []
-        }
+        console.log('Metrics feature not yet implemented in Core Service');
+        return [];
     }
 }
 

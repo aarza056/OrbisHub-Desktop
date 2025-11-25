@@ -3948,6 +3948,14 @@ if (clearJobsBtn && confirmModal) {
 
 // --- Simple router and settings (theme) handling ---
 async function showView(name, updateUrl = true) {
+    // Stop agent auto-refresh when leaving agents view
+    const currentView = document.querySelector('.view.is-visible');
+    if (currentView && currentView.id === 'view-agents' && name !== 'agents') {
+        if (typeof window.stopAgentAutoRefresh === 'function') {
+            window.stopAgentAutoRefresh();
+        }
+    }
+    
     const target = document.getElementById('view-' + name)
     const actual = target ? name : 'summary'
     document.querySelectorAll('.view').forEach(v => v.classList.toggle('is-visible', v.id === 'view-' + actual))
@@ -4008,6 +4016,13 @@ async function showView(name, updateUrl = true) {
                     store.write(db, true)
                     renderUsers()
 
+                }
+                break
+                
+            case 'agents':
+                // Initialize agent management via AgentUI module
+                if (window.AgentUI) {
+                    window.AgentUI.renderAgentsDashboard();
                 }
                 break
                 

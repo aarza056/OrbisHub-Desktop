@@ -681,6 +681,67 @@ ipcMain.handle('db-test-connection', async (event, config) => {
     }
 });
 
+// HTTP Request Handler for Core Service API
+ipcMain.handle('http-request', async (event, url, options = {}) => {
+    try {
+        const https = require('https');
+        const http = require('http');
+        
+        // Replace localhost with 127.0.0.1 to avoid IPv6 issues
+        const fixedUrl = url.replace('localhost', '127.0.0.1');
+        const urlObj = new URL(fixedUrl);
+        const client = urlObj.protocol === 'https:' ? https : http;
+        
+        return new Promise((resolve, reject) => {
+            const reqOptions = {
+                hostname: urlObj.hostname,
+                port: urlObj.port || (urlObj.protocol === 'https:' ? 443 : 80),
+                path: urlObj.pathname + urlObj.search,
+                method: options.method || 'GET',
+                headers: options.headers || {},
+                family: 4  // Force IPv4
+            };
+            
+            const req = client.request(reqOptions, (res) => {
+                let data = '';
+                res.on('data', (chunk) => data += chunk);
+                res.on('end', () => {
+                    try {
+                        const result = {
+                            ok: res.statusCode >= 200 && res.statusCode < 300,
+                            status: res.statusCode,
+                            statusText: res.statusMessage,
+                            data: data ? JSON.parse(data) : null
+                        };
+                        resolve(result);
+                    } catch (error) {
+                        resolve({
+                            ok: res.statusCode >= 200 && res.statusCode < 300,
+                            status: res.statusCode,
+                            statusText: res.statusMessage,
+                            data: data
+                        });
+                    }
+                });
+            });
+            
+            req.on('error', (error) => {
+                console.error('HTTP request error:', error);
+                resolve({ ok: false, status: 0, error: error.message });
+            });
+            
+            if (options.body) {
+                req.write(typeof options.body === 'string' ? options.body : JSON.stringify(options.body));
+            }
+            
+            req.end();
+        });
+    } catch (error) {
+        console.error('HTTP request setup error:', error);
+        return { ok: false, status: 0, error: error.message };
+    }
+});
+
 // Database Queries
 ipcMain.handle('db-query', async (event, query, params = []) => {
     try {

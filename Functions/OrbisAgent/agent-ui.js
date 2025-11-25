@@ -76,18 +76,18 @@ const AgentUI = {
         const card = document.createElement('div')
         card.className = 'agent-card'
         
-        // Determine status
-        const now = Date.now()
-        const lastHeartbeat = new Date(agent.lastHeartbeat).getTime()
-        const minutesSinceHeartbeat = (now - lastHeartbeat) / 1000 / 60
+        // Determine status based on last heartbeat (UTC timestamp)
+        const now = new Date().getTime()
+        const lastHeartbeat = new Date(agent.lastHeartbeat + 'Z').getTime() // Ensure UTC parsing
+        const secondsSinceHeartbeat = (now - lastHeartbeat) / 1000
         
-        let status = agent.status
+        let status = 'offline'
         let statusClass = 'offline'
         
-        if (minutesSinceHeartbeat < 2) {
+        if (secondsSinceHeartbeat < 120) { // Less than 2 minutes
             status = 'online'
             statusClass = 'online'
-        } else if (minutesSinceHeartbeat < 10) {
+        } else if (secondsSinceHeartbeat < 600) { // Less than 10 minutes
             status = 'idle'
             statusClass = 'idle'
         } else {
@@ -140,7 +140,7 @@ const AgentUI = {
             <div class="agent-card__details">
                 <div class="agent-card__detail-row">
                     <span class="agent-card__detail-label">IP Address:</span>
-                    <span class="agent-card__detail-value">${agent.ipAddress || '—'}</span>
+                    <span class="agent-card__detail-value">${this.getPrimaryIP(agent.ipAddress)}</span>
                 </div>
                 <div class="agent-card__detail-row">
                     <span class="agent-card__detail-label">Last Seen:</span>
@@ -184,14 +184,36 @@ const AgentUI = {
      * @returns {string} - Formatted time ago
      */
     formatTimeAgo(timestamp) {
-        const now = Date.now()
-        const then = new Date(timestamp).getTime()
+        const now = new Date().getTime()
+        const then = new Date(timestamp + 'Z').getTime() // Ensure UTC parsing
         const seconds = Math.floor((now - then) / 1000)
 
+        if (seconds < 0) return 'just now' // Handle future timestamps
         if (seconds < 60) return `${seconds}s ago`
         if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
         if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
         return `${Math.floor(seconds / 86400)}d ago`
+    },
+
+    /**
+     * Extract primary IP address from comma-separated list
+     * Filters out link-local addresses (169.254.x.x) and returns the first valid IP
+     * @param {string} ipAddresses - Comma-separated IP addresses
+     * @returns {string} - Primary IP address
+     */
+    getPrimaryIP(ipAddresses) {
+        if (!ipAddresses) return '—'
+        
+        const ips = ipAddresses.split(',').map(ip => ip.trim())
+        
+        // Filter out link-local addresses (169.254.x.x) and prefer private network IPs
+        const validIPs = ips.filter(ip => !ip.startsWith('169.254.'))
+        
+        if (validIPs.length === 0) return ips[0] || '—' // Fallback to first IP if all are link-local
+        
+        // Prefer 192.168.x.x or 10.x.x.x addresses
+        const privateIP = validIPs.find(ip => ip.startsWith('192.168.') || ip.startsWith('10.'))
+        return privateIP || validIPs[0]
     },
 
     /**
@@ -391,15 +413,15 @@ const AgentUI = {
      * @param {Array} agents - Array of agents
      */
     updateStatusCounters(agents) {
-        const now = Date.now()
+        const now = new Date().getTime()
         let onlineCount = 0
         let offlineCount = 0
         
         agents.forEach(agent => {
-            const lastHeartbeat = new Date(agent.lastHeartbeat).getTime()
-            const minutesSinceHeartbeat = (now - lastHeartbeat) / 1000 / 60
+            const lastHeartbeat = new Date(agent.lastHeartbeat + 'Z').getTime()
+            const secondsSinceHeartbeat = (now - lastHeartbeat) / 1000
             
-            if (minutesSinceHeartbeat < 10) {
+            if (secondsSinceHeartbeat < 600) { // Less than 10 minutes
                 onlineCount++
             } else {
                 offlineCount++

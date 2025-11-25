@@ -322,6 +322,15 @@
 
 <div class="nav__group">
   <div class="nav__label">System Administrators</div>
+  <button class="nav__btn" data-view="agents">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+      <line x1="8" y1="21" x2="16" y2="21"></line>
+      <line x1="12" y1="17" x2="12" y2="21"></line>
+      <circle cx="12" cy="10" r="3"></circle>
+    </svg>
+    Orbis Agents
+  </button>
   <button class="nav__btn" data-view="admin-users">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -361,15 +370,6 @@
       <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
     </svg>
     Credentials
-  </button>
-  <button class="nav__btn" data-view="agents">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
-      <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-      <line x1="8" y1="21" x2="16" y2="21"></line>
-      <line x1="12" y1="17" x2="12" y2="21"></line>
-      <circle cx="12" cy="10" r="3"></circle>
-    </svg>
-    Orbis Agents
   </button>
   <button class="nav__btn" data-view="admin-audit">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
@@ -613,38 +613,6 @@
 </div>
 </section>
 
-<!-- OrbisAgents View -->
-<section id="view-agents" class="view">
-<div class="view__header">
-  <h1>OrbisAgents</h1>
-  <div style="flex:1"></div>
-  <button class="btn" onclick="AgentUI.showDeploymentGuide()" style="background:linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color:white; border:none;">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-      <polyline points="7 10 12 15 17 10"></polyline>
-      <line x1="12" y1="15" x2="12" y2="3"></line>
-    </svg>
-    Deploy Agent
-  </button>
-</div>
-<div class="view__toolbar">
-  <div style="display:flex; align-items:center; gap:12px; flex:1;">
-    <input id="agentSearchInput" class="input" placeholder="Search agents by name or IP..." style="flex:1; max-width: 600px;" />
-    <div style="display:flex; gap:8px; align-items:center;">
-      <div style="width:10px; height:10px; border-radius:50%; background:#10b981; box-shadow:0 0 8px #10b981;"></div>
-      <span style="font-size:13px; color:var(--muted);" id="agentsOnlineCount">0 Online</span>
-    </div>
-    <div style="display:flex; gap:8px; align-items:center;">
-      <div style="width:10px; height:10px; border-radius:50%; background:#ef4444;"></div>
-      <span style="font-size:13px; color:var(--muted);" id="agentsOfflineCount">0 Offline</span>
-    </div>
-  </div>
-</div>
-<div class="stack">
-  <div id="agentsList" class="grid" style="grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));"></div>
-</div>
-</section>
-
 <!-- ElasticSearch View -->
 <section id="view-elasticsearch" class="view">
   <div class="view__header">
@@ -712,6 +680,40 @@
         <h2>📚 Documentation</h2>
         <p class="muted">Complete guide to OrbisHub features</p>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- Agents Management -->
+<section id="view-agents" class="view">
+  <div class="view__header">
+    <h1>Agent Management</h1>
+    <div style="flex:1"></div>
+    <div style="display:flex; gap:12px;">
+      <span id="agentsOnlineCount" class="badge" style="background:#10b98120; color:#10b981; font-weight:600;">0 Online</span>
+      <span id="agentsOfflineCount" class="badge" style="background:#ef444420; color:#ef4444; font-weight:600;">0 Offline</span>
+      <button class="btn btn-ghost" onclick="AgentUI.showDeploymentGuide()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+          <line x1="12" y1="22.08" x2="12" y2="12"></line>
+        </svg>
+        Deploy Agent
+      </button>
+      <button id="refresh-agents-btn" class="btn" onclick="AgentUI.renderAgentsDashboard()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div id="agentsList" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(380px, 1fr)); gap:20px;">
+      <!-- Agent cards will be rendered here by AgentUI.renderAgentsDashboard() -->
     </div>
   </div>
 </section>
@@ -2449,156 +2451,6 @@
 <button id="confirmDeleteUserBtn" type="submit" value="confirm" class="btn btn-danger">Delete</button>
 </menu>
 </form>
-</dialog>
-
-<!-- OrbisAgent Modals -->
-<!-- Agent Details Modal -->
-<dialog id="agentDetailsModal" class="modal">
-    <div class="modal-content" style="max-width:800px; width:90%;">
-        <div class="modal-header">
-            <h2>Agent Details</h2>
-            <button class="modal-close" onclick="document.getElementById('agentDetailsModal').close()">&times;</button>
-        </div>
-        <div class="modal-body" style="max-height:70vh; overflow-y:auto;">
-            <!-- Agent Info -->
-            <div style="background:var(--bg); padding:20px; border-radius:12px; margin-bottom:20px;">
-                <h3 style="margin:0 0 16px 0; font-size:18px;">Agent Information</h3>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-                    <div>
-                        <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">Machine Name</div>
-                        <div style="font-weight:600;" id="agentDetailName">—</div>
-                    </div>
-                    <div>
-                        <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">Operating System</div>
-                        <div style="font-weight:600;" id="agentDetailOS">—</div>
-                    </div>
-                    <div>
-                        <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">IP Address</div>
-                        <div style="font-family:monospace; font-weight:600;" id="agentDetailIP">—</div>
-                    </div>
-                    <div>
-                        <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">Status</div>
-                        <div style="font-weight:600;" id="agentDetailStatus">—</div>
-                    </div>
-                    <div>
-                        <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">Version</div>
-                        <div style="font-weight:600;" id="agentDetailVersion">—</div>
-                    </div>
-                    <div>
-                        <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">Last Seen</div>
-                        <div style="font-weight:600;" id="agentDetailLastSeen">—</div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Recent Jobs -->
-            <div style="margin-bottom:20px;">
-                <h3 style="margin:0 0 12px 0; font-size:16px;">Recent Jobs</h3>
-                <div id="agentDetailJobs" style="max-height:200px; overflow-y:auto;">
-                    <p class="muted" style="text-align:center; padding:20px;">Loading...</p>
-                </div>
-            </div>
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-ghost" onclick="document.getElementById('agentDetailsModal').close()">Close</button>
-        </div>
-    </div>
-</dialog>
-
-<!-- Run Job Modal -->
-<dialog id="runJobModal" class="modal">
-    <div class="modal-content" style="max-width:700px; width:90%;">
-        <div class="modal-header">
-            <h2>Run Job on Agent</h2>
-            <button class="modal-close" onclick="document.getElementById('runJobModal').close()">&times;</button>
-        </div>
-        <div class="modal-body">
-            <p style="margin-bottom:16px; color:var(--muted);">
-                Execute a script or command on agent: <strong id="runJobAgentName">—</strong>
-            </p>
-            
-            <div style="margin-bottom:16px;">
-                <label for="jobType" style="display:block; margin-bottom:8px; font-weight:600;">Job Type</label>
-                <select id="jobType" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; background:var(--panel); color:var(--text);">
-                    <option value="script">PowerShell Script</option>
-                    <option value="command">Command</option>
-                    <option value="monitor">Monitor</option>
-                    <option value="custom">Custom</option>
-                </select>
-            </div>
-            
-            <div style="margin-bottom:16px;">
-                <label for="jobScript" style="display:block; margin-bottom:8px; font-weight:600;">Script / Command</label>
-                <textarea id="jobScript" rows="10" placeholder="Enter PowerShell script or command here..." style="width:100%; padding:12px; border:1px solid var(--border); border-radius:8px; background:var(--panel); color:var(--text); font-family:monospace; font-size:13px; resize:vertical;"></textarea>
-            </div>
-            
-            <div style="padding:12px; background:#3b82f620; border-left:4px solid #3b82f6; border-radius:8px; font-size:13px; color:var(--muted);">
-                <strong style="color:#3b82f6;">💡 Tip:</strong> Scripts execute in PowerShell context on the remote machine. Ensure proper syntax and permissions.
-            </div>
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-ghost" onclick="document.getElementById('runJobModal').close()">Cancel</button>
-            <button class="btn" onclick="AgentUI.submitJob()" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none;">Submit Job</button>
-        </div>
-    </div>
-</dialog>
-
-<!-- Agent Deployment Guide Modal -->
-<dialog id="agentDeploymentModal" class="modal">
-    <div class="modal-content" style="max-width:700px; width:90%;">
-        <div class="modal-header">
-            <h2>OrbisAgent Deployment Guide</h2>
-            <button class="modal-close" onclick="document.getElementById('agentDeploymentModal').close()">&times;</button>
-        </div>
-        <div class="modal-body">
-            <h3 style="margin:0 0 12px 0;">Quick Start</h3>
-            <p style="color:var(--muted); margin:0 0 16px 0;">Deploy OrbisAgent to remote Windows machines in three simple steps:</p>
-            <ol style="list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:18px;">
-                <li style="background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px;">
-                    <div style="display:flex; gap:14px;">
-                        <div style="width:32px; height:32px; background:#3b82f6; color:#fff; font-weight:600; display:flex; align-items:center; justify-content:center; border-radius:8px;">1</div>
-                        <div style="flex:1;">
-                            <div style="font-weight:600; margin-bottom:6px;">Download Agent Script</div>
-                            <div style="color:var(--muted); font-size:13px; margin-bottom:10px;">Copy the PowerShell agent script to your target machine.</div>
-                            <div style="position:relative;">
-                                <code class="deployment-step__code" data-copy="Functions/OrbisAgent/agent-client.ps1">Functions/OrbisAgent/agent-client.ps1</code>
-                                <button class="deployment-code-copy" data-copy-target="Functions/OrbisAgent/agent-client.ps1" title="Copy path">Copy</button>
-                            </div>
-                        </div>
-                    </div>
-                </li>
-                <li style="background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px;">
-                    <div style="display:flex; gap:14px;">
-                        <div style="width:32px; height:32px; background:#10b981; color:#fff; font-weight:600; display:flex; align-items:center; justify-content:center; border-radius:8px;">2</div>
-                        <div style="flex:1;">
-                            <div style="font-weight:600; margin-bottom:6px;">Run Agent</div>
-                            <div style="color:var(--muted); font-size:13px; margin-bottom:10px;">Execute with your OrbisHub server URL.</div>
-                            <div style="position:relative;">
-                                <code class="deployment-step__code" data-copy="./agent-client.ps1 -HubUrl \"http://your-hub-server:3000\"">.\\agent-client.ps1 -HubUrl "http://your-hub-server:3000"</code>
-                                <button class="deployment-code-copy" data-copy-target="./agent-client.ps1 -HubUrl \"http://your-hub-server:3000\"" title="Copy command">Copy</button>
-                            </div>
-                        </div>
-                    </div>
-                </li>
-                <li style="background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px;">
-                    <div style="display:flex; gap:14px;">
-                        <div style="width:32px; height:32px; background:#f59e0b; color:#fff; font-weight:600; display:flex; align-items:center; justify-content:center; border-radius:8px;">3</div>
-                        <div style="flex:1;">
-                            <div style="font-weight:600; margin-bottom:6px;">Verify Connection</div>
-                            <div style="color:var(--muted); font-size:13px;">Agent should appear in this dashboard within 30 seconds.</div>
-                        </div>
-                    </div>
-                </li>
-            </ol>
-            <div style="margin-top:24px; padding:16px; background:rgba(245,158,11,0.1); border-left:4px solid #f59e0b; border-radius:10px;">
-                <div style="font-weight:600; color:#f59e0b; margin-bottom:6px;">Security Note</div>
-                <p style="margin:0; color:var(--muted); font-size:13px; line-height:1.5;">This initial implementation is designed for trusted internal networks. For production use, implement API key authentication, HTTPS encryption, and script validation.</p>
-            </div>
-        </div>
-        <div class="modal-footer">
-            <button class="btn" onclick="document.getElementById('agentDeploymentModal').close()">Close</button>
-        </div>
-    </div>
 </dialog>
 
 <!-- Integration Modals -->
