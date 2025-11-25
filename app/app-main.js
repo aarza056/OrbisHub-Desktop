@@ -9735,3 +9735,27 @@ function formatBytes(bytes, decimals = 2) {
 if (window.electronAPI) {
     initializeAutoUpdater()
 }
+
+// ========== ORBISAGENT MODULE INITIALIZATION ==========
+// Initialize OrbisAgent UI when view is shown
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize AgentUI module if available
+    if (window.AgentUI) {
+        window.AgentUI.init()
+    }
+    
+    // Listen for view changes to render agents when agents view is shown
+    const navButtons = document.querySelectorAll('.nav__btn[data-view]')
+    navButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const viewName = btn.dataset.view
+            
+            // Render agents when agents view is shown
+            if (viewName === 'agents' && window.AgentUI) {
+                setTimeout(() => {
+                    window.AgentUI.renderAgentsDashboard()
+                }, 100)
+            }
+        })
+    })
+})
