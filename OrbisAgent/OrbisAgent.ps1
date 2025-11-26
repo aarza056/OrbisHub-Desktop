@@ -59,13 +59,22 @@ function Get-SystemMetrics {
         $memPercent = [math]::Round((($mem.TotalVisibleMemorySize - $mem.FreePhysicalMemory) / $mem.TotalVisibleMemorySize) * 100, 1)
         $disk = Get-PSDrive C | Select-Object @{N='PercentUsed';E={[math]::Round(($_.Used / ($_.Used + $_.Free)) * 100, 1)}}
         
+        # Uptime calculation
+        $uptimeSpan = (Get-Date) - $mem.LastBootUpTime
+        $uptimeFormatted = if ($uptimeSpan.TotalHours -gt 24) {
+            "$([math]::Floor($uptimeSpan.TotalDays))d $($uptimeSpan.Hours)h"
+        } else {
+            "$([math]::Floor($uptimeSpan.TotalHours))h $($uptimeSpan.Minutes)m"
+        }
+        
         return @{
             cpuPercent = [math]::Round($cpu, 1)
             memoryPercent = $memPercent
             diskPercent = $disk.PercentUsed
+            uptime = $uptimeFormatted
         }
     } catch {
-        return @{ cpuPercent = 0; memoryPercent = 0; diskPercent = 0 }
+        return @{ cpuPercent = 0; memoryPercent = 0; diskPercent = 0; uptime = '—' }
     }
 }
 

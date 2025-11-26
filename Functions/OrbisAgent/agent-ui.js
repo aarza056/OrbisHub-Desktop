@@ -100,6 +100,7 @@ const AgentUI = {
         const cpuPercent = metadata.cpuPercent || 0
         const memPercent = metadata.memoryPercent || 0
         const diskPercent = metadata.diskPercent || 0
+        const uptime = metadata.uptime || '—'
         
         const cpuInfo = cpuPercent ? `${cpuPercent.toFixed(1)}%` : '—'
         const memInfo = memPercent ? `${memPercent.toFixed(1)}%` : '—'
@@ -134,6 +135,10 @@ const AgentUI = {
                 <div class="agent-card__metric">
                     <div class="agent-card__metric-label">Disk</div>
                     <div class="agent-card__metric-value ${diskClass}">${diskInfo}</div>
+                </div>
+                <div class="agent-card__metric">
+                    <div class="agent-card__metric-label">Uptime</div>
+                    <div class="agent-card__metric-value">${uptime}</div>
                 </div>
             </div>
             

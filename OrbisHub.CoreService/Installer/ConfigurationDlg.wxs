@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <UI>
+      <Dialog Id="ConfigurationDlg" Width="370" Height="270" Title="[ProductName] Configuration">
+        
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="300" Height="15" Transparent="yes" NoPrefix="yes">
+          <Text>{\WixUI_Font_Title}Database and Service Configuration</Text>
+        </Control>
+        
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="320" Height="30" Transparent="yes" NoPrefix="yes">
+          <Text>Configure the SQL Server connection and service settings.</Text>
+        </Control>
+        
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.InstallDirDlgBannerBitmap)" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        
+        <!-- SQL Server Settings -->
+        <Control Id="SqlServerLabel" Type="Text" X="20" Y="60" Width="100" Height="15" Text="SQL Server:" />
+        <Control Id="SqlServerEdit" Type="Edit" X="120" Y="58" Width="220" Height="18" Property="SQLSERVER" />
+        
+        <Control Id="DatabaseLabel" Type="Text" X="20" Y="80" Width="100" Height="15" Text="Database Name:" />
+        <Control Id="DatabaseEdit" Type="Edit" X="120" Y="78" Width="220" Height="18" Property="DATABASE" />
+        
+        <!-- Authentication Type -->
+        <Control Id="AuthTypeLabel" Type="Text" X="20" Y="105" Width="320" Height="15" Text="Authentication:" />
+        
+        <Control Id="WindowsAuthRadio" Type="RadioButtonGroup" X="120" Y="105" Width="220" Height="40" Property="USEWINDOWSAUTH">
+          <RadioButtonGroup Property="USEWINDOWSAUTH">
+            <RadioButton Text="Windows Authentication" Value="1" X="0" Y="0" Width="200" Height="17" />
+            <RadioButton Text="SQL Server Authentication" Value="0" X="0" Y="20" Width="200" Height="17" />
+          </RadioButtonGroup>
+        </Control>
+        
+        <!-- SQL Authentication fields -->
+        <Control Id="SqlUserLabel" Type="Text" X="20" Y="150" Width="100" Height="15" Text="SQL Username:">
+          <Condition Action="hide">USEWINDOWSAUTH = "1"</Condition>
+          <Condition Action="show">USEWINDOWSAUTH = "0"</Condition>
+        </Control>
+        <Control Id="SqlUserEdit" Type="Edit" X="120" Y="148" Width="220" Height="18" Property="SQLUSER">
+          <Condition Action="hide">USEWINDOWSAUTH = "1"</Condition>
+          <Condition Action="show">USEWINDOWSAUTH = "0"</Condition>
+        </Control>
+        
+        <Control Id="SqlPasswordLabel" Type="Text" X="20" Y="170" Width="100" Height="15" Text="SQL Password:">
+          <Condition Action="hide">USEWINDOWSAUTH = "1"</Condition>
+          <Condition Action="show">USEWINDOWSAUTH = "0"</Condition>
+        </Control>
+        <Control Id="SqlPasswordEdit" Type="Edit" X="120" Y="168" Width="220" Height="18" Property="SQLPASSWORD" Password="yes">
+          <Condition Action="hide">USEWINDOWSAUTH = "1"</Condition>
+          <Condition Action="show">USEWINDOWSAUTH = "0"</Condition>
+        </Control>
+        
+        <!-- Service Port -->
+        <Control Id="PortLabel" Type="Text" X="20" Y="195" Width="100" Height="15" Text="Service Port:" />
+        <Control Id="PortEdit" Type="Edit" X="120" Y="193" Width="100" Height="18" Property="SERVICEPORT" />
+        
+        <!-- Bottom Line and Buttons -->
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
+          <Publish Event="DoAction" Value="BuildConnectionString">1</Publish>
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+        </Control>
+      </Dialog>
+    </UI>
+  </Fragment>
+</Wix>
