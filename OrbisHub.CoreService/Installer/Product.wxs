@@ -1,0 +1,439 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+  
+  <!-- Product Definition -->
+  <Product Id="*" 
+           Name="OrbisHub Core Service" 
+           Language="1033" 
+           Version="1.0.0.0" 
+           Manufacturer="OrbisHub Team" 
+           UpgradeCode="F5E4D3C2-B1A0-4F5E-8D9C-0B1A2F3E4D5C">
+    
+    <Package InstallerVersion="500" 
+             Compressed="yes" 
+             InstallScope="perMachine" 
+             Description="OrbisHub Core Service - Central Controller for Agents"
+             Comments="Manages and coordinates OrbisHub agents and clients"
+             Manufacturer="OrbisHub Team" />
+
+    <!-- Prevent downgrades -->
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    
+    <!-- Embedded CAB for all files -->
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Custom Properties for Configuration -->
+    <Property Id="SQLSERVER" Value="localhost" />
+    <Property Id="DATABASE" Value="OrbisHub" />
+    <Property Id="SERVICEPORT" Value="5000" />
+    <Property Id="USEWINDOWSAUTH" Value="1" />
+    <Property Id="SQLUSER" Secure="yes" />
+    <Property Id="SQLPASSWORD" Secure="yes" Hidden="yes" />
+    
+    <!-- UI Icon -->
+    <Icon Id="OrbisIcon.ico" SourceFile="..\..\assets\icon.ico2" />
+    <Property Id="ARPPRODUCTICON" Value="OrbisIcon.ico" />
+    
+    <!-- Add/Remove Programs properties -->
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/orbishub" />
+
+    <!-- Check for admin privileges -->
+    <Condition Message="You must be an administrator to install this product.">
+      Privileged
+    </Condition>
+
+    <!-- Check for .NET 8 Runtime -->
+    <Property Id="DOTNETRUNTIME">
+      <RegistrySearch Id="SearchForDotNet8"
+                      Root="HKLM"
+                      Key="SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedhost"
+                      Name="Version"
+                      Type="raw" />
+    </Property>
+    
+    <Condition Message="This application requires .NET 8.0 Runtime or later. Please install from https://dotnet.microsoft.com/download">
+      <![CDATA[Installed OR DOTNETRUNTIME >= "8.0"]]>
+    </Condition>
+
+    <!-- Feature Definition -->
+    <Feature Id="ProductFeature" 
+             Title="OrbisHub Core Service" 
+             Level="1"
+             Description="Installs OrbisHub Core Service as a Windows Service">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="ServiceComponents" />
+    </Feature>
+
+    <!-- Custom UI Reference -->
+    <UIRef Id="CustomInstallUI" />
+    
+    <!-- Custom Actions for Service Management -->
+    
+    <!-- Build connection string -->
+    <CustomAction Id="BuildConnectionString"
+                  Return="check"
+                  Execute="immediate"
+                  Script="vbscript">
+      <![CDATA[
+        Dim connStr, useWindowsAuth
+        useWindowsAuth = Session.Property("USEWINDOWSAUTH")
+        
+        If useWindowsAuth = "1" Then
+          connStr = "Server=" & Session.Property("SQLSERVER") & ";" & _
+                   "Database=" & Session.Property("DATABASE") & ";" & _
+                   "Integrated Security=true;TrustServerCertificate=True;"
+        Else
+          connStr = "Server=" & Session.Property("SQLSERVER") & ";" & _
+                   "Database=" & Session.Property("DATABASE") & ";" & _
+                   "User Id=" & Session.Property("SQLUSER") & ";" & _
+                   "Password=" & Session.Property("SQLPASSWORD") & ";" & _
+                   "TrustServerCertificate=True;"
+        End If
+        
+        Session.Property("CONNECTIONSTRING") = connStr
+      ]]>
+    </CustomAction>
+    
+    <!-- Configure appsettings.json -->
+    <CustomAction Id="SetConfigPath"
+                  Return="check"
+                  Property="ConfigureSettings"
+                  Value="[INSTALLFOLDER]|[SERVICEPORT]|[CONNECTIONSTRING]" />
+
+    <CustomAction Id="ConfigureSettings"
+                  Return="check"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Script="vbscript">
+      <![CDATA[
+        On Error Resume Next
+        
+        Dim params, parts, installPath, port, connStr
+        Dim fso, settingsFile, content, newContent
+        
+        params = Session.Property("CustomActionData")
+        parts = Split(params, "|")
+        
+        installPath = parts(0)
+        port = parts(1)
+        connStr = parts(2)
+        
+        Set fso = CreateObject("Scripting.FileSystemObject")
+        settingsFile = installPath & "appsettings.json"
+        
+        If fso.FileExists(settingsFile) Then
+          Set file = fso.OpenTextFile(settingsFile, 1)
+          content = file.ReadAll
+          file.Close
+          
+          ' Replace placeholders
+          newContent = content
+          newContent = Replace(newContent, """http://localhost:5000""", """http://0.0.0.0:" & port & """")
+          newContent = Replace(newContent, "Server=localhost;Database=OrbisHub;Integrated Security=true;TrustServerCertificate=True;", connStr)
+          
+          Set file = fso.OpenTextFile(settingsFile, 2)
+          file.Write newContent
+          file.Close
+        End If
+      ]]>
+    </CustomAction>
+
+    <!-- Install Windows Service -->
+    <CustomAction Id="SetServiceInstallPath"
+                  Return="check"
+                  Property="InstallWindowsService"
+                  Value="[INSTALLFOLDER]" />
+
+    <CustomAction Id="InstallWindowsService"
+                  Return="check"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Script="vbscript">
+      <![CDATA[
+        On Error Resume Next
+        
+        Dim WshShell, serviceName, exePath, cmd
+        Set WshShell = CreateObject("WScript.Shell")
+        
+        serviceName = "OrbisHubCoreService"
+        exePath = Session.Property("CustomActionData") & "OrbisHub.CoreService.exe"
+        
+        ' Create the service
+        cmd = "sc.exe create " & serviceName & " binPath= """ & exePath & """ start= auto"
+        WshShell.Run cmd, 0, True
+        
+        ' Set description
+        cmd = "sc.exe description " & serviceName & " ""Central controller for OrbisHub agents and clients"""
+        WshShell.Run cmd, 0, True
+        
+        ' Set recovery options (restart on failure)
+        cmd = "sc.exe failure " & serviceName & " reset= 86400 actions= restart/60000/restart/60000/restart/60000"
+        WshShell.Run cmd, 0, True
+      ]]>
+    </CustomAction>
+
+    <!-- Start Windows Service -->
+    <CustomAction Id="StartWindowsService"
+                  Return="ignore"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Script="vbscript">
+      <![CDATA[
+        On Error Resume Next
+        Dim WshShell, serviceName
+        Set WshShell = CreateObject("WScript.Shell")
+        
+        serviceName = "OrbisHubCoreService"
+        
+        ' Start the service
+        WshShell.Run "sc.exe start " & serviceName, 0, True
+        WScript.Sleep 2000
+      ]]>
+    </CustomAction>
+
+    <!-- Stop Windows Service -->
+    <CustomAction Id="StopWindowsService"
+                  Return="ignore"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Script="vbscript">
+      <![CDATA[
+        On Error Resume Next
+        Dim WshShell, serviceName
+        Set WshShell = CreateObject("WScript.Shell")
+        
+        serviceName = "OrbisHubCoreService"
+        
+        ' Stop the service
+        WshShell.Run "sc.exe stop " & serviceName, 0, True
+        WScript.Sleep 3000
+      ]]>
+    </CustomAction>
+
+    <!-- Uninstall Windows Service -->
+    <CustomAction Id="UninstallWindowsService"
+                  Return="ignore"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Script="vbscript">
+      <![CDATA[
+        On Error Resume Next
+        Dim WshShell, serviceName
+        Set WshShell = CreateObject("WScript.Shell")
+        
+        serviceName = "OrbisHubCoreService"
+        
+        ' Delete the service
+        WshShell.Run "sc.exe delete " & serviceName, 0, True
+      ]]>
+    </CustomAction>
+
+    <!-- Configure Firewall -->
+    <CustomAction Id="SetFirewallPort"
+                  Return="check"
+                  Property="ConfigureFirewall"
+                  Value="[SERVICEPORT]" />
+
+    <CustomAction Id="ConfigureFirewall"
+                  Return="ignore"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Script="vbscript">
+      <![CDATA[
+        On Error Resume Next
+        Dim WshShell, ruleName, port, cmd
+        Set WshShell = CreateObject("WScript.Shell")
+        
+        port = Session.Property("CustomActionData")
+        ruleName = "OrbisHub Core Service - Port " & port
+        
+        ' Remove existing rule
+        WshShell.Run "netsh advfirewall firewall delete rule name=""" & ruleName & """", 0, True
+        
+        ' Add new rule
+        cmd = "netsh advfirewall firewall add rule name=""" & ruleName & """ " & _
+              "dir=in action=allow protocol=TCP localport=" & port & " " & _
+              "enable=yes profile=any"
+        
+        WshShell.Run cmd, 0, True
+      ]]>
+    </CustomAction>
+
+    <!-- Remove Firewall Rule -->
+    <CustomAction Id="SetFirewallRemovePort"
+                  Return="check"
+                  Property="RemoveFirewall"
+                  Value="[SERVICEPORT]" />
+
+    <CustomAction Id="RemoveFirewall"
+                  Return="ignore"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Script="vbscript">
+      <![CDATA[
+        On Error Resume Next
+        Dim WshShell, ruleName, port
+        Set WshShell = CreateObject("WScript.Shell")
+        
+        port = Session.Property("CustomActionData")
+        ruleName = "OrbisHub Core Service - Port " & port
+        
+        WshShell.Run "netsh advfirewall firewall delete rule name=""" & ruleName & """", 0, True
+      ]]>
+    </CustomAction>
+    
+    <!-- Install Sequence -->
+    <InstallExecuteSequence>
+      <!-- Build connection string -->
+      <Custom Action="BuildConnectionString" Before="InstallFiles">NOT REMOVE</Custom>
+      
+      <!-- Configure settings -->
+      <Custom Action="SetConfigPath" After="InstallFiles">NOT REMOVE</Custom>
+      <Custom Action="ConfigureSettings" After="SetConfigPath">NOT REMOVE</Custom>
+      
+      <!-- Install and configure service -->
+      <Custom Action="SetServiceInstallPath" After="ConfigureSettings">NOT REMOVE</Custom>
+      <Custom Action="InstallWindowsService" After="SetServiceInstallPath">NOT REMOVE</Custom>
+      
+      <!-- Configure firewall -->
+      <Custom Action="SetFirewallPort" After="InstallWindowsService">NOT REMOVE</Custom>
+      <Custom Action="ConfigureFirewall" After="SetFirewallPort">NOT REMOVE</Custom>
+      
+      <!-- Start service -->
+      <Custom Action="StartWindowsService" After="ConfigureFirewall">NOT REMOVE</Custom>
+      
+      <!-- Uninstall sequence -->
+      <Custom Action="StopWindowsService" Before="RemoveFiles">REMOVE="ALL"</Custom>
+      <Custom Action="UninstallWindowsService" After="StopWindowsService">REMOVE="ALL"</Custom>
+      <Custom Action="SetFirewallRemovePort" After="UninstallWindowsService">REMOVE="ALL"</Custom>
+      <Custom Action="RemoveFirewall" After="SetFirewallRemovePort">REMOVE="ALL"</Custom>
+    </InstallExecuteSequence>
+  </Product>
+
+  <!-- Directory Structure -->
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="CompanyFolder" Name="OrbisHub">
+          <Directory Id="INSTALLFOLDER" Name="CoreService">
+            <Directory Id="LogsFolder" Name="Logs" />
+          </Directory>
+        </Directory>
+      </Directory>
+      
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="OrbisHub Core Service"/>
+      </Directory>
+    </Directory>
+  </Fragment>
+
+  <!-- Product Components -->
+  <Fragment>
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      
+      <!-- Main executable and DLLs -->
+      <Component Id="MainExecutable" Guid="A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D">
+        <File Id="CoreServiceExe" 
+              Source="..\publish\OrbisHub.CoreService.exe" 
+              KeyPath="yes" />
+      </Component>
+
+      <!-- Configuration Files -->
+      <Component Id="ConfigFiles" Guid="B2C3D4E5-F6A7-4B8C-9D0E-1F2A3B4C5D6E">
+        <File Id="AppSettingsJSON" 
+              Source="..\publish\appsettings.json" 
+              KeyPath="yes" />
+        <File Id="AppSettingsProdJSON" 
+              Source="..\publish\appsettings.Production.json" 
+              KeyPath="no" />
+      </Component>
+
+      <!-- All DLL files from publish folder -->
+      <Component Id="RuntimeFiles" Guid="C3D4E5F6-A7B8-4C9D-0E1F-2A3B4C5D6E7F">
+        <File Id="OrbisHub.CoreService.dll" 
+              Source="..\publish\OrbisHub.CoreService.dll" 
+              KeyPath="yes" />
+      </Component>
+      
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- Service Components -->
+  <Fragment>
+    <ComponentGroup Id="ServiceComponents" Directory="INSTALLFOLDER">
+      <Component Id="OrbisHubCoreServiceComponent" Guid="D4E5F6A7-B8C9-4D0E-1F2A-3B4C5D6E7F8A">
+        
+        <!-- Registry marker for service installation -->
+        <RegistryValue Root="HKLM" 
+                      Key="SOFTWARE\OrbisHub\CoreService" 
+                      Name="ServiceInstalled" 
+                      Type="integer" 
+                      Value="1" 
+                      KeyPath="yes" />
+      </Component>
+      
+      <Component Id="LogsDirectory" Guid="E5F6A7B8-C9D0-4E1F-2A3B-4C5D6E7F8A9B">
+        <CreateFolder Directory="LogsFolder" />
+        <RemoveFolder Id="RemoveLogsFolder" Directory="LogsFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" 
+                      Key="Software\OrbisHub\CoreService" 
+                      Name="LogsCreated" 
+                      Type="integer" 
+                      Value="1" 
+                      KeyPath="yes" />
+      </Component>
+      
+      <Component Id="ApplicationShortcut" Guid="F6A7B8C9-D0E1-4F2A-3B4C-5D6E7F8A9B0C">
+        <Shortcut Id="ViewLogsShortcut"
+                  Directory="ApplicationProgramsFolder"
+                  Name="View Core Service Logs"
+                  Description="Open OrbisHub Core Service log files"
+                  Target="[LogsFolder]"
+                  WorkingDirectory="LogsFolder" />
+        
+        <Shortcut Id="OpenConfigShortcut"
+                  Directory="ApplicationProgramsFolder"
+                  Name="Configure Core Service"
+                  Description="Edit appsettings.json"
+                  Target="[WindowsFolder]System32\notepad.exe"
+                  Arguments="&quot;[INSTALLFOLDER]appsettings.json&quot;"
+                  WorkingDirectory="INSTALLFOLDER" />
+        
+        <Shortcut Id="UninstallShortcut"
+                  Directory="ApplicationProgramsFolder"
+                  Name="Uninstall OrbisHub Core Service"
+                  Description="Uninstall OrbisHub Core Service"
+                  Target="[SystemFolder]msiexec.exe"
+                  Arguments="/x [ProductCode]" />
+        
+        <RemoveFolder Id="ApplicationProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall"/>
+        
+        <RegistryValue Root="HKCU" 
+                      Key="Software\OrbisHub\CoreService" 
+                      Name="ShortcutsCreated" 
+                      Type="integer" 
+                      Value="1" 
+                      KeyPath="yes"/>
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- Custom Installation UI -->
+  <Fragment>
+    <UI Id="CustomInstallUI">
+      <!-- Use built-in dialog set as base -->
+      <UIRef Id="WixUI_InstallDir" />
+      <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+      
+      <!-- Custom dialogs -->
+      <DialogRef Id="ConfigurationDlg" />
+      
+      <!-- Dialog sequence -->
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ConfigurationDlg">1</Publish>
+      <Publish Dialog="ConfigurationDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
+      <Publish Dialog="ConfigurationDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg">1</Publish>
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="ConfigurationDlg">1</Publish>
+    </UI>
+  </Fragment>
+</Wix>

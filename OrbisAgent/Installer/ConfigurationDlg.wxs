@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <UI>
+      <Dialog Id="ConfigurationDlg" Width="370" Height="270" Title="OrbisAgent Configuration">
+        
+        <!-- Banner -->
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.InstallDirDlgBannerBitmap)" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        
+        <!-- Title -->
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="250" Height="15" Transparent="yes" NoPrefix="yes">
+          <Text>{\WixUI_Font_Title}OrbisAgent Configuration</Text>
+        </Control>
+        
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes">
+          <Text>Configure connection to OrbisHub Core Service</Text>
+        </Control>
+        
+        <!-- Core Service URL -->
+        <Control Id="CoreServiceLabel" Type="Text" X="20" Y="60" Width="320" Height="15" NoPrefix="yes">
+          <Text>Core Service URL:</Text>
+        </Control>
+        
+        <Control Id="CoreServiceEdit" Type="Edit" X="20" Y="75" Width="280" Height="18" Property="CORESERVICEURL" />
+        
+        <Control Id="CoreServiceInfo" Type="Text" X="20" Y="95" Width="320" Height="20" NoPrefix="yes">
+          <Text>{\WixUI_Font_Small}Example: http://192.168.1.100:5000</Text>
+        </Control>
+        
+        <!-- Agent ID -->
+        <Control Id="AgentIdLabel" Type="Text" X="20" Y="125" Width="320" Height="15" NoPrefix="yes">
+          <Text>Agent ID (optional):</Text>
+        </Control>
+        
+        <Control Id="AgentIdEdit" Type="Edit" X="20" Y="140" Width="280" Height="18" Property="AGENTID" />
+        
+        <Control Id="AgentIdInfo" Type="Text" X="20" Y="160" Width="320" Height="20" NoPrefix="yes">
+          <Text>{\WixUI_Font_Small}Leave blank to use computer name</Text>
+        </Control>
+        
+        <!-- Poll Interval -->
+        <Control Id="PollIntervalLabel" Type="Text" X="20" Y="190" Width="150" Height="15" NoPrefix="yes">
+          <Text>Poll Interval (seconds):</Text>
+        </Control>
+        
+        <Control Id="PollIntervalEdit" Type="Edit" X="180" Y="190" Width="50" Height="18" Property="POLLINTERVAL" />
+        
+        <!-- Bottom Line -->
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        
+        <!-- Navigation Buttons -->
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+        </Control>
+      </Dialog>
+    </UI>
+  </Fragment>
+</Wix>

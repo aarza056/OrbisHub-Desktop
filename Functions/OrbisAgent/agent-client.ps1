@@ -86,11 +86,19 @@ function Get-SystemMetrics {
             Write-Log "Failed to get disk metrics: $_" "WARN"
         }
         
+        # Uptime calculation
+        $uptimeSpan = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
+        $uptimeFormatted = if ($uptimeSpan.TotalHours -gt 24) {
+            "$([math]::Floor($uptimeSpan.TotalDays))d $($uptimeSpan.Hours)h"
+        } else {
+            "$([math]::Floor($uptimeSpan.TotalHours))h $($uptimeSpan.Minutes)m"
+        }
+        
         return @{
             cpuPercent = [math]::Round($cpu, 2)
             memoryPercent = [math]::Round($memory, 2)
             diskPercent = $disk
-            uptime = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
+            uptime = $uptimeFormatted
         }
     } catch {
         Write-Log "Failed to collect metrics: $_" "ERROR"

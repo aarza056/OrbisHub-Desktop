@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+  
+  <!-- Product Definition -->
+  <Product Id="*" 
+           Name="OrbisAgent" 
+           Language="1033" 
+           Version="1.0.0.0" 
+           Manufacturer="OrbisHub Team" 
+           UpgradeCode="A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D">
+    
+    <Package InstallerVersion="500" 
+             Compressed="yes" 
+             InstallScope="perMachine" 
+             Description="OrbisHub PowerShell Agent - Remote Execution Service"
+             Comments="Executes jobs from OrbisHub Core Service"
+             Manufacturer="OrbisHub Team" />
+
+    <!-- Prevent downgrades -->
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    
+    <!-- Embedded CAB for all files -->
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Custom Properties for Configuration -->
+    <Property Id="CORESERVICEURL" Value="http://127.0.0.1:5000" />
+    <Property Id="AGENTID" Secure="yes" />
+    <Property Id="POLLINTERVAL" Value="30" />
+    <Property Id="METRICSINTERVAL" Value="60" />
+    
+    <!-- UI Icon -->
+    <Icon Id="OrbisIcon.ico" SourceFile="..\..\assets\icon.ico2" />
+    <Property Id="ARPPRODUCTICON" Value="OrbisIcon.ico" />
+    
+    <!-- Add/Remove Programs properties -->
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/orbishub" />
+
+    <!-- Check for admin privileges -->
+    <Condition Message="You must be an administrator to install this product.">
+      Privileged
+    </Condition>
+
+    <!-- Feature Definition -->
+    <Feature Id="ProductFeature" 
+             Title="OrbisAgent Service" 
+             Level="1"
+             Description="Installs OrbisAgent as a Windows Service">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="ServiceComponents" />
+    </Feature>
+
+    <!-- Custom UI Reference -->
+    <UIRef Id="CustomInstallUI" />
+    
+    <!-- Custom Actions for Service Management -->
+    <CustomAction Id="SetInstallPath"
+                  Return="check"
+                  Property="CreateScheduledTask"
+                  Value="[INSTALLFOLDER]" />
+
+    <CustomAction Id="CreateScheduledTask"
+                  Return="check"
+                  Execute="deferred"
+                  Impersonate="no"
+                  HideTarget="no"
+                  Script="vbscript">
+      <![CDATA[
+        On Error Resume Next
+        
+        Dim WshShell, taskName, scriptPath, cmd
+        Set WshShell = CreateObject("WScript.Shell")
+        
+        taskName = "OrbisAgent"
+        scriptPath = Session.Property("CustomActionData")
+        
+        ' Remove existing task if present
+        WshShell.Run "schtasks /Delete /TN """ & taskName & """ /F", 0, True
+        
+        ' Create new scheduled task
+        cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command " & _
+              """$action = New-ScheduledTaskAction -Execute 'powershell.exe' " & _
+              "-Argument '-NoProfile -ExecutionPolicy Bypass -File """ & scriptPath & "OrbisAgent-Service.ps1""'; " & _
+              "$trigger = New-ScheduledTaskTrigger -AtStartup; " & _
+              "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries " & _
+              "-DontStopIfGoingOnBatteries -StartWhenAvailable " & _
+              "-RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) " & _
+              "-ExecutionTimeLimit (New-TimeSpan -Days 365); " & _
+              "$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' " & _
+              "-LogonType ServiceAccount -RunLevel Highest; " & _
+              "Register-ScheduledTask -TaskName '" & taskName & "' " & _
+              "-Action $action -Trigger $trigger -Settings $settings " & _
+              "-Principal $principal -Description 'OrbisHub PowerShell Agent' -Force"""
+        
+        WshShell.Run cmd, 0, True
+      ]]>
+    </CustomAction>
+
+    <CustomAction Id="StartScheduledTask"
+                  Return="ignore"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Script="vbscript">
+      <![CDATA[
+        On Error Resume Next
+        Dim WshShell, taskName
+        Set WshShell = CreateObject("WScript.Shell")
+        taskName = "OrbisAgent"
+        
+        WshShell.Run "schtasks /Run /TN """ & taskName & """", 0, True
+        WScript.Sleep 2000
+      ]]>
+    </CustomAction>
+
+    <CustomAction Id="StopScheduledTask"
+                  Return="ignore"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Script="vbscript">
+      <![CDATA[
+        On Error Resume Next
+        Dim WshShell, taskName
+        Set WshShell = CreateObject("WScript.Shell")
+        taskName = "OrbisAgent"
+        
+        WshShell.Run "schtasks /End /TN """ & taskName & """", 0, True
+        WScript.Sleep 1000
+      ]]>
+    </CustomAction>
+
+    <CustomAction Id="RemoveScheduledTask"
+                  Return="ignore"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Script="vbscript">
+      <![CDATA[
+        On Error Resume Next
+        Dim WshShell, taskName
+        Set WshShell = CreateObject("WScript.Shell")
+        taskName = "OrbisAgent"
+        
+        WshShell.Run "schtasks /Delete /TN """ & taskName & """ /F", 0, True
+      ]]>
+    </CustomAction>
+
+    <CustomAction Id="ConfigureFirewall"
+                  Return="ignore"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Script="vbscript">
+      <![CDATA[
+        On Error Resume Next
+        Dim WshShell, ruleName, cmd
+        Set WshShell = CreateObject("WScript.Shell")
+        
+        ruleName = "OrbisAgent - PowerShell Remoting"
+        
+        WshShell.Run "netsh advfirewall firewall delete rule name=""" & ruleName & """", 0, True
+        
+        cmd = "netsh advfirewall firewall add rule name=""" & ruleName & """ " & _
+              "dir=out action=allow program=""C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"" " & _
+              "enable=yes profile=any"
+        
+        WshShell.Run cmd, 0, True
+      ]]>
+    </CustomAction>
+
+    <CustomAction Id="RemoveFirewall"
+                  Return="ignore"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Script="vbscript">
+      <![CDATA[
+        On Error Resume Next
+        Dim WshShell, ruleName
+        Set WshShell = CreateObject("WScript.Shell")
+        
+        ruleName = "OrbisAgent - PowerShell Remoting"
+        WshShell.Run "netsh advfirewall firewall delete rule name=""" & ruleName & """", 0, True
+      ]]>
+    </CustomAction>
+    
+    <!-- Install Sequence -->
+    <InstallExecuteSequence>
+      <!-- Set installation path for custom actions -->
+      <Custom Action="SetInstallPath" Before="CreateScheduledTask">NOT REMOVE</Custom>
+      
+      <!-- Create and start scheduled task -->
+      <Custom Action="CreateScheduledTask" After="InstallFiles">NOT REMOVE</Custom>
+      <Custom Action="ConfigureFirewall" After="CreateScheduledTask">NOT REMOVE</Custom>
+      <Custom Action="StartScheduledTask" After="ConfigureFirewall">NOT REMOVE</Custom>
+      
+      <!-- Stop and remove on uninstall -->
+      <Custom Action="StopScheduledTask" Before="RemoveFiles">REMOVE="ALL"</Custom>
+      <Custom Action="RemoveScheduledTask" After="StopScheduledTask">REMOVE="ALL"</Custom>
+      <Custom Action="RemoveFirewall" After="RemoveScheduledTask">REMOVE="ALL"</Custom>
+    </InstallExecuteSequence>
+  </Product>
+
+  <!-- Directory Structure -->
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLFOLDER" Name="OrbisAgent">
+          <Directory Id="LogsFolder" Name="Logs" />
+        </Directory>
+      </Directory>
+      
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="OrbisAgent"/>
+      </Directory>
+    </Directory>
+  </Fragment>
+
+  <!-- Product Components -->
+  <Fragment>
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      
+      <!-- Bootstrap Script (downloads and runs latest agent) -->
+      <Component Id="BootstrapScript" Guid="A9B8C7D6-E5F4-4A3B-9C2D-1E0F9A8B7C6D">
+        <File Id="BootstrapPS1" 
+              Source="..\OrbisAgent-Bootstrap.ps1" 
+              KeyPath="yes" />
+      </Component>
+      
+      <!-- Main Agent Script (initially included, updated by bootstrap) -->
+      <Component Id="AgentScript" Guid="B1C2D3E4-F5A6-4B5C-8D9E-0F1A2B3C4D5E">
+        <File Id="OrbisAgentPS1" 
+              Source="..\OrbisAgent.ps1" 
+              KeyPath="yes" />
+      </Component>
+
+      <!-- Configuration File -->
+      <Component Id="ConfigFile" Guid="C1D2E3F4-A5B6-4C5D-8E9F-0A1B2C3D4E5F">
+        <File Id="ConfigJSON" 
+              Source="config.json" 
+              KeyPath="yes" />
+      </Component>
+
+      <!-- Service Wrapper Script -->
+      <Component Id="ServiceWrapper" Guid="D1E2F3A4-B5C6-4D5E-8F9A-0B1C2D3E4F5A">
+        <File Id="ServiceWrapperPS1" 
+              Source="OrbisAgent-Service.ps1" 
+              KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- Service Components -->
+  <Fragment>
+    <ComponentGroup Id="ServiceComponents" Directory="INSTALLFOLDER">
+      <Component Id="OrbisAgentService" Guid="A2B3C4D5-E6F7-4A5B-8C9D-0E1F2A3B4C5D">
+        
+        <!-- Registry marker for service installation -->
+        <RegistryValue Root="HKLM" 
+                      Key="SOFTWARE\OrbisHub\OrbisAgent" 
+                      Name="ServiceInstalled" 
+                      Type="integer" 
+                      Value="1" 
+                      KeyPath="yes" />
+      </Component>
+      
+      <Component Id="LogsDirectory" Guid="E1F2A3B4-C5D6-4E5F-8A9B-0C1D2E3F4A5B">
+        <CreateFolder Directory="LogsFolder" />
+        <RemoveFolder Id="RemoveLogsFolder" Directory="LogsFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" 
+                      Key="Software\OrbisHub\OrbisAgent" 
+                      Name="LogsCreated" 
+                      Type="integer" 
+                      Value="1" 
+                      KeyPath="yes" />
+      </Component>
+      
+      <Component Id="ApplicationShortcut" Guid="F1A2B3C4-D5E6-4F5A-8B9C-0D1E2F3A4B5C">
+        <Shortcut Id="ViewLogsShortcut"
+                  Directory="ApplicationProgramsFolder"
+                  Name="View OrbisAgent Logs"
+                  Description="Open OrbisAgent log files"
+                  Target="[WindowsFolder]System32\WindowsPowerShell\v1.0\powershell.exe"
+                  Arguments="-NoExit -Command &quot;Get-Content '[INSTALLFOLDER]Logs\OrbisAgent.log' -Tail 50 -Wait&quot;"
+                  WorkingDirectory="INSTALLFOLDER" />
+        
+        <Shortcut Id="UninstallShortcut"
+                  Directory="ApplicationProgramsFolder"
+                  Name="Uninstall OrbisAgent"
+                  Description="Uninstall OrbisAgent Service"
+                  Target="[SystemFolder]msiexec.exe"
+                  Arguments="/x [ProductCode]" />
+        
+        <RemoveFolder Id="ApplicationProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall"/>
+        
+        <RegistryValue Root="HKCU" 
+                      Key="Software\OrbisHub\OrbisAgent" 
+                      Name="ShortcutsCreated" 
+                      Type="integer" 
+                      Value="1" 
+                      KeyPath="yes"/>
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- Custom Installation UI -->
+  <Fragment>
+    <UI Id="CustomInstallUI">
+      <!-- Use built-in dialog set as base -->
+      <UIRef Id="WixUI_InstallDir" />
+      <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+      
+      <!-- Custom dialogs -->
+      <DialogRef Id="ConfigurationDlg" />
+      
+      <!-- Dialog sequence -->
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ConfigurationDlg">1</Publish>
+      <Publish Dialog="ConfigurationDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
+      <Publish Dialog="ConfigurationDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg">1</Publish>
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="ConfigurationDlg">1</Publish>
+    </UI>
+  </Fragment>
+</Wix>

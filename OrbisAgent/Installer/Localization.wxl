@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization Culture="en-US" xmlns="http://schemas.microsoft.com/wix/2006/localization">
+  
+  <!-- Product Information -->
+  <String Id="ProductName">OrbisAgent</String>
+  <String Id="ManufacturerName">OrbisHub Team</String>
+  <String Id="ProductDescription">OrbisHub PowerShell Agent - Remote Execution Service</String>
+  
+  <!-- Dialog Strings -->
+  <String Id="WelcomeTitle">Welcome to the OrbisAgent Setup Wizard</String>
+  <String Id="WelcomeDescription">This wizard will guide you through the installation of OrbisAgent on your computer.</String>
+  
+  <String Id="ConfigTitle">Configure OrbisAgent</String>
+  <String Id="ConfigDescription">Enter the URL of your OrbisHub Core Service</String>
+  
+  <String Id="InstallDirTitle">Choose Installation Location</String>
+  <String Id="InstallDirDescription">Select where OrbisAgent will be installed</String>
+  
+  <String Id="VerifyReadyTitle">Ready to Install</String>
+  <String Id="VerifyReadyDescription">Click Install to begin the installation</String>
+  
+  <String Id="ProgressTitle">Installing OrbisAgent</String>
+  <String Id="ProgressDescription">Please wait while OrbisAgent is being installed</String>
+  
+  <String Id="FinishTitle">Installation Complete</String>
+  <String Id="FinishDescription">OrbisAgent has been successfully installed and started as a Windows service.</String>
+  
+  <!-- Button Text -->
+  <String Id="WixUINext">&amp;Next</String>
+  <String Id="WixUIBack">&amp;Back</String>
+  <String Id="WixUICancel">Cancel</String>
+  <String Id="WixUIFinish">&amp;Finish</String>
+  <String Id="WixUIInstall">&amp;Install</String>
+  
+  <!-- Error Messages -->
+  <String Id="ErrorInsufficientPrivileges">You must be an administrator to install this product.</String>
+  <String Id="ErrorNewerVersionInstalled">A newer version of [ProductName] is already installed.</String>
+  
+  <!-- Feature Descriptions -->
+  <String Id="FeatureMainDescription">Installs OrbisAgent core files and service</String>
+  
+  <!-- Bitmaps -->
+  <String Id="InstallDirDlgBannerBitmap">WixUI_Bmp_Banner</String>
+  <String Id="WixUIBannerBmp">WixUI_Bmp_Banner</String>
+  <String Id="WixUIDialogBmp">WixUI_Bmp_Dialog</String>
+  
+</WixLocalization>

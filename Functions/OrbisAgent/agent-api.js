@@ -10,7 +10,7 @@
 
 const AgentAPI = {
     // Core Service URL - can be configured
-    coreServiceUrl: 'http://127.0.0.1:5000',
+    coreServiceUrl: 'http://192.168.11.56:5000',
 
     /**
      * Set Core Service URL
@@ -127,14 +127,17 @@ const AgentAPI = {
 
     /**
      * Delete an agent
-     * NOTE: Agents cannot be deleted via Desktop client
-     * They auto-expire after 2 minutes without heartbeat
      * @param {string} agentId - Agent ID
      * @returns {Promise<Object>} - Success status
      */
     async deleteAgent(agentId) {
-        console.log('Agents auto-expire after heartbeat timeout. Manual deletion not supported.');
-        return { success: false, error: 'Manual agent deletion not supported. Agents expire automatically.' };
+        try {
+            await this.apiCall(`/api/agents/${agentId}`, 'DELETE');
+            return { success: true };
+        } catch (error) {
+            console.error('Failed to delete agent:', error);
+            return { success: false, error: error.message };
+        }
     },
 
     /**
@@ -238,8 +241,96 @@ const AgentAPI = {
      * @returns {Promise<Array>} - List of metrics
      */
     async getAgentMetrics(agentId, limit = 100) {
-        console.log('Metrics feature not yet implemented in Core Service');
-        return [];
+        console.log('Metrics feature not yet implemented in Core Service')
+        return []
+    },
+
+    /**
+     * Get build history for an agent
+     * Tracks version changes and deployments over time
+     * @param {string} agentId - Agent ID
+     * @param {number} limit - Number of build records to return
+     * @returns {Promise<Array>} - List of build history entries
+     */
+    async getAgentBuildHistory(agentId, limit = 50) {
+        try {
+            // For now, generate build history from job history and agent data
+            // In the future, this could query a dedicated BuildHistory table
+            const jobs = await this.getAgentJobs(agentId, limit)
+            const agent = await this.getAgentById(agentId)
+            
+            if (!agent) return []
+            
+            // Extract version changes from job history
+            const buildHistory = []
+            
+            // Add current version as most recent build
+            if (agent.version) {
+                buildHistory.push({
+                    version: agent.version,
+                    timestamp: agent.lastHeartbeat,
+                    status: 'active',
+                    osVersion: agent.os,
+                    description: 'Current active version'
+                })
+            }
+            
+            // Extract version-related jobs (deployments, updates)
+            const versionJobs = jobs.filter(job => 
+                job.type && (
+                    job.type.toLowerCase().includes('deploy') ||
+                    job.type.toLowerCase().includes('update') ||
+                    job.type.toLowerCase().includes('install') ||
+                    job.type === 'GetSystemInfo'
+                )
+            )
+            
+            // Add job-based build entries
+            versionJobs.forEach(job => {
+                let version = 'Unknown'
+                let description = job.type
+                
+                // Try to extract version from job result
+                if (job.resultJson) {
+                    try {
+                        const result = JSON.parse(job.resultJson)
+                        if (result.version) version = result.version
+                        if (result.agentVersion) version = result.agentVersion
+                    } catch (e) {
+                        // Ignore parsing errors
+                    }
+                }
+                
+                buildHistory.push({
+                    version: version,
+                    timestamp: job.completedAt || job.createdAt,
+                    status: job.status,
+                    osVersion: agent.os,
+                    description: description,
+                    deployedBy: job.createdBy || 'System'
+                })
+            })
+            
+            // Sort by timestamp descending (newest first)
+            buildHistory.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+            
+            // Remove duplicates and limit results
+            const uniqueBuilds = []
+            const seenVersions = new Set()
+            
+            for (const build of buildHistory) {
+                const key = `${build.version}-${build.timestamp}`
+                if (!seenVersions.has(key)) {
+                    seenVersions.add(key)
+                    uniqueBuilds.push(build)
+                }
+            }
+            
+            return uniqueBuilds.slice(0, limit)
+        } catch (error) {
+            console.error('Failed to get agent build history:', error)
+            return []
+        }
     }
 }
 

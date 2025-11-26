@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization Culture="en-us" Language="1033" xmlns="http://schemas.microsoft.com/wix/2006/localization">
+  
+  <!-- Product Information -->
+  <String Id="ApplicationName">OrbisHub Core Service</String>
+  <String Id="ManufacturerName">OrbisHub Team</String>
+  
+  <!-- Welcome Dialog -->
+  <String Id="WelcomeTitle">Welcome to the [ProductName] Setup Wizard</String>
+  <String Id="WelcomeDescription">This wizard will guide you through the installation of [ProductName], the central controller for OrbisHub agents and clients.</String>
+  
+  <!-- Installation Directory -->
+  <String Id="InstallDirTitle">Choose Installation Location</String>
+  <String Id="InstallDirDescription">Select the folder where you want to install [ProductName].</String>
+  
+  <!-- Configuration Dialog -->
+  <String Id="ConfigurationTitle">Database and Service Configuration</String>
+  <String Id="ConfigurationDescription">Configure SQL Server connection and service settings.</String>
+  
+  <!-- Buttons -->
+  <String Id="WixUIBack">&amp;Back</String>
+  <String Id="WixUINext">&amp;Next</String>
+  <String Id="WixUICancel">Cancel</String>
+  <String Id="WixUIFinish">&amp;Finish</String>
+  <String Id="WixUIInstall">&amp;Install</String>
+  
+  <!-- Progress Dialog -->
+  <String Id="ProgressTextInstalling">Installing [ProductName]</String>
+  <String Id="ProgressTextUninstalling">Uninstalling [ProductName]</String>
+  
+  <!-- Exit Dialog -->
+  <String Id="ExitDialogTitle">Completing the [ProductName] Setup Wizard</String>
+  <String Id="ExitDialogDescription">[ProductName] has been successfully installed.</String>
+  <String Id="ExitDialogDescriptionSuccess">Click Finish to exit the wizard. The Windows Service has been started and is ready to use.</String>
+  
+  <!-- Maintenance Dialog -->
+  <String Id="MaintenanceTitle">Modify, Repair or Remove</String>
+  <String Id="MaintenanceDescription">Choose whether to modify, repair, or remove [ProductName].</String>
+  
+  <!-- Error Messages -->
+  <String Id="ErrorDotNetRequired">This application requires .NET 8.0 Runtime or later. Please install from https://dotnet.microsoft.com/download</String>
+  <String Id="ErrorAdminRequired">You must be an administrator to install this product.</String>
+  
+</WixLocalization>

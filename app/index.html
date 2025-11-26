@@ -323,11 +323,10 @@
 <div class="nav__group">
   <div class="nav__label">System Administrators</div>
   <button class="nav__btn" data-view="agents">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
       <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
       <line x1="8" y1="21" x2="16" y2="21"></line>
       <line x1="12" y1="17" x2="12" y2="21"></line>
-      <circle cx="12" cy="10" r="3"></circle>
     </svg>
     Orbis Agents
   </button>
@@ -3392,11 +3391,38 @@ Channels
                 </div>
             </div>
             
-            <!-- Recent Jobs -->
-            <div>
-                <h3>Recent Jobs</h3>
-                <div id="agentDetailJobs" class="agent-jobs-list">
-                    <p class="muted" style="text-align:center; padding:20px;">Loading...</p>
+            <!-- Tab Navigation -->
+            <div class="agent-tabs">
+                <button class="agent-tab agent-tab--active" onclick="AgentUI.switchTab('jobs')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    Recent Jobs
+                </button>
+                <button class="agent-tab" onclick="AgentUI.switchTab('builds')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                    </svg>
+                    Build History
+                </button>
+            </div>
+            
+            <!-- Tab Content -->
+            <div class="agent-tab-content">
+                <!-- Recent Jobs Tab -->
+                <div id="agentTabJobs" class="agent-tab-panel agent-tab-panel--active">
+                    <div id="agentDetailJobs" class="agent-jobs-list">
+                        <p class="muted" style="text-align:center; padding:20px;">Loading...</p>
+                    </div>
+                </div>
+                
+                <!-- Build History Tab -->
+                <div id="agentTabBuilds" class="agent-tab-panel">
+                    <div id="agentDetailBuilds" class="agent-builds-list">
+                        <p class="muted" style="text-align:center; padding:20px;">Loading...</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -3450,82 +3476,112 @@ Channels
 <dialog id="agentDeploymentModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <h2>🚀 OrbisAgent Deployment Guide</h2>
+            <h2>Deploy OrbisAgent</h2>
             <button class="modal-close" onclick="document.getElementById('agentDeploymentModal').close()">&times;</button>
         </div>
         <div class="modal-body">
             <div>
-                <h3>Quick Start</h3>
-                <p style="color:var(--muted); margin-bottom:20px;">Deploy OrbisAgent to your remote Windows machines in 3 simple steps:</p>
+                <h3>Quick Install (Recommended)</h3>
+                <p style="color:var(--muted); margin-bottom:20px;">One command to download and install the agent on a remote Windows PC:</p>
                 
                 <div class="deployment-steps">
                     <div class="deployment-step">
                         <div class="deployment-step__number deployment-step__number--1">1</div>
                         <div class="deployment-step__content">
-                            <h4 class="deployment-step__title">Download Agent Script</h4>
-                            <p class="deployment-step__description">Copy the PowerShell agent script to your target machine.</p>
-                            <div class="code-block-wrapper">
-                                <code>Functions/OrbisAgent/agent-client.ps1</code>
-                                <button class="code-copy-btn" onclick="navigator.clipboard.writeText('Functions/OrbisAgent/agent-client.ps1'); this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy', 2000)">Copy</button>
-                            </div>
+                            <h4 class="deployment-step__title">Open PowerShell as Administrator</h4>
+                            <p class="deployment-step__description">On the target PC, right-click PowerShell and select "Run as Administrator"</p>
                         </div>
                     </div>
                     
                     <div class="deployment-step">
                         <div class="deployment-step__number deployment-step__number--2">2</div>
                         <div class="deployment-step__content">
-                            <h4 class="deployment-step__title">Run Agent</h4>
-                            <p class="deployment-step__description">Execute with your OrbisHub server URL (replace with your actual server address).</p>
-                            <div class="code-block-wrapper">
-                                <code>.\\agent-client.ps1 -HubUrl "http://your-hub-server:3000"</code>
-                                <button class="code-copy-btn" onclick="navigator.clipboard.writeText('.\\\\agent-client.ps1 -HubUrl &quot;http://your-hub-server:3000&quot;'); this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy', 2000)">Copy</button>
+                            <h4 class="deployment-step__title">Run Installation Command</h4>
+                            <p class="deployment-step__description">Copy and paste this command on the remote PC:</p>
+                            <div class="deployment-code-block">
+                                <pre class="deployment-code" id="bootstrapCommand">Loading...</pre>
+                                <button class="deployment-code-copy" id="copyBootstrapBtn">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="16 1 21 6 8 19 3 19 3 14 16 1"></polyline>
+                                    </svg>
+                                    Copy
+                                </button>
                             </div>
+                            <p style="color:var(--muted); font-size:12px; margin-top:8px;">
+                                This command will automatically detect your server IP and download the agent.
+                            </p>
                         </div>
                     </div>
                     
                     <div class="deployment-step">
                         <div class="deployment-step__number deployment-step__number--3">3</div>
                         <div class="deployment-step__content">
-                            <h4 class="deployment-step__title">Verify Connection</h4>
-                            <p class="deployment-step__description">Agent should appear in this dashboard within 30 seconds.</p>
+                            <h4 class="deployment-step__title">Verify Installation</h4>
+                            <p class="deployment-step__description">The agent will install and start automatically. It will appear in this dashboard within 30 seconds.</p>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <div>
-                <h3>Optional Parameters</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Parameter</th>
-                            <th>Description</th>
-                            <th>Default</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>-AgentId</td>
-                            <td style="color:var(--muted);">Unique identifier for this agent</td>
-                            <td>Computer name</td>
-                        </tr>
-                        <tr>
-                            <td>-PollInterval</td>
-                            <td style="color:var(--muted);">Seconds between job polls</td>
-                            <td>30</td>
-                        </tr>
-                        <tr>
-                            <td>-MetricsInterval</td>
-                            <td style="color:var(--muted);">Seconds between metric reports</td>
-                            <td>60</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div style="margin-top:30px; padding-top:30px; border-top:1px solid var(--border);">
+                <h3>Manual Installation</h3>
+                <p style="color:var(--muted); margin-bottom:15px;">If you prefer manual installation or the quick install fails:</p>
+                
+                <div style="margin-bottom:15px;">
+                    <h4 style="font-size:14px; margin-bottom:8px;">Step 1: Download Installer</h4>
+                    <div class="deployment-code-block">
+                        <pre class="deployment-code" id="downloadInstallerCommand">Loading...</pre>
+                        <button class="deployment-code-copy" id="copyDownloadInstallerBtn">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="16 1 21 6 8 19 3 19 3 14 16 1"></polyline>
+                            </svg>
+                            Copy
+                        </button>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 style="font-size:14px; margin-bottom:8px;">Step 2: Run Installer</h4>
+                    <div class="deployment-code-block">
+                        <pre class="deployment-code" id="runInstallerCommand">Loading...</pre>
+                        <button class="deployment-code-copy" id="copyRunInstallerBtn">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="16 1 21 6 8 19 3 19 3 14 16 1"></polyline>
+                            </svg>
+                            Copy
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top:30px; padding-top:30px; border-top:1px solid var(--border);">
+                <h3>What Gets Installed?</h3>
+                <ul style="color:var(--muted); font-size:14px; line-height:1.8;">
+                    <li>OrbisAgent installed to <code>C:\Program Files\OrbisAgent</code></li>
+                    <li>Windows Scheduled Task running as SYSTEM with admin privileges</li>
+                    <li>Auto-starts on boot with automatic restart on failure</li>
+                    <li>Sends heartbeats every 30 seconds with system metrics</li>
+                    <li>Polls for jobs every 5 seconds</li>
+                </ul>
+            </div>
+            
+            <div style="margin-top:30px; padding-top:30px; border-top:1px solid var(--border);">
+                <h3>Uninstall Agent</h3>
+                <p style="color:var(--muted); margin-bottom:15px;">To remove the agent from a PC:</p>
+                <div class="deployment-code-block">
+                    <pre class="deployment-code" id="uninstallCommand">Loading...</pre>
+                    <button class="deployment-code-copy" id="copyUninstallBtn">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="16 1 21 6 8 19 3 19 3 14 16 1"></polyline>
+                        </svg>
+                        Copy
+                    </button>
+                </div>
             </div>
             
             <div class="security-warning">
                 <div class="security-warning__header">
-                    <span class="security-warning__icon">⚠️</span>
+                    <span class="security-warning__icon">!</span>
                     <strong class="security-warning__title">Security Note</strong>
                 </div>
                 <p class="security-warning__text">This initial implementation is designed for trusted internal networks. For production use, implement API key authentication, HTTPS encryption, and script validation.</p>

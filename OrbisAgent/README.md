@@ -7,6 +7,7 @@
 ## Features
 
 - ✅ Automatic registration with Core Service
+- ✅ Persistent agent identity (survives restarts and reinstalls)
 - ✅ Periodic heartbeat (every 30 seconds)
 - ✅ Job polling (every 5 seconds)
 - ✅ Script execution (PowerShell & CMD)
@@ -130,16 +131,42 @@ Gets status of a specific Windows service.
 }
 ```
 
-## Configuration
+## Agent Identity Persistence
 
-Edit `C:\Program Files\OrbisAgent\config.ps1`:
+The agent uses a persistent identifier to maintain the same identity across restarts and reinstalls. This ensures that:
+
+- **Restarting the PC** won't create a duplicate agent
+- **Reinstalling the agent** preserves the same agent record
+- **Job history** remains associated with the same machine
+
+### How It Works
+
+1. **First Run**: Agent generates an ID based on the Windows Machine GUID
+2. **ID Storage**: The ID is saved to `agent-id.txt` in the installation directory
+3. **Subsequent Runs**: Agent reads the stored ID and re-registers with the same identity
+
+### Resetting Agent Identity
+
+To force creation of a new agent identity (e.g., after cloning a VM):
 
 ```powershell
-# OrbisAgent Configuration
-$CoreServiceUrl = "http://localhost:5000"
-$HeartbeatIntervalSeconds = 30
-$JobPollIntervalSeconds = 5
+# Stop the agent
+Stop-ScheduledTask -TaskName "OrbisAgent"
+
+# Delete the stored agent ID
+Remove-Item "C:\Program Files\OrbisAgent\agent-id.txt"
+
+# Start the agent (will generate new ID)
+Start-ScheduledTask -TaskName "OrbisAgent"
 ```
+
+## Configuration
+
+The agent configuration is set during installation via the `Install-OrbisAgent.ps1` script parameters.
+
+To change the Core Service URL after installation, edit the service wrapper:
+
+`C:\Program Files\OrbisAgent\OrbisAgent-Service.ps1`
 
 After changing configuration, restart the agent:
 
