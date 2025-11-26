@@ -217,6 +217,32 @@ const AgentUI = {
     },
 
     /**
+     * Switch between tabs in agent details modal
+     * @param {string} tabName - Tab name ('jobs' or 'builds')
+     */
+    switchTab(tabName) {
+        // Update tab buttons
+        const tabs = document.querySelectorAll('.agent-tab')
+        if (tabs.length === 0) return
+        
+        tabs.forEach(tab => tab.classList.remove('agent-tab--active'))
+        
+        const panels = document.querySelectorAll('.agent-tab-panel')
+        panels.forEach(panel => panel.classList.remove('agent-tab-panel--active'))
+        
+        // Activate selected tab
+        if (tabName === 'jobs') {
+            if (tabs[0]) tabs[0].classList.add('agent-tab--active')
+            const jobsPanel = document.getElementById('agentTabJobs')
+            if (jobsPanel) jobsPanel.classList.add('agent-tab-panel--active')
+        } else if (tabName === 'builds') {
+            if (tabs[1]) tabs[1].classList.add('agent-tab--active')
+            const buildsPanel = document.getElementById('agentTabBuilds')
+            if (buildsPanel) buildsPanel.classList.add('agent-tab-panel--active')
+        }
+    },
+
+    /**
      * Show agent details modal
      * @param {string} agentId - Agent ID
      */
@@ -231,35 +257,38 @@ const AgentUI = {
                 return
             }
 
-            // Load recent jobs and metrics
-            const [jobs, metrics] = await Promise.all([
+            // Store agent ID for tab switching
+            modal.dataset.agentId = agentId
+
+            // Load recent jobs and build history
+            const [jobs, buildHistory] = await Promise.all([
                 window.AgentAPI.getAgentJobs(agentId, 10),
-                window.AgentAPI.getAgentMetrics(agentId, 20)
+                window.AgentAPI.getAgentBuildHistory(agentId, 20)
             ])
 
             // Populate modal
-            document.getElementById('agentDetailName').textContent = agent.machineName
-            document.getElementById('agentDetailOS').textContent = agent.os || 'Unknown'
-            document.getElementById('agentDetailIP').textContent = agent.ipAddress || '—'
-            document.getElementById('agentDetailStatus').textContent = agent.status
-            document.getElementById('agentDetailVersion').textContent = agent.version || '1.0.0'
-            document.getElementById('agentDetailLastSeen').textContent = new Date(agent.lastHeartbeat).toLocaleString()
+            const nameEl = document.getElementById('agentDetailName')
+            const osEl = document.getElementById('agentDetailOS')
+            const ipEl = document.getElementById('agentDetailIP')
+            const statusEl = document.getElementById('agentDetailStatus')
+            const versionEl = document.getElementById('agentDetailVersion')
+            const lastSeenEl = document.getElementById('agentDetailLastSeen')
+            
+            if (nameEl) nameEl.textContent = agent.machineName
+            if (osEl) osEl.textContent = agent.os || 'Unknown'
+            if (ipEl) ipEl.textContent = agent.ipAddress || '—'
+            if (statusEl) statusEl.textContent = agent.status
+            if (versionEl) versionEl.textContent = agent.version || '1.0.0'
+            if (lastSeenEl) lastSeenEl.textContent = new Date(agent.lastHeartbeat).toLocaleString()
 
             // Render recent jobs
-            const jobsList = document.getElementById('agentDetailJobs')
-            if (jobs.length === 0) {
-                jobsList.innerHTML = '<p class="muted" style="text-align:center; padding:20px;">No jobs yet</p>'
-            } else {
-                jobsList.innerHTML = jobs.map(job => `
-                    <div style="padding:12px; background:var(--bg); border-radius:8px; margin-bottom:8px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div style="font-weight:600;">${job.type}</div>
-                            <span class="badge" style="background:${job.status === 'completed' ? '#10b981' : job.status === 'failed' ? '#ef4444' : '#f59e0b'}20; color:${job.status === 'completed' ? '#10b981' : job.status === 'failed' ? '#ef4444' : '#f59e0b'};">${job.status}</span>
-                        </div>
-                        <div style="font-size:12px; color:var(--muted); margin-top:4px;">${new Date(job.createdAt).toLocaleString()}</div>
-                    </div>
-                `).join('')
-            }
+            this.renderJobsList(jobs)
+            
+            // Render build history
+            this.renderBuildHistory(buildHistory, agent.version)
+
+            // Reset to jobs tab
+            this.switchTab('jobs')
 
             // Show modal
             modal.showModal()
@@ -268,6 +297,256 @@ const AgentUI = {
             console.error('Failed to load agent details:', error)
             alert('Failed to load agent details')
         }
+    },
+
+    /**
+     * Render jobs list in modal
+     * @param {Array} jobs - Array of jobs
+     */
+    renderJobsList(jobs) {
+        const jobsList = document.getElementById('agentDetailJobs')
+        if (!jobsList) return
+        
+        if (jobs.length === 0) {
+            jobsList.innerHTML = '<p class="muted" style="text-align:center; padding:20px;">No jobs yet</p>'
+        } else {
+            jobsList.innerHTML = jobs.map((job, index) => {
+                const statusColor = job.status === 'Completed' ? '#10b981' : 
+                                  job.status === 'Failed' ? '#ef4444' : 
+                                  job.status === 'Running' ? '#3b82f6' : '#f59e0b'
+                
+                // Parse payload to get script
+                let script = ''
+                let shell = 'PowerShell'
+                try {
+                    if (job.payloadJson) {
+                        const payload = JSON.parse(job.payloadJson)
+                        script = payload.script || ''
+                        shell = payload.shell || 'PowerShell'
+                    }
+                } catch (e) {
+                    // Ignore parse errors
+                }
+                
+                // Parse result
+                let result = ''
+                let exitCode = null
+                try {
+                    if (job.resultJson) {
+                        const resultData = JSON.parse(job.resultJson)
+                        result = resultData.output || resultData.result || ''
+                        exitCode = resultData.exitCode
+                    }
+                } catch (e) {
+                    // Ignore parse errors
+                }
+                
+                const hasScript = script && script.trim().length > 0
+                const hasResult = result && result.trim().length > 0
+                const hasError = job.errorMessage && job.errorMessage.trim().length > 0
+                
+                return `
+                    <div class="agent-job-card">
+                        <div class="agent-job-card__header">
+                            <div class="agent-job-card__info">
+                                <div class="agent-job-card__type">${job.type}</div>
+                                <div class="agent-job-card__time">${new Date(job.createdUtc).toLocaleString()}</div>
+                            </div>
+                            <span class="agent-job-card__status" style="background:${statusColor}20; color:${statusColor};">
+                                ${job.status}
+                            </span>
+                        </div>
+                        
+                        ${job.startedUtc ? `
+                        <div class="agent-job-card__meta">
+                            <div class="agent-job-card__meta-item">
+                                <span class="agent-job-card__meta-label">Started:</span>
+                                <span class="agent-job-card__meta-value">${new Date(job.startedUtc).toLocaleString()}</span>
+                            </div>
+                            ${job.completedUtc ? `
+                            <div class="agent-job-card__meta-item">
+                                <span class="agent-job-card__meta-label">Completed:</span>
+                                <span class="agent-job-card__meta-value">${new Date(job.completedUtc).toLocaleString()}</span>
+                            </div>
+                            <div class="agent-job-card__meta-item">
+                                <span class="agent-job-card__meta-label">Duration:</span>
+                                <span class="agent-job-card__meta-value">${this.formatDuration(job.startedUtc, job.completedUtc)}</span>
+                            </div>
+                            ` : ''}
+                            ${exitCode !== null ? `
+                            <div class="agent-job-card__meta-item">
+                                <span class="agent-job-card__meta-label">Exit Code:</span>
+                                <span class="agent-job-card__meta-value" style="color:${exitCode === 0 ? '#10b981' : '#ef4444'};">${exitCode}</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                        ` : ''}
+                        
+                        ${hasScript ? `
+                        <div class="agent-job-card__section">
+                            <button class="agent-job-card__toggle" onclick="AgentUI.toggleJobSection('script-${index}')">
+                                <svg class="agent-job-card__toggle-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                                Script (${shell})
+                            </button>
+                            <div id="script-${index}" class="agent-job-card__content" style="display:none;">
+                                <pre class="agent-job-card__code">${this.escapeHtml(script)}</pre>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        ${hasResult ? `
+                        <div class="agent-job-card__section">
+                            <button class="agent-job-card__toggle" onclick="AgentUI.toggleJobSection('result-${index}')">
+                                <svg class="agent-job-card__toggle-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                                Output
+                            </button>
+                            <div id="result-${index}" class="agent-job-card__content" style="display:none;">
+                                <pre class="agent-job-card__code">${this.escapeHtml(result)}</pre>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        ${hasError ? `
+                        <div class="agent-job-card__section">
+                            <button class="agent-job-card__toggle agent-job-card__toggle--error" onclick="AgentUI.toggleJobSection('error-${index}')">
+                                <svg class="agent-job-card__toggle-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                                Error
+                            </button>
+                            <div id="error-${index}" class="agent-job-card__content" style="display:none;">
+                                <pre class="agent-job-card__code agent-job-card__code--error">${this.escapeHtml(job.errorMessage)}</pre>
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                `
+            }).join('')
+        }
+    },
+
+    /**
+     * Toggle job section visibility
+     * @param {string} sectionId - Section ID
+     */
+    toggleJobSection(sectionId) {
+        const section = document.getElementById(sectionId)
+        const toggle = section?.previousElementSibling
+        
+        if (section && toggle) {
+            const isHidden = section.style.display === 'none'
+            section.style.display = isHidden ? 'block' : 'none'
+            
+            const icon = toggle.querySelector('.agent-job-card__toggle-icon')
+            if (icon) {
+                icon.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)'
+            }
+        }
+    },
+
+    /**
+     * Format duration between two dates
+     * @param {string} start - Start timestamp
+     * @param {string} end - End timestamp
+     * @returns {string} - Formatted duration
+     */
+    formatDuration(start, end) {
+        const ms = new Date(end) - new Date(start)
+        const seconds = Math.floor(ms / 1000)
+        
+        if (seconds < 60) return `${seconds}s`
+        if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+        return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`
+    },
+
+    /**
+     * Escape HTML to prevent XSS
+     * @param {string} text - Text to escape
+     * @returns {string} - Escaped text
+     */
+    escapeHtml(text) {
+        if (!text) return ''
+        const div = document.createElement('div')
+        div.textContent = text
+        return div.innerHTML
+    },
+
+    /**
+     * Render build history in modal
+     * @param {Array} builds - Array of build history entries
+     * @param {string} currentVersion - Current agent version
+     */
+    renderBuildHistory(builds, currentVersion) {
+        const buildsList = document.getElementById('agentDetailBuilds')
+        if (!buildsList) return
+        
+        if (builds.length === 0) {
+            buildsList.innerHTML = `
+                <div class="agent-builds-empty">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                    </svg>
+                    <h4>No Build History</h4>
+                    <p>Build deployments and version changes will appear here</p>
+                </div>
+            `
+            return
+        }
+        
+        buildsList.innerHTML = builds.map((build, index) => {
+            const isCurrent = build.version === currentVersion && index === 0
+            const itemClass = isCurrent ? 'agent-build-item--current' : (build.status === 'failed' ? 'agent-build-item--failed' : '')
+            const badgeText = isCurrent ? 'Current' : (build.status === 'failed' ? 'Failed' : build.status || 'Deployed')
+            
+            const icon = isCurrent ? 
+                '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>' :
+                (build.status === 'failed' ? 
+                    '<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>' :
+                    '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>')
+            
+            return `
+                <div class="agent-build-item ${itemClass}">
+                    <div class="agent-build-item__icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            ${icon}
+                        </svg>
+                    </div>
+                    <div class="agent-build-item__content">
+                        <div class="agent-build-item__header">
+                            <div class="agent-build-item__version">v${build.version}</div>
+                            <div class="agent-build-item__badge">${badgeText}</div>
+                        </div>
+                        <div class="agent-build-item__time">
+                            ${this.formatTimeAgo(build.timestamp)} · ${new Date(build.timestamp).toLocaleString()}
+                        </div>
+                        ${build.osVersion ? `
+                        <div class="agent-build-item__details">
+                            <div class="agent-build-item__detail">
+                                <div class="agent-build-item__detail-label">OS Version</div>
+                                <div class="agent-build-item__detail-value">${build.osVersion}</div>
+                            </div>
+                            ${build.deployedBy ? `
+                            <div class="agent-build-item__detail">
+                                <div class="agent-build-item__detail-label">Deployed By</div>
+                                <div class="agent-build-item__detail-value">${build.deployedBy}</div>
+                            </div>
+                            ` : ''}
+                        </div>
+                        ` : ''}
+                        ${build.description ? `
+                        <div class="agent-build-item__description">
+                            ${build.description}
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `
+        }).join('')
     },
 
     /**

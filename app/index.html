@@ -3391,11 +3391,38 @@ Channels
                 </div>
             </div>
             
-            <!-- Recent Jobs -->
-            <div>
-                <h3>Recent Jobs</h3>
-                <div id="agentDetailJobs" class="agent-jobs-list">
-                    <p class="muted" style="text-align:center; padding:20px;">Loading...</p>
+            <!-- Tab Navigation -->
+            <div class="agent-tabs">
+                <button class="agent-tab agent-tab--active" onclick="AgentUI.switchTab('jobs')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    Recent Jobs
+                </button>
+                <button class="agent-tab" onclick="AgentUI.switchTab('builds')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                    </svg>
+                    Build History
+                </button>
+            </div>
+            
+            <!-- Tab Content -->
+            <div class="agent-tab-content">
+                <!-- Recent Jobs Tab -->
+                <div id="agentTabJobs" class="agent-tab-panel agent-tab-panel--active">
+                    <div id="agentDetailJobs" class="agent-jobs-list">
+                        <p class="muted" style="text-align:center; padding:20px;">Loading...</p>
+                    </div>
+                </div>
+                
+                <!-- Build History Tab -->
+                <div id="agentTabBuilds" class="agent-tab-panel">
+                    <div id="agentDetailBuilds" class="agent-builds-list">
+                        <p class="muted" style="text-align:center; padding:20px;">Loading...</p>
+                    </div>
                 </div>
             </div>
         </div>
