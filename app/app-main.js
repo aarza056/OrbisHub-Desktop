@@ -4020,9 +4020,15 @@ async function showView(name, updateUrl = true) {
                 break
                 
             case 'agents':
-                // Initialize agent management via AgentUI module
+                // Only render agents dashboard if it hasn't been loaded yet
                 if (window.AgentUI) {
-                    window.AgentUI.renderAgentsDashboard();
+                    const agentsList = document.getElementById('agentsList');
+                    // Check if agents list is empty or not yet rendered
+                    if (!agentsList || agentsList.children.length === 0 || 
+                        agentsList.innerHTML.includes('Loading agents...') ||
+                        agentsList.innerHTML.includes('No Agents Connected')) {
+                        window.AgentUI.renderAgentsDashboard();
+                    }
                 }
                 break
                 
@@ -9759,18 +9765,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.AgentUI.init()
     }
     
-    // Listen for view changes to render agents when agents view is shown
-    const navButtons = document.querySelectorAll('.nav__btn[data-view]')
-    navButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const viewName = btn.dataset.view
-            
-            // Render agents when agents view is shown
-            if (viewName === 'agents' && window.AgentUI) {
-                setTimeout(() => {
-                    window.AgentUI.renderAgentsDashboard()
-                }, 100)
-            }
-        })
-    })
+    // Note: Agent view rendering is handled by the showView() function
+    // No need for duplicate event listeners here
 })
+
