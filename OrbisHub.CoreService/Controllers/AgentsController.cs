@@ -166,4 +166,36 @@ public class AgentsController : ControllerBase
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
+
+    /// <summary>
+    /// Delete an agent
+    /// DELETE /api/agents/{agentId}
+    /// </summary>
+    [HttpDelete("{agentId}")]
+    public async Task<ActionResult> Delete(Guid agentId)
+    {
+        try
+        {
+            var agent = await _agentRepository.GetByIdAsync(agentId);
+            if (agent == null)
+            {
+                return NotFound(new { error = "Agent not found" });
+            }
+
+            var success = await _agentRepository.DeleteAsync(agentId);
+            
+            if (!success)
+            {
+                return StatusCode(500, new { error = "Failed to delete agent" });
+            }
+
+            _logger.LogInformation("Agent {AgentId} ({MachineName}) deleted", agentId, agent.MachineName);
+            return Ok(new { message = "Agent deleted successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting agent {AgentId}", agentId);
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
 }

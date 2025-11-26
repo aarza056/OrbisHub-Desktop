@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("OrbisHub.CoreService")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5b48202b18c6799fa9c86b1752b77e1ca8a37c19")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+25d3b4176b96d50f0bf4400bcfebe77f007e39ee")]
 [assembly: System.Reflection.AssemblyProductAttribute("OrbisHub.CoreService")]
 [assembly: System.Reflection.AssemblyTitleAttribute("OrbisHub.CoreService")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

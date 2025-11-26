@@ -127,14 +127,17 @@ const AgentAPI = {
 
     /**
      * Delete an agent
-     * NOTE: Agents cannot be deleted via Desktop client
-     * They auto-expire after 2 minutes without heartbeat
      * @param {string} agentId - Agent ID
      * @returns {Promise<Object>} - Success status
      */
     async deleteAgent(agentId) {
-        console.log('Agents auto-expire after heartbeat timeout. Manual deletion not supported.');
-        return { success: false, error: 'Manual agent deletion not supported. Agents expire automatically.' };
+        try {
+            await this.apiCall(`/api/agents/${agentId}`, 'DELETE');
+            return { success: true };
+        } catch (error) {
+            console.error('Failed to delete agent:', error);
+            return { success: false, error: error.message };
+        }
     },
 
     /**

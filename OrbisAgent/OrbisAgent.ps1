@@ -19,8 +19,13 @@ $script:CoreServiceUrl = $CoreServiceUrl
 $script:Running = $true
 $script:AgentVersion = "1.0.0"
 
-# Log file
-$script:LogPath = Join-Path $PSScriptRoot "OrbisAgent.log"
+# Log file - use Logs subdirectory if it exists
+$logsDir = Join-Path $PSScriptRoot "Logs"
+if (Test-Path $logsDir) {
+    $script:LogPath = Join-Path $logsDir "OrbisAgent.log"
+} else {
+    $script:LogPath = Join-Path $PSScriptRoot "OrbisAgent.log"
+}
 
 function Write-Log {
     param([string]$Message, [string]$Level = "INFO")
@@ -110,6 +115,15 @@ function Send-Heartbeat {
         Write-Log "Heartbeat sent successfully" "DEBUG"
         return $true
     } catch {
+        # If agent not found (404), re-register
+        if ($_.Exception.Response.StatusCode.value__ -eq 404) {
+            Write-Log "Agent not found in database (404). Re-registering..." "WARN"
+            $registered = Register-Agent
+            if ($registered) {
+                Write-Log "Re-registration successful" "SUCCESS"
+                return $true
+            }
+        }
         Write-Log "Failed to send heartbeat: $_" "ERROR"
         return $false
     }
@@ -139,7 +153,16 @@ function Get-NextJob {
         
         return $null
     } catch {
-        Write-Log "Failed to get next job: $_" "ERROR"
+        # If agent not found (404), re-register and retry
+        if ($_.Exception.Response.StatusCode.value__ -eq 404) {
+            Write-Log "Agent not found when polling for jobs (404). Re-registering..." "WARN"
+            $registered = Register-Agent
+            if (-not $registered) {
+                Write-Log "Re-registration failed" "ERROR"
+            }
+        } else {
+            Write-Log "Failed to get next job: $_" "ERROR"
+        }
         return $null
     }
 }
