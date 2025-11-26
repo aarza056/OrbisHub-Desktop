@@ -10,7 +10,7 @@
 
 const AgentAPI = {
     // Core Service URL - can be configured
-    coreServiceUrl: 'http://127.0.0.1:5000',
+    coreServiceUrl: 'http://192.168.11.56:5000',
 
     /**
      * Set Core Service URL

@@ -24,31 +24,109 @@ public class AgentDownloadController : ControllerBase
     [HttpGet("download")]
     public IActionResult DownloadAgent()
     {
+        return DownloadAgentFile("OrbisAgent.ps1");
+    }
+
+    /// <summary>
+    /// Download the agent installer script
+    /// GET /api/agent/download/installer
+    /// </summary>
+    [HttpGet("download/installer")]
+    public IActionResult DownloadInstaller()
+    {
+        return DownloadAgentFile("Install-OrbisAgent.ps1");
+    }
+
+    /// <summary>
+    /// Download the agent bootstrap script (one-liner installer)
+    /// GET /api/agent/download/bootstrap
+    /// </summary>
+    [HttpGet("download/bootstrap")]
+    public IActionResult DownloadBootstrap()
+    {
+        return DownloadAgentFile("OrbisAgent-Bootstrap.ps1");
+    }
+
+    /// <summary>
+    /// Download the uninstaller script
+    /// GET /api/agent/download/uninstaller
+    /// </summary>
+    [HttpGet("download/uninstaller")]
+    public IActionResult DownloadUninstaller()
+    {
+        return DownloadAgentFile("Uninstall-OrbisAgent.ps1");
+    }
+
+    /// <summary>
+    /// Get installation instructions and commands
+    /// GET /api/agent/install-guide
+    /// </summary>
+    [HttpGet("install-guide")]
+    public IActionResult GetInstallGuide()
+    {
         try
         {
-            // Path to the agent script in the project
-            var agentScriptPath = Path.Combine(
-                _environment.ContentRootPath,
-                "..",
-                "OrbisAgent",
-                "OrbisAgent.ps1"
-            );
-
-            if (!System.IO.File.Exists(agentScriptPath))
+            var serverUrl = $"{Request.Scheme}://{Request.Host}";
+            
+            var guide = new
             {
-                _logger.LogError("Agent script not found at: {Path}", agentScriptPath);
-                return NotFound(new { error = "Agent script not found" });
-            }
+                quickInstall = new
+                {
+                    title = "Quick Install (One Command)",
+                    description = "Run this command on the target PC as Administrator",
+                    command = $"irm {serverUrl}/api/agent/download/bootstrap | iex"
+                },
+                manualInstall = new
+                {
+                    title = "Manual Install",
+                    steps = new[]
+                    {
+                        new { step = 1, description = "Download the installer", command = $"Invoke-WebRequest -Uri '{serverUrl}/api/agent/download/installer' -OutFile 'Install-OrbisAgent.ps1'" },
+                        new { step = 2, description = "Run the installer as Administrator", command = $".\\Install-OrbisAgent.ps1 -CoreServiceUrl '{serverUrl}'" }
+                    }
+                },
+                uninstall = new
+                {
+                    title = "Uninstall Agent",
+                    command = $"irm {serverUrl}/api/agent/download/uninstaller | iex"
+                }
+            };
 
-            var scriptContent = System.IO.File.ReadAllBytes(agentScriptPath);
-            
-            _logger.LogInformation("Agent script downloaded");
-            
-            return File(scriptContent, "text/plain", "OrbisAgent.ps1");
+            return Ok(guide);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error downloading agent script");
+            _logger.LogError(ex, "Error generating install guide");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+
+    private IActionResult DownloadAgentFile(string fileName)
+    {
+        try
+        {
+            var filePath = Path.Combine(
+                _environment.ContentRootPath,
+                "..",
+                "OrbisAgent",
+                fileName
+            );
+
+            if (!System.IO.File.Exists(filePath))
+            {
+                _logger.LogError("Agent file not found at: {Path}", filePath);
+                return NotFound(new { error = $"{fileName} not found" });
+            }
+
+            var fileContent = System.IO.File.ReadAllBytes(filePath);
+            
+            _logger.LogInformation("Agent file downloaded: {FileName}", fileName);
+            
+            return File(fileContent, "text/plain", fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error downloading agent file: {FileName}", fileName);
             return StatusCode(500, new { error = "Internal server error" });
         }
     }

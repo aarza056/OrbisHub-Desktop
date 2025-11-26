@@ -655,10 +655,72 @@ const AgentUI = {
     showDeploymentGuide() {
         const modal = document.getElementById('agentDeploymentModal')
         if (modal) {
+            // Populate commands with actual server URL
+            this.populateDeploymentCommands()
+            
             modal.showModal()
             // Attach copy handlers (idempotent)
             this.attachDeploymentCopyHandlers()
         }
+    },
+
+    /**
+     * Populate deployment commands with actual server IP
+     */
+    populateDeploymentCommands() {
+        // Get server URL - try multiple sources
+        let serverUrl = 'http://127.0.0.1:5000'
+        
+        // Try to get from AgentAPI
+        if (window.AgentAPI && window.AgentAPI.coreServiceUrl) {
+            serverUrl = window.AgentAPI.coreServiceUrl
+        }
+        // Or detect from current window location
+        else if (window.location.protocol === 'file:') {
+            // Electron app - use localhost
+            serverUrl = 'http://127.0.0.1:5000'
+        } else {
+            // Web browser - use current host with port 5000
+            serverUrl = `${window.location.protocol}//${window.location.hostname}:5000`
+        }
+        
+        console.log('Deployment Guide - Using server URL:', serverUrl)
+        
+        // Quick install command
+        const bootstrapCmd = `irm ${serverUrl}/api/agent/download/bootstrap | iex`
+        const bootstrapEl = document.getElementById('bootstrapCommand')
+        if (bootstrapEl) {
+            bootstrapEl.textContent = bootstrapCmd
+            console.log('Set bootstrap command:', bootstrapCmd)
+        }
+        
+        // Manual install - download
+        const downloadCmd = `Invoke-WebRequest -Uri '${serverUrl}/api/agent/download/installer' -OutFile 'Install-OrbisAgent.ps1'`
+        const downloadEl = document.getElementById('downloadInstallerCommand')
+        if (downloadEl) downloadEl.textContent = downloadCmd
+        
+        // Manual install - run
+        const runCmd = `.\\Install-OrbisAgent.ps1 -CoreServiceUrl '${serverUrl}'`
+        const runEl = document.getElementById('runInstallerCommand')
+        if (runEl) runEl.textContent = runCmd
+        
+        // Uninstall command
+        const uninstallCmd = `irm ${serverUrl}/api/agent/download/uninstaller | iex`
+        const uninstallEl = document.getElementById('uninstallCommand')
+        if (uninstallEl) uninstallEl.textContent = uninstallCmd
+        
+        // Update copy button targets
+        const copyBootstrapBtn = document.getElementById('copyBootstrapBtn')
+        if (copyBootstrapBtn) copyBootstrapBtn.dataset.copyTarget = bootstrapCmd
+        
+        const copyDownloadBtn = document.getElementById('copyDownloadInstallerBtn')
+        if (copyDownloadBtn) copyDownloadBtn.dataset.copyTarget = downloadCmd
+        
+        const copyRunBtn = document.getElementById('copyRunInstallerBtn')
+        if (copyRunBtn) copyRunBtn.dataset.copyTarget = runCmd
+        
+        const copyUninstallBtn = document.getElementById('copyUninstallBtn')
+        if (copyUninstallBtn) copyUninstallBtn.dataset.copyTarget = uninstallCmd
     },
 
     /**
