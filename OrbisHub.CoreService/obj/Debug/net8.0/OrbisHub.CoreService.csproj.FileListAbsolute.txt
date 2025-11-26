@@ -95,3 +95,9 @@ C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\obj\Debug\
 C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\obj\Debug\net8.0\OrbisHub.CoreService.pdb
 C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\obj\Debug\net8.0\OrbisHub.CoreService.genruntimeconfig.cache
 C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\obj\Debug\net8.0\ref\OrbisHub.CoreService.dll
+C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\bin\Debug\net8.0\publish\publish\publish\publish\publish\web.config
+C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\bin\Debug\net8.0\publish\publish\publish\publish\publish\appsettings.Development.json
+C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\bin\Debug\net8.0\publish\publish\publish\publish\publish\appsettings.json
+C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\bin\Debug\net8.0\publish\publish\publish\publish\publish\OrbisHub.CoreService.deps.json
+C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\bin\Debug\net8.0\publish\publish\publish\publish\publish\OrbisHub.CoreService.runtimeconfig.json
+C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\bin\Debug\net8.0\publish\publish\publish\publish\publish\OrbisHub.CoreService.staticwebassets.endpoints.json

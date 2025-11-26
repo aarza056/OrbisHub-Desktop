@@ -80,6 +80,7 @@ Invoke-WebRequest -Uri 'http://YOUR_SERVER_IP:5000/api/agent/download' -OutFile 
 When installed via bootstrap or installer:
 
 - **Location:** `C:\Program Files\OrbisAgent\`
+- **Agent ID File:** `C:\Program Files\OrbisAgent\agent-id.txt` (persistent identity)
 - **Service Type:** Windows Scheduled Task
 - **Runs As:** SYSTEM (with administrator privileges)
 - **Auto-Start:** Yes (triggers at system startup)
@@ -88,6 +89,23 @@ When installed via bootstrap or installer:
 - **Job Poll Interval:** 5 seconds
 
 ## Agent Behavior
+
+### Agent Identity Persistence
+
+The agent maintains a persistent identity across restarts and reinstalls to prevent duplicate agent entries:
+
+- **First Run:** Agent generates an ID based on the Windows Machine GUID
+- **ID Storage:** The ID is saved to `agent-id.txt` in the installation directory
+- **Subsequent Runs:** Agent reads the stored ID and re-registers with the same identity
+- **After Restart:** Same agent ID is used, no duplicate created
+- **After Reinstall:** If `agent-id.txt` exists, the same ID is reused
+
+To force a new agent identity (e.g., after VM cloning):
+```powershell
+Stop-ScheduledTask -TaskName "OrbisAgent"
+Remove-Item "C:\Program Files\OrbisAgent\agent-id.txt"
+Start-ScheduledTask -TaskName "OrbisAgent"
+```
 
 ### After Installation
 1. Agent registers with Core Service (or re-registers if already known)
@@ -102,12 +120,13 @@ When installed via bootstrap or installer:
 ### After PC Restart
 1. Scheduled Task triggers automatically at startup
 2. Agent starts within seconds of Windows boot
-3. Registers/re-registers with Core Service
-4. Resumes normal operation (heartbeats + job polling)
+3. Reads stored agent ID from `agent-id.txt`
+4. Registers/re-registers with Core Service using the same ID
+5. Resumes normal operation (heartbeats + job polling)
 
 ### After Agent Crash
 1. Windows automatically restarts the task (1-minute interval)
-2. Agent re-registers with Core Service
+2. Agent reads stored ID and re-registers with Core Service
 3. Resumes operation
 
 ## Management Commands

@@ -105,17 +105,34 @@ public class AgentDownloadController : ControllerBase
     {
         try
         {
-            var filePath = Path.Combine(
-                _environment.ContentRootPath,
-                "..",
-                "OrbisAgent",
-                fileName
-            );
-
-            if (!System.IO.File.Exists(filePath))
+            // Try multiple paths to find the agent files
+            var possiblePaths = new[]
             {
-                _logger.LogError("Agent file not found at: {Path}", filePath);
-                return NotFound(new { error = $"{fileName} not found" });
+                Path.Combine(_environment.ContentRootPath, "OrbisAgent", fileName),
+                Path.Combine(_environment.ContentRootPath, "..", "OrbisAgent", fileName),
+                Path.Combine(_environment.ContentRootPath, "..", "..", "OrbisAgent", fileName),
+                @"c:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisAgent\" + fileName
+            };
+
+            string? filePath = null;
+            _logger.LogInformation("ContentRootPath: {ContentRoot}", _environment.ContentRootPath);
+            
+            foreach (var path in possiblePaths)
+            {
+                var normalizedPath = Path.GetFullPath(path);
+                _logger.LogInformation("Checking path: {Path}, Exists: {Exists}", normalizedPath, System.IO.File.Exists(normalizedPath));
+                if (System.IO.File.Exists(normalizedPath))
+                {
+                    filePath = normalizedPath;
+                    _logger.LogInformation("Found file at: {Path}", normalizedPath);
+                    break;
+                }
+            }
+
+            if (filePath == null)
+            {
+                _logger.LogError("Agent file not found. Tried paths: {Paths}", string.Join(", ", possiblePaths.Select(Path.GetFullPath)));
+                return NotFound(new { error = $"{fileName} not found", searchedPaths = possiblePaths.Select(Path.GetFullPath).ToArray() });
             }
 
             var fileContent = System.IO.File.ReadAllBytes(filePath);

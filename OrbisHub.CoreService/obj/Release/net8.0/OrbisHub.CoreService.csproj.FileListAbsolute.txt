@@ -89,3 +89,9 @@ C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\bin\Releas
 C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\bin\Release\net8.0\publish\publish\publish\OrbisHub.CoreService.deps.json
 C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\bin\Release\net8.0\publish\publish\publish\OrbisHub.CoreService.runtimeconfig.json
 C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\bin\Release\net8.0\publish\publish\publish\OrbisHub.CoreService.staticwebassets.endpoints.json
+C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\bin\Release\net8.0\publish\publish\publish\publish\web.config
+C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\bin\Release\net8.0\publish\publish\publish\publish\appsettings.Development.json
+C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\bin\Release\net8.0\publish\publish\publish\publish\appsettings.json
+C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\bin\Release\net8.0\publish\publish\publish\publish\OrbisHub.CoreService.deps.json
+C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\bin\Release\net8.0\publish\publish\publish\publish\OrbisHub.CoreService.runtimeconfig.json
+C:\Users\Ashot\Documents\GitHub\OrbisHub-Desktop\OrbisHub.CoreService\bin\Release\net8.0\publish\publish\publish\publish\OrbisHub.CoreService.staticwebassets.endpoints.json
