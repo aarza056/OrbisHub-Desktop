@@ -16,7 +16,10 @@ const AgentUI = {
         const agentsList = document.getElementById('agentsList')
         if (!agentsList) return
 
-        agentsList.innerHTML = '<div style="padding:20px; text-align:center; color:var(--muted);">Loading agents...</div>'
+        // Only show loading message if the list is completely empty
+        if (!agentsList.hasChildNodes() || agentsList.children.length === 0) {
+            agentsList.innerHTML = '<div style="padding:20px; text-align:center; color:var(--muted);">Loading agents...</div>'
+        }
 
         try {
             const agents = await window.AgentAPI.getAllAgents()
