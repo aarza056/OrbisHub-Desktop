@@ -1,1 +1,2 @@
-1. In "Remote Desktop Manager" server status is not being checked - 
+1. In "Remote Desktop Manager" server status is not being checked - Fixed
+2. ❌ Error initializing app data: ReferenceError: renderIntegrations is not defined - Fixed

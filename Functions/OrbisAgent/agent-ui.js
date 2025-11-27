@@ -790,8 +790,6 @@ const AgentUI = {
      * Initialize agent UI module
      */
     init() {
-        console.log('🤖 Agent UI module initialized')
-        
         // Auto-refresh agents every 30 seconds
         setInterval(() => {
             const agentsList = document.getElementById('agentsList')
