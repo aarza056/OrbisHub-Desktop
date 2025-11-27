@@ -453,14 +453,6 @@
   <span>Messages</span>
   <span class="nav-badge" id="navUnreadBadge" style="display:none;">0</span>
 </button>
-<!-- AI Assistant Button -->
-<button class="config-status-btn" id="assistantTopBtn" title="Ask AI" style="margin-right:12px;">
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="10"></circle>
-    <path d="M9 12l2 2 4-4"></path>
-  </svg>
-  <span>Ask AI</span>
- </button>
 <!-- Configuration Status Button -->
 <button class="config-status-btn" id="configStatusBtn" title="System Configuration">
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3144,56 +3136,6 @@ Channels
 </menu>
 </form>
 </dialog>
-
-<!-- AI Chat Assistant -->
-<div id="aiChatWidget" class="ai-chat-widget">
-  <div class="ai-chat-header">
-    <div style="display: flex; align-items: center; gap: 8px;">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-      </svg>
-      <span style="font-weight: 600;">Քեռի AI</span>
-    </div>
-    <button id="closeChatBtn" class="ai-chat-close">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="18" y1="6" x2="6" y2="18"></line>
-        <line x1="6" y1="6" x2="18" y2="18"></line>
-      </svg>
-    </button>
-  </div>
-  <div id="aiChatMessages" class="ai-chat-messages">
-    <div class="ai-message">
-      <div class="ai-message-avatar">
-        <img src="media/qeri.png" alt="Քեռի AI" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
-      </div>
-      <div class="ai-message-content">
-        <p>Hi! I'm <strong>Քեռի AI</strong>, your DevOps assistant. I can do everything in OrbisHub!</p>
-        <p><strong>Try asking me:</strong></p>
-        <ul>
-          <li>"Create environment named Prod at https://example.com"</li>
-          <li>"List all servers"</li>
-          <li>"Delete user John"</li>
-          <li>"How many environments do I have?"</li>
-          <li>"Help" - to see all commands</li>
-        </ul>
-        <p>Just ask naturally and I'll understand! 😊</p>
-      </div>
-    </div>
-  </div>
-  <div class="ai-chat-input-container">
-    <input type="text" id="aiChatInput" class="ai-chat-input" placeholder="Type your message...">
-    <button id="aiChatSend" class="ai-chat-send">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="22" y1="2" x2="11" y2="13"></line>
-        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-      </svg>
-    </button>
-  </div>
-</div>
-<!-- Removed floating AI toggle button -->
-
-<!-- Modern UI Enhancement: Toast Container (auto-created by JS) -->
-<!-- Modern UI Enhancement: Command Palette (auto-created by JS) -->
 
 <!-- System Configuration Modal -->
 <dialog id="systemConfigModal" class="modal">
