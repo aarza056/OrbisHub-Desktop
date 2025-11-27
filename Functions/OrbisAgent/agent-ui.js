@@ -133,7 +133,7 @@ const AgentUI = {
                     <div class="agent-card__metric-value ${memClass}">${memInfo}</div>
                 </div>
                 <div class="agent-card__metric">
-                    <div class="agent-card__metric-label">Disk</div>
+                    <div class="agent-card__metric-label">Storage</div>
                     <div class="agent-card__metric-value ${diskClass}">${diskInfo}</div>
                 </div>
                 <div class="agent-card__metric">
