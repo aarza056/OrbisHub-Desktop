@@ -43,13 +43,38 @@ const AgentUI = {
                 return
             }
 
-            // Render agents grid
-            agentsList.innerHTML = ''
-            
             // Update status counters
             this.updateStatusCounters(agents)
             
-            agents.forEach(agent => {
+            // Remove any loading messages or non-card elements
+            Array.from(agentsList.children).forEach(child => {
+                if (!child.classList.contains('agent-card')) {
+                    child.remove()
+                }
+            })
+            
+            // Update existing cards in place instead of clearing and rebuilding
+            // This prevents the visual "jump" when refreshing
+            const existingCards = Array.from(agentsList.querySelectorAll('.agent-card'))
+            const agentMap = new Map(agents.map(agent => [agent.id, agent]))
+            
+            // Update or remove existing cards
+            existingCards.forEach(card => {
+                const cardId = card.dataset.agentId
+                const agent = agentMap.get(cardId)
+                
+                if (agent) {
+                    // Update existing card
+                    this.updateAgentCard(card, agent)
+                    agentMap.delete(cardId) // Mark as processed
+                } else {
+                    // Agent no longer exists, remove card
+                    card.remove()
+                }
+            })
+            
+            // Add new agent cards that weren't in the existing list
+            agentMap.forEach(agent => {
                 const agentCard = this.createAgentCard(agent)
                 agentsList.appendChild(agentCard)
             })
@@ -78,7 +103,20 @@ const AgentUI = {
     createAgentCard(agent) {
         const card = document.createElement('div')
         card.className = 'agent-card'
+        card.dataset.agentId = agent.id // Add data attribute for tracking
         
+        // Populate card content
+        this.updateAgentCard(card, agent)
+        
+        return card
+    },
+
+    /**
+     * Update an existing agent card with new data
+     * @param {HTMLElement} card - Agent card element
+     * @param {Object} agent - Agent data
+     */
+    updateAgentCard(card, agent) {
         // Determine status based on last heartbeat (UTC timestamp)
         const now = new Date().getTime()
         const lastHeartbeat = new Date(agent.lastHeartbeat + 'Z').getTime() // Ensure UTC parsing
@@ -182,9 +220,8 @@ const AgentUI = {
                 </button>
             </div>
         `
-        
-        return card
     },
+
 
     /**
      * Format timestamp to relative time

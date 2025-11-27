@@ -4370,15 +4370,9 @@ async function showView(name, updateUrl = true) {
                 break
                 
             case 'agents':
-                // Only render agents dashboard if it hasn't been loaded yet
+                // Always refresh agents when clicking the nav button
                 if (window.AgentUI) {
-                    const agentsList = document.getElementById('agentsList');
-                    // Check if agents list is empty or not yet rendered
-                    if (!agentsList || agentsList.children.length === 0 || 
-                        agentsList.innerHTML.includes('Loading agents...') ||
-                        agentsList.innerHTML.includes('No Agents Connected')) {
-                        window.AgentUI.renderAgentsDashboard();
-                    }
+                    window.AgentUI.renderAgentsDashboard();
                 }
                 break
                 
