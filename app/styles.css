@@ -298,6 +298,7 @@ body.compact-mode .card { padding: 10px; border-radius: 12px; }
   line-height: 1;
   box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
   margin-left: 8px;
+  animation: badge-pulse 2s ease-in-out infinite;
 }
 
 .config-status-btn.configured:hover {
@@ -5130,6 +5131,232 @@ SETUP WIZARD
   .btn {
     padding: 9px 14px;
     font-size: 13px;
+  }
+}
+
+/* ========================================
+   Summary Dashboard Styles
+   ======================================== */
+
+/* Status Banner */
+.summary-status-banner {
+  background: linear-gradient(135deg, var(--panel) 0%, color-mix(in srgb, var(--primary) 5%, var(--panel)) 100%);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.summary-status-banner__content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.summary-status-banner__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--primary) 0%, color-mix(in srgb, var(--primary) 80%, transparent) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.summary-status-banner__title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.summary-status-banner__subtitle {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.summary-health-ring {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.summary-health-ring__percentage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Metric Cards */
+.summary-metric-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.summary-metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.summary-metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent-color) 0%, transparent 100%);
+}
+
+.summary-metric-card--blue {
+  --accent-color: #3b82f6;
+}
+
+.summary-metric-card--green {
+  --accent-color: #10b981;
+}
+
+.summary-metric-card--purple {
+  --accent-color: #8b5cf6;
+}
+
+.summary-metric-card--orange {
+  --accent-color: #f59e0b;
+}
+
+.summary-metric-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.summary-metric-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-color) 15%, transparent) 0%, color-mix(in srgb, var(--accent-color) 5%, transparent) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-color);
+}
+
+.summary-metric-card__trend {
+  opacity: 0.6;
+}
+
+.summary-metric-card__value {
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 8px;
+  color: var(--accent-color);
+}
+
+.summary-metric-card__label {
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.summary-metric-card__details {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.summary-metric-detail {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-metric-detail__label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.summary-metric-detail__value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.summary-metric-detail__value--success {
+  color: #10b981;
+}
+
+.summary-metric-detail__value--error {
+  color: #ef4444;
+}
+
+.summary-metric-detail__value--muted {
+  color: var(--muted);
+}
+
+.summary-metric-detail__value--info {
+  color: var(--primary);
+}
+
+.summary-metric-card__progress {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.summary-metric-card__progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-color) 0%, color-mix(in srgb, var(--accent-color) 70%, transparent) 100%);
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+/* Activity filter buttons */
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.btn-ghost.active {
+  background: var(--primary);
+  color: white;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .summary-metric-card__value {
+    font-size: 36px;
+  }
+}
+
+@media (max-width: 768px) {
+  .summary-status-banner {
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  .summary-metric-card__value {
+    font-size: 32px;
   }
 }
 

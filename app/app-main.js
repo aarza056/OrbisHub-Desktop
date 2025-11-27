@@ -363,6 +363,26 @@ const store = {
                 summary: { enabled: false, time: '09:00', channel: '', recipients: '' },
                 health: { enabled: false, status: 'all', channel: '', recipients: '' }
             },
+            settings: {
+                compactMode: false,
+                fontSize: 'medium',
+                desktopNotifications: true,
+                errorNotifications: true,
+                soundEffects: false,
+                autoRefresh: false,
+                refreshInterval: 60,
+                autoBackup: false,
+                dataRetentionDays: 30,
+                exportFormat: 'json',
+                autoLock: false,
+                sessionTimeout: 15,
+                showPasswords: false,
+                auditLogging: true,
+                animations: true,
+                lazyLoading: true,
+                itemsPerPage: 50,
+                cacheDuration: 300
+            },
             locks: {},
             features: { claude_sonnet_4: true }
         }
@@ -389,7 +409,8 @@ const store = {
                 servers: db.servers || [],
                 credentials: db.credentials || [],
                 users: db.users || [],
-                auditLogs: db.auditLogs || []
+                auditLogs: db.auditLogs || [],
+                settings: db.settings || getDefaultSettings()
             })
         })
         const result = await response.json()
@@ -3143,18 +3164,6 @@ async function renderAllViews() {
         console.error('❌ Failed to load data:', error)
     }
     
-    // Restore last active view or default to summary
-    try {
-        const lastView = null 
-        if (lastView) {
-            showView(lastView)
-        } else {
-            showView('summary')
-        }
-    } catch (e) {
-        showView('summary')
-    }
-    
     // Render all views using cached data
     try {
 
@@ -3177,6 +3186,18 @@ async function renderAllViews() {
     } catch (error) {
         console.error('❌ Error initializing app data:', error)
         // Still show the app even if some data fails to load
+    }
+    
+    // Restore last active view or default to summary (after data is loaded)
+    try {
+        const lastView = null 
+        if (lastView) {
+            await showView(lastView)
+        } else {
+            await showView('summary')
+        }
+    } catch (e) {
+        await showView('summary')
     }
 }
 
@@ -3605,8 +3626,55 @@ if (testNotificationBtn) {
 // SUMMARY DASHBOARD
 // ============================================
 
-function updateSummaryDashboard() {
+let summaryStartTime = Date.now()
+let summaryActivityFilter = 'all'
+
+function updateSummaryNotificationBadge(systemHealth, hasErrors) {
+    const badge = document.getElementById('summaryNotificationBadge')
+    if (!badge) return
+    
+    if (systemHealth < 100 || hasErrors) {
+        badge.style.display = 'inline-flex'
+    } else {
+        badge.style.display = 'none'
+    }
+}
+
+async function updateSummaryDashboard() {
+    // Ensure the summary view DOM is loaded
+    const healthPercentageEl = document.getElementById('summaryHealthPercentage')
+    if (!healthPercentageEl) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    
+    // On first call after login, wait a bit longer to ensure all DOM elements are rendered
+    const summaryStatusBanner = document.getElementById('summaryStatusBanner')
+    if (summaryStatusBanner && !summaryStatusBanner.dataset.initialized) {
+        summaryStatusBanner.dataset.initialized = 'true'
+        await new Promise(resolve => setTimeout(resolve, 200))
+    }
+    
+    // Refresh servers from API
+    try {
+        const serversResponse = await fetch(`${API_BASE_URL}/api/load-data`)
+        const serversResult = await serversResponse.json()
+        if (serversResult.success && serversResult.data) {
+            const db = store.readSync()
+            db.servers = serversResult.data.servers || []
+            db.environments = serversResult.data.environments || db.environments || []
+            db.credentials = serversResult.data.credentials || db.credentials || []
+            db.users = serversResult.data.users || db.users || []
+            store.write(db, true) // Skip sync back to DB
+        }
+    } catch (error) {
+        console.error('Failed to refresh servers for summary:', error)
+    }
+    
     const db = store.readSync()
+    
+    // Update last refresh time
+    const lastUpdateEl = document.getElementById('summaryLastUpdate')
+    if (lastUpdateEl) lastUpdateEl.textContent = 'Just now'
     
     // Environments stats
     const environments = db.environments || []
@@ -3619,6 +3687,19 @@ function updateSummaryDashboard() {
     const elEnvIssues = document.getElementById('summaryEnvIssues')
     if (elEnvIssues) elEnvIssues.textContent = issueEnvs
     
+    // Update environment health bar
+    const envHealthBar = document.getElementById('summaryEnvHealthBar')
+    if (envHealthBar) {
+        if (environments.length > 0) {
+            const healthPercentage = (healthyEnvs / environments.length) * 100
+            envHealthBar.style.width = healthPercentage + '%'
+            envHealthBar.style.opacity = '1'
+        } else {
+            envHealthBar.style.width = '100%'
+            envHealthBar.style.opacity = '0.3'
+        }
+    }
+    
     // Servers stats
     const servers = db.servers || []
     const elSrvCount = document.getElementById('summaryServerCount')
@@ -3630,66 +3711,522 @@ function updateSummaryDashboard() {
     const elSrvOffline = document.getElementById('summaryServerOffline')
     if (elSrvOffline) elSrvOffline.textContent = offlineServers
     
-    // No script/build stats
+    // Update server health bar
+    const serverHealthBar = document.getElementById('summaryServerHealthBar')
+    if (serverHealthBar) {
+        if (servers.length > 0) {
+            const healthPercentage = (onlineServers / servers.length) * 100
+            serverHealthBar.style.width = healthPercentage + '%'
+            serverHealthBar.style.opacity = '1'
+        } else {
+            serverHealthBar.style.width = '100%'
+            serverHealthBar.style.opacity = '0.3'
+        }
+    }
+    
+    // Agents stats - fetch from API
+    let agents = []
+    let activeAgents = 0
+    let inactiveAgents = 0
+    
+    try {
+        if (window.AgentAPI) {
+            agents = await window.AgentAPI.getAllAgents()
+            // Count active agents (last heartbeat within 5 minutes)
+            const fiveMinutesAgo = Date.now() - (5 * 60 * 1000)
+            activeAgents = agents.filter(a => {
+                if (!a.lastHeartbeat) return false
+                const lastHeartbeat = new Date(a.lastHeartbeat + 'Z').getTime()
+                return lastHeartbeat > fiveMinutesAgo
+            }).length
+            inactiveAgents = agents.length - activeAgents
+        }
+    } catch (error) {
+        console.error('Failed to fetch agents for summary:', error)
+    }
+    
+    const elAgentCount = document.getElementById('summaryAgentCount')
+    if (elAgentCount) elAgentCount.textContent = agents.length
+    const elAgentActive = document.getElementById('summaryAgentActive')
+    if (elAgentActive) elAgentActive.textContent = activeAgents
+    const elAgentInactive = document.getElementById('summaryAgentInactive')
+    if (elAgentInactive) elAgentInactive.textContent = inactiveAgents
+    
+    // Update agent health bar
+    const agentHealthBar = document.getElementById('summaryAgentHealthBar')
+    if (agentHealthBar) {
+        if (agents.length > 0) {
+            const healthPercentage = (activeAgents / agents.length) * 100
+            agentHealthBar.style.width = healthPercentage + '%'
+            agentHealthBar.style.opacity = '1'
+        } else {
+            agentHealthBar.style.width = '100%'
+            agentHealthBar.style.opacity = '0.3'
+        }
+    }
+    
+    // Credentials stats
+    const credentials = db.credentials || []
+    const elCredCount = document.getElementById('summaryCredCount')
+    if (elCredCount) elCredCount.textContent = credentials.length
+    const elCredValid = document.getElementById('summaryCredValid')
+    if (elCredValid) elCredValid.textContent = credentials.length
+    const credTypes = [...new Set(credentials.map(c => c.type || 'Unknown'))].length
+    const elCredTypes = document.getElementById('summaryCredTypes')
+    if (elCredTypes) elCredTypes.textContent = credTypes
+    
+    // Update credential health bar
+    const credHealthBar = document.getElementById('summaryCredHealthBar')
+    if (credHealthBar) {
+        credHealthBar.style.width = '100%'
+        credHealthBar.style.opacity = credentials.length > 0 ? '1' : '0.3'
+    }
+    
+    // System info
+    const users = db.users || []
+    const elUserCount = document.getElementById('summaryUserCount')
+    if (elUserCount) elUserCount.textContent = users.length
+    
+    // Database status
+    const elDbStatus = document.getElementById('summaryDbStatus')
+    if (elDbStatus) {
+        try {
+            // Check if we can read from the database
+            const testDb = store.readSync()
+            if (testDb) {
+                elDbStatus.textContent = '✓ Connected'
+                elDbStatus.style.color = '#10b981'
+            } else {
+                elDbStatus.textContent = '⚠ Unknown'
+                elDbStatus.style.color = '#f59e0b'
+            }
+        } catch (e) {
+            elDbStatus.textContent = '✗ Error'
+            elDbStatus.style.color = '#ef4444'
+        }
+    }
+    
+    // OrbisHub.Core Service status
+    const elCoreStatus = document.getElementById('summaryCoreStatus')
+    if (elCoreStatus) {
+        try {
+            const coreUrl = window.AgentAPI ? window.AgentAPI.coreServiceUrl : 'http://192.168.11.56:5000'
+            
+            // Use Electron's HTTP request to avoid CORS issues
+            if (window.electronAPI && window.electronAPI.httpRequest) {
+                const response = await window.electronAPI.httpRequest(`${coreUrl}/api/agents`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                
+                if (response.ok) {
+                    elCoreStatus.textContent = '✓ Running'
+                    elCoreStatus.style.color = '#10b981'
+                } else {
+                    elCoreStatus.textContent = '⚠ Error'
+                    elCoreStatus.style.color = '#f59e0b'
+                }
+            } else {
+                // Fallback to regular fetch
+                const response = await fetch(`${coreUrl}/api/agents`, { 
+                    method: 'GET',
+                    signal: AbortSignal.timeout(3000)
+                })
+                if (response.ok) {
+                    elCoreStatus.textContent = '✓ Running'
+                    elCoreStatus.style.color = '#10b981'
+                } else {
+                    elCoreStatus.textContent = '⚠ Error'
+                    elCoreStatus.style.color = '#f59e0b'
+                }
+            }
+        } catch (e) {
+            console.error('Core Service check failed:', e)
+            elCoreStatus.textContent = '✗ Offline'
+            elCoreStatus.style.color = '#ef4444'
+        }
+    }
+    
+    // Database size
+    const elDbSize = document.getElementById('summaryDbSize')
+    if (elDbSize) {
+        try {
+            if (window.electronAPI && window.electronAPI.dbGetSize) {
+                const result = await window.electronAPI.dbGetSize()
+                if (result.success && result.sizeInMB !== undefined) {
+                    const sizeMB = parseFloat(result.sizeInMB)
+                    if (sizeMB >= 1024) {
+                        elDbSize.textContent = `${(sizeMB / 1024).toFixed(2)} GB`
+                    } else {
+                        elDbSize.textContent = `${sizeMB.toFixed(2)} MB`
+                    }
+                } else {
+                    elDbSize.textContent = '-'
+                }
+            } else {
+                elDbSize.textContent = '-'
+            }
+        } catch (e) {
+            console.error('Failed to get DB size:', e)
+            elDbSize.textContent = '-'
+        }
+    }
+    
+    // Update uptime
+    updateSummaryUptime()
+    
+    // Calculate overall system health including infrastructure services
+    const totalItems = environments.length + servers.length + agents.length
+    const healthyItems = healthyEnvs + onlineServers + activeAgents
+    
+    // Check infrastructure health (DB and Core Service)
+    const dbHealthy = elDbStatus && elDbStatus.textContent.includes('✓') ? 1 : 0
+    const coreHealthy = elCoreStatus && elCoreStatus.textContent.includes('✓') ? 1 : 0
+    const infrastructureTotal = 2 // DB + Core Service
+    const infrastructureHealthy = dbHealthy + coreHealthy
+    
+    // If no items exist, only use infrastructure health
+    let overallHealth = 100
+    let isEmptyState = totalItems === 0
+    
+    if (isEmptyState) {
+        // Only infrastructure services exist
+        if (infrastructureTotal > 0) {
+            overallHealth = (infrastructureHealthy / infrastructureTotal) * 100
+            isEmptyState = false // We have infrastructure to monitor
+        }
+    } else {
+        // Combine resource health (70%) and infrastructure health (30%)
+        const resourceHealth = (healthyItems / totalItems) * 100
+        const infraHealth = (infrastructureHealthy / infrastructureTotal) * 100
+        overallHealth = (resourceHealth * 0.7) + (infraHealth * 0.3)
+    }
+    
+    // Update health ring
+    const healthCircle = document.getElementById('summaryHealthCircle')
+    const healthPercentage = document.getElementById('summaryHealthPercentage')
+    
+    if (healthCircle && healthPercentage) {
+        if (isEmptyState) {
+            // Show dash for empty state
+            healthPercentage.textContent = '--'
+            healthCircle.style.strokeDashoffset = 201 // Full circle
+            healthCircle.style.stroke = 'var(--muted)'
+        } else {
+            const circumference = 2 * Math.PI * 32
+            const offset = circumference - (overallHealth / 100) * circumference
+            healthCircle.style.strokeDashoffset = offset
+            healthPercentage.textContent = Math.round(overallHealth) + '%'
+            
+            // Update color based on health
+            if (overallHealth >= 90) {
+                healthCircle.style.stroke = '#10b981'
+            } else if (overallHealth >= 70) {
+                healthCircle.style.stroke = '#f59e0b'
+            } else {
+                healthCircle.style.stroke = '#ef4444'
+            }
+        }
+    }
+    
+    // Update system status text
+    const systemStatus = document.getElementById('summarySystemStatus')
+    if (systemStatus) {
+        if (isEmptyState) {
+            systemStatus.textContent = 'No Data'
+            systemStatus.style.color = 'var(--muted)'
+        } else if (overallHealth >= 90) {
+            systemStatus.textContent = 'Operational'
+            systemStatus.style.color = '#10b981'
+        } else if (overallHealth >= 70) {
+            systemStatus.textContent = 'Degraded'
+            systemStatus.style.color = '#f59e0b'
+        } else {
+            systemStatus.textContent = 'Issues Detected'
+            systemStatus.style.color = '#ef4444'
+        }
+    }
+    
+    // Check for errors and update error logs
+    updateErrorLogs({
+        environments,
+        servers,
+        agents,
+        issueEnvs,
+        offlineServers,
+        inactiveAgents,
+        dbStatus: elDbStatus ? elDbStatus.textContent : '',
+        coreStatus: elCoreStatus ? elCoreStatus.textContent : ''
+    })
+    
+    // Update notification badge based on health and errors
+    const hasErrors = issueEnvs > 0 || offlineServers > 0 || inactiveAgents > 0 || 
+                      (elDbStatus && !elDbStatus.textContent.includes('✓')) ||
+                      (elCoreStatus && !elCoreStatus.textContent.includes('✓'))
+    updateSummaryNotificationBadge(isEmptyState ? 100 : overallHealth, hasErrors)
     
     // Recent activity
     updateRecentActivity(db)
 }
 
+function updateErrorLogs(data) {
+    const errorLogsContainer = document.getElementById('summaryErrorLogsContainer')
+    const errorLogsEl = document.getElementById('summaryErrorLogs')
+    
+    if (!errorLogsContainer || !errorLogsEl) return
+    
+    const errors = []
+    const timestamp = new Date().toLocaleString()
+    
+    // Check for database errors
+    if (data.dbStatus && data.dbStatus.includes('✗')) {
+        errors.push({
+            severity: 'critical',
+            component: 'Database Connection',
+            message: 'Unable to connect to SQL Server database',
+            details: 'Check if SQL Server is running and database credentials are correct. Go to Admin Panel > Database Setup to reconfigure.',
+            action: 'Verify SQL Server service is running and connection settings are correct',
+            time: timestamp
+        })
+    }
+    
+    // Check for Core Service errors
+    if (data.coreStatus && data.coreStatus.includes('✗')) {
+        errors.push({
+            severity: 'critical',
+            component: 'OrbisHub.Core Service',
+            message: 'Core Service is not responding',
+            details: 'The OrbisHub.Core Windows Service is offline or unreachable. Agent management and job execution are unavailable.',
+            action: 'Start the OrbisHub.Core service or verify the service URL is correct in Agent settings',
+            time: timestamp
+        })
+    } else if (data.coreStatus && data.coreStatus.includes('⚠')) {
+        errors.push({
+            severity: 'warning',
+            component: 'OrbisHub.Core Service',
+            message: 'Core Service returned an HTTP error',
+            details: 'The service is running but returned an error response. This may indicate configuration issues or the service is starting up.',
+            action: 'Check the Core Service logs for errors or wait a moment and refresh',
+            time: timestamp
+        })
+    }
+    
+    // Check for environment issues
+    if (data.issueEnvs > 0) {
+        errors.push({
+            severity: 'warning',
+            component: 'Environments',
+            message: `${data.issueEnvs} environment${data.issueEnvs > 1 ? 's have' : ' has'} health issues`,
+            details: 'One or more environments are marked as unhealthy. This may indicate connectivity problems or service outages.',
+            action: 'Review the Environments view to see which environments are affected and check their health status',
+            time: timestamp
+        })
+    }
+    
+    // Check for offline servers
+    if (data.offlineServers > 0) {
+        errors.push({
+            severity: 'warning',
+            component: 'Servers',
+            message: `${data.offlineServers} server${data.offlineServers > 1 ? 's are' : ' is'} offline or unreachable`,
+            details: 'These servers failed health checks or are not responding to ping/connection attempts.',
+            action: 'Check network connectivity, firewall rules, and verify servers are powered on',
+            time: timestamp
+        })
+    }
+    
+    // Check for inactive agents
+    if (data.inactiveAgents > 0) {
+        errors.push({
+            severity: 'warning',
+            component: 'Agents',
+            message: `${data.inactiveAgents} agent${data.inactiveAgents > 1 ? 's are' : ' is'} inactive (no heartbeat in 5+ minutes)`,
+            details: 'Agents have not reported a heartbeat recently. They may be stopped, the machine is offline, or network issues exist.',
+            action: 'Check if the OrbisAgent service is running on affected machines and verify network connectivity',
+            time: timestamp
+        })
+    }
+    
+    // Show/hide error logs container
+    if (errors.length > 0) {
+        errorLogsContainer.style.display = 'block'
+        
+        // Format errors as detailed log entries
+        const logHtml = errors.map(error => {
+            const severityColor = error.severity === 'critical' ? '#ef4444' : 
+                                 error.severity === 'warning' ? '#f59e0b' : '#3b82f6'
+            const severityLabel = error.severity.toUpperCase()
+            const severityIcon = error.severity === 'critical' ? '🔴' : '⚠️'
+            
+            return `
+                <div style="margin-bottom:12px; padding:12px; background:var(--panel); border-left:4px solid ${severityColor}; border-radius:6px;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                        <span style="font-size:16px;">${severityIcon}</span>
+                        <span style="color:${severityColor}; font-weight:700; font-size:11px; letter-spacing:0.5px;">[${severityLabel}]</span>
+                        <span style="color:var(--text); font-weight:600; font-size:13px;">${error.component}</span>
+                        <span style="color:var(--muted); font-size:10px; margin-left:auto;">${error.time}</span>
+                    </div>
+                    <div style="color:var(--text); font-size:13px; margin-bottom:6px; font-weight:500; padding-left:24px;">
+                        ${error.message}
+                    </div>
+                    ${error.details ? `
+                        <div style="color:var(--muted); font-size:12px; line-height:1.5; padding-left:24px; margin-bottom:6px;">
+                            ${error.details}
+                        </div>
+                    ` : ''}
+                    ${error.action ? `
+                        <div style="padding-left:24px; margin-top:8px;">
+                            <div style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px; background:var(--bg); border:1px solid var(--border); border-radius:4px; font-size:11px;">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                                <span style="color:var(--primary); font-weight:500;">Suggested Action:</span>
+                                <span style="color:var(--text);">${error.action}</span>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `
+        }).join('')
+        
+        errorLogsEl.innerHTML = logHtml
+    } else {
+        errorLogsContainer.style.display = 'none'
+    }
+}
+
+function updateSummaryUptime() {
+    const elUptime = document.getElementById('summaryUptime')
+    if (!elUptime) return
+    
+    const uptimeMs = Date.now() - summaryStartTime
+    const hours = Math.floor(uptimeMs / 3600000)
+    const minutes = Math.floor((uptimeMs % 3600000) / 60000)
+    
+    if (hours > 0) {
+        elUptime.textContent = `${hours}h ${minutes}m`
+    } else {
+        elUptime.textContent = `${minutes}m`
+    }
+}
+
+function filterSummaryActivity(filter) {
+    summaryActivityFilter = filter
+    
+    // Update button states
+    document.getElementById('activityFilterAll')?.classList.toggle('active', filter === 'all')
+    document.getElementById('activityFilterEnv')?.classList.toggle('active', filter === 'environments')
+    document.getElementById('activityFilterSrv')?.classList.toggle('active', filter === 'servers')
+    
+    const db = store.readSync()
+    updateRecentActivity(db)
+}
+
+// Update uptime every minute
+setInterval(updateSummaryUptime, 60000)
+
 function updateRecentActivity(db) {
     const activityContainer = document.getElementById('summaryRecentActivity')
+    if (!activityContainer) return
+    
     const activities = []
     
-    // Activities removed
-    
     // Get recently added environments
-    const environments = (db.environments || []).slice(-3).reverse()
-    environments.forEach(env => {
-        activities.push({
-            type: 'environment',
-            icon: '🌍',
-            text: `Environment "${env.name}" created`,
-            time: env.createdAt || Date.now(),
-            status: 'info'
+    if (summaryActivityFilter === 'all' || summaryActivityFilter === 'environments') {
+        const environments = (db.environments || []).slice(-5).reverse()
+        environments.forEach(env => {
+            activities.push({
+                type: 'environment',
+                icon: '🌍',
+                text: `Environment "${env.name}" created`,
+                time: env.createdAt || Date.now(),
+                status: 'info',
+                action: () => showView('environments')
+            })
         })
-    })
+    }
     
     // Get recently added servers
-    const servers = (db.servers || []).slice(-3).reverse()
-    servers.forEach(server => {
-        activities.push({
-            type: 'server',
-            icon: '🖥️',
-            text: `Server "${server.displayName || server.hostname || server.ipAddress || 'Server'}" added`,
-            time: server.createdAt || Date.now(),
-            status: 'info'
+    if (summaryActivityFilter === 'all' || summaryActivityFilter === 'servers') {
+        const servers = (db.servers || []).slice(-5).reverse()
+        servers.forEach(server => {
+            activities.push({
+                type: 'server',
+                icon: '🖥️',
+                text: `Server "${server.displayName || server.hostname || server.ipAddress || 'Server'}" added`,
+                time: server.createdAt || Date.now(),
+                status: 'info',
+                action: () => showView('servers')
+            })
         })
-    })
+    }
     
-    // Sort by time and take latest 10
+    // Get recent audit logs for additional context
+    if (summaryActivityFilter === 'all') {
+        const audits = (db.auditLogs || []).slice(-3).reverse()
+        audits.forEach(audit => {
+            let icon = '📝'
+            let status = 'info'
+            if (audit.action && audit.action.includes('delete')) {
+                icon = '🗑️'
+                status = 'warning'
+            } else if (audit.action && audit.action.includes('update')) {
+                icon = '✏️'
+            }
+            
+            activities.push({
+                type: 'audit',
+                icon: icon,
+                text: audit.action || 'Activity logged',
+                time: audit.timestamp || Date.now(),
+                status: status,
+                user: audit.username
+            })
+        })
+    }
+    
+    // Sort by time and take latest 15
     activities.sort((a, b) => b.time - a.time)
-    const recentActivities = activities.slice(0, 10)
+    const recentActivities = activities.slice(0, 15)
     
     if (recentActivities.length === 0) {
-        activityContainer.innerHTML = '<p class="muted">No recent activity</p>'
+        activityContainer.innerHTML = `
+            <div style="text-align:center; padding:40px 20px;">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="opacity:0.3; margin-bottom:12px;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <p class="muted">No recent activity</p>
+            </div>
+        `
         return
     }
     
-    if (!activityContainer) return
     activityContainer.innerHTML = recentActivities.map(activity => {
         const timeAgo = getTimeAgo(activity.time)
         const statusColor = activity.status === 'success' ? '#10b981' : 
-                           activity.status === 'failed' ? '#ef4444' : 
-                           'var(--muted)'
+                           activity.status === 'failed' || activity.status === 'warning' ? '#f59e0b' : 
+                           activity.status === 'error' ? '#ef4444' :
+                           'var(--primary)'
+        
+        const clickable = activity.action ? 'cursor:pointer; transition: background 0.2s;' : ''
+        const hoverEffect = activity.action ? 'onmouseover="this.style.background=\'var(--ring)\'" onmouseout="this.style.background=\'var(--bg-secondary)\'"' : ''
+        const onclick = activity.action ? `onclick="(${activity.action.toString()})()"` : ''
         
         return `
-            <div style="display:flex; align-items:center; gap:12px; padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; margin-bottom:8px;">
-                <div style="font-size:24px;">${activity.icon}</div>
-                <div style="flex:1;">
-                    <div style="font-size:14px; font-weight:500;">${activity.text}</div>
-                    <div style="font-size:12px; color:var(--muted); margin-top:2px;">${timeAgo}</div>
+            <div style="display:flex; align-items:center; gap:12px; padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; margin-bottom:8px; ${clickable}" ${hoverEffect} ${onclick}>
+                <div style="font-size:20px; flex-shrink:0;">${activity.icon}</div>
+                <div style="flex:1; min-width:0;">
+                    <div style="font-size:13px; font-weight:500; margin-bottom:2px;">${activity.text}</div>
+                    <div style="font-size:11px; color:var(--muted); display:flex; gap:8px; align-items:center;">
+                        <span>${timeAgo}</span>
+                        ${activity.user ? `<span>•</span><span>${activity.user}</span>` : ''}
+                    </div>
                 </div>
-                <div style="width:8px; height:8px; border-radius:50%; background:${statusColor};"></div>
+                <div style="width:6px; height:6px; border-radius:50%; background:${statusColor}; flex-shrink:0;"></div>
             </div>
         `
     }).join('')
@@ -3803,7 +4340,7 @@ async function showView(name, updateUrl = true) {
 
         switch (actual) {
             case 'summary':
-                updateSummaryDashboard()
+                await updateSummaryDashboard()
                 break
                 
             case 'servers':
@@ -4180,6 +4717,10 @@ async function showApp() {
     if (appMain) appMain.style.display = 'block'
     // Update user menu with current user info
     updateUserMenu()
+    // Reload and apply settings after login
+    const settings = readSettings()
+    applySettings(settings)
+    populateSettingsForm(settings)
     // Initialize app content after showing
     await renderAllViews()
     // Initialize from URL parameters
@@ -6170,10 +6711,10 @@ function readSettings() {
     return db.settings
 }
 
-function saveSettings(patch) {
+async function saveSettings(patch) {
     const db = store.readSync()
     db.settings = { ...getDefaultSettings(), ...(db.settings || {}), ...(patch || {}) }
-    store.write(db)
+    await store.write(db)
     return db.settings
 }
 
@@ -6211,7 +6752,7 @@ function applySettings(settings) {
                 const visible = document.querySelector('.view.is-visible')
                 if (!visible) return
                 try {
-                    if (visible.id === 'view-summary') updateSummaryDashboard()
+                    if (visible.id === 'view-summary') await updateSummaryDashboard()
                     else if (visible.id === 'view-environments') window.renderEnvs && window.renderEnvs(document.getElementById('search')?.value || '')
                     else if (visible.id === 'view-servers') renderServers && renderServers()
                     else if (visible.id === 'view-admin-audit') renderAuditLogs && renderAuditLogs()
@@ -6250,11 +6791,11 @@ function bindSettingsControls() {
     const onChange = (id, getVal) => {
         const el = document.getElementById(id)
         if (!el) return
-        el.addEventListener('change', () => {
+        el.addEventListener('change', async () => {
 
             const newSettings = getVal(el)
 
-            const settings = saveSettings(newSettings)
+            const settings = await saveSettings(newSettings)
 
             applySettings(settings)
             ToastManager?.success?.('Settings Updated', 'Your change has been saved', 2000)

@@ -317,6 +317,7 @@
       <rect x="3" y="14" width="7" height="7"></rect>
     </svg>
     Summary
+    <span id="summaryNotificationBadge" class="nav-badge" style="display:none;">!</span>
   </button>
 </div>
 
@@ -491,92 +492,278 @@
 <div class="views">
 <section id="view-summary" class="view">
 <div class="view__header">
-  <h1>Summary Dashboard</h1>
+  <h1>Overview Dashboard</h1>
   <div style="flex:1"></div>
+  <button class="btn btn-ghost" onclick="updateSummaryDashboard()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="23 4 23 10 17 10"></polyline>
+      <polyline points="1 20 1 14 7 14"></polyline>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+    </svg>
+    Refresh
+  </button>
 </div>
+
 <div class="stack">
-  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px; margin-bottom:24px;">
-    <!-- Environments Summary -->
-    <div class="card" style="background:linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(37,99,235,0.05) 100%); border:1px solid rgba(59,130,246,0.2);">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-        <h3 style="margin:0;">Environments</h3>
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(59,130,246,0.6)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="2" y1="12" x2="22" y2="12"></line>
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+  <!-- System Status Banner -->
+  <div id="summaryStatusBanner" class="summary-status-banner">
+    <div class="summary-status-banner__content">
+      <div class="summary-status-banner__icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
         </svg>
       </div>
-      <div style="font-size:36px; font-weight:700; color:#3b82f6; margin-bottom:8px;" id="summaryEnvCount">0</div>
-      <div style="font-size:13px; color:var(--muted);">Total Environments</div>
-      <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(59,130,246,0.2);">
-        <div style="display:flex; gap:16px; font-size:12px;">
-          <div style="flex:1;">
-            <div style="color:var(--muted);">Healthy</div>
-            <div style="font-weight:600; color:#10b981;" id="summaryEnvHealthy">0</div>
-          </div>
-          <div style="flex:1;">
-            <div style="color:var(--muted);">Issues</div>
-            <div style="font-weight:600; color:#ef4444;" id="summaryEnvIssues">0</div>
-          </div>
+      <div class="summary-status-banner__info">
+        <div class="summary-status-banner__title">System Status: <span id="summarySystemStatus">Loading...</span></div>
+        <div class="summary-status-banner__subtitle">Last updated: <span id="summaryLastUpdate">Just now</span></div>
+      </div>
+    </div>
+    <div class="summary-status-banner__health">
+      <div class="summary-health-ring" id="summaryHealthRing">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="32" fill="none" stroke="var(--border)" stroke-width="6"></circle>
+          <circle id="summaryHealthCircle" cx="40" cy="40" r="32" fill="none" stroke="#10b981" stroke-width="6" stroke-dasharray="201 201" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 40 40)"></circle>
+        </svg>
+        <div class="summary-health-ring__percentage" id="summaryHealthPercentage">--</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Key Metrics Grid -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:20px; margin-bottom:24px;">
+    <!-- Environments Card -->
+    <div class="summary-metric-card summary-metric-card--blue">
+      <div class="summary-metric-card__header">
+        <div class="summary-metric-card__icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          </svg>
         </div>
+        <div class="summary-metric-card__trend" id="summaryEnvTrend">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+          </svg>
+        </div>
+      </div>
+      <div class="summary-metric-card__value" id="summaryEnvCount">0</div>
+      <div class="summary-metric-card__label">Environments</div>
+      <div class="summary-metric-card__details">
+        <div class="summary-metric-detail">
+          <span class="summary-metric-detail__label">Healthy</span>
+          <span class="summary-metric-detail__value summary-metric-detail__value--success" id="summaryEnvHealthy">0</span>
+        </div>
+        <div class="summary-metric-detail">
+          <span class="summary-metric-detail__label">Issues</span>
+          <span class="summary-metric-detail__value summary-metric-detail__value--error" id="summaryEnvIssues">0</span>
+        </div>
+      </div>
+      <div class="summary-metric-card__progress">
+        <div class="summary-metric-card__progress-bar" id="summaryEnvHealthBar" style="width:100%"></div>
       </div>
     </div>
     
-    <!-- Servers Summary -->
-    <div class="card" style="background:linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.05) 100%); border:1px solid rgba(16,185,129,0.2);">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-        <h3 style="margin:0;">Servers</h3>
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(16,185,129,0.6)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-          <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-          <line x1="6" y1="6" x2="6.01" y2="6"></line>
-          <line x1="6" y1="18" x2="6.01" y2="18"></line>
-        </svg>
+    <!-- Servers Card -->
+    <div class="summary-metric-card summary-metric-card--green">
+      <div class="summary-metric-card__header">
+        <div class="summary-metric-card__icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+          </svg>
+        </div>
+        <div class="summary-metric-card__trend" id="summaryServerTrend">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+          </svg>
+        </div>
       </div>
-      <div style="font-size:36px; font-weight:700; color:#10b981; margin-bottom:8px;" id="summaryServerCount">0</div>
-      <div style="font-size:13px; color:var(--muted);">Total Servers</div>
-      <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(16,185,129,0.2);">
-        <div style="display:flex; gap:16px; font-size:12px;">
-          <div style="flex:1;">
-            <div style="color:var(--muted);">Online</div>
-            <div style="font-weight:600; color:#10b981;" id="summaryServerOnline">0</div>
+      <div class="summary-metric-card__value" id="summaryServerCount">0</div>
+      <div class="summary-metric-card__label">Servers</div>
+      <div class="summary-metric-card__details">
+        <div class="summary-metric-detail">
+          <span class="summary-metric-detail__label">Online</span>
+          <span class="summary-metric-detail__value summary-metric-detail__value--success" id="summaryServerOnline">0</span>
+        </div>
+        <div class="summary-metric-detail">
+          <span class="summary-metric-detail__label">Offline</span>
+          <span class="summary-metric-detail__value summary-metric-detail__value--muted" id="summaryServerOffline">0</span>
+        </div>
+      </div>
+      <div class="summary-metric-card__progress">
+        <div class="summary-metric-card__progress-bar" id="summaryServerHealthBar" style="width:100%"></div>
+      </div>
+    </div>
+
+    <!-- Agents Card -->
+    <div class="summary-metric-card summary-metric-card--purple">
+      <div class="summary-metric-card__header">
+        <div class="summary-metric-card__icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+          </svg>
+        </div>
+        <div class="summary-metric-card__trend" id="summaryAgentTrend">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+          </svg>
+        </div>
+      </div>
+      <div class="summary-metric-card__value" id="summaryAgentCount">0</div>
+      <div class="summary-metric-card__label">Agents</div>
+      <div class="summary-metric-card__details">
+        <div class="summary-metric-detail">
+          <span class="summary-metric-detail__label">Active</span>
+          <span class="summary-metric-detail__value summary-metric-detail__value--success" id="summaryAgentActive">0</span>
+        </div>
+        <div class="summary-metric-detail">
+          <span class="summary-metric-detail__label">Inactive</span>
+          <span class="summary-metric-detail__value summary-metric-detail__value--muted" id="summaryAgentInactive">0</span>
+        </div>
+      </div>
+      <div class="summary-metric-card__progress">
+        <div class="summary-metric-card__progress-bar" id="summaryAgentHealthBar" style="width:100%"></div>
+      </div>
+    </div>
+
+    <!-- Credentials Card -->
+    <div class="summary-metric-card summary-metric-card--orange">
+      <div class="summary-metric-card__header">
+        <div class="summary-metric-card__icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </div>
+        <div class="summary-metric-card__trend" id="summaryCredTrend">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+          </svg>
+        </div>
+      </div>
+      <div class="summary-metric-card__value" id="summaryCredCount">0</div>
+      <div class="summary-metric-card__label">Credentials</div>
+      <div class="summary-metric-card__details">
+        <div class="summary-metric-detail">
+          <span class="summary-metric-detail__label">Valid</span>
+          <span class="summary-metric-detail__value summary-metric-detail__value--success" id="summaryCredValid">0</span>
+        </div>
+        <div class="summary-metric-detail">
+          <span class="summary-metric-detail__label">Types</span>
+          <span class="summary-metric-detail__value summary-metric-detail__value--info" id="summaryCredTypes">0</span>
+        </div>
+      </div>
+      <div class="summary-metric-card__progress">
+        <div class="summary-metric-card__progress-bar" id="summaryCredHealthBar" style="width:100%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Two Column Layout for Activity and Quick Actions -->
+  <div style="display:grid; grid-template-columns:2fr 1fr; gap:20px; margin-bottom:24px;">
+    <!-- Recent Activity -->
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <h3 style="margin:0;">Recent Activity</h3>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-ghost btn-sm" onclick="filterSummaryActivity('all')" id="activityFilterAll">All</button>
+          <button class="btn btn-ghost btn-sm" onclick="filterSummaryActivity('environments')" id="activityFilterEnv">Environments</button>
+          <button class="btn btn-ghost btn-sm" onclick="filterSummaryActivity('servers')" id="activityFilterSrv">Servers</button>
+        </div>
+      </div>
+      <div id="summaryRecentActivity" style="max-height:400px; overflow-y:auto;">
+        <p class="muted">No recent activity</p>
+      </div>
+    </div>
+    
+    <!-- Quick Actions & Stats -->
+    <div class="stack" style="gap:20px;">
+      <!-- Quick Actions -->
+      <div class="card">
+        <h3 style="margin-bottom:16px;">Quick Actions</h3>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="showView('environments'); document.getElementById('addEnvBtn').click();">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="16"></line>
+              <line x1="8" y1="12" x2="16" y2="12"></line>
+            </svg>
+            Add Environment
+          </button>
+          <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="showView('servers'); document.getElementById('addServerBtn').click();">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+              <line x1="12" y1="6" x2="12" y2="6"></line>
+            </svg>
+            Add Server
+          </button>
+          <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="showView('agents')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            </svg>
+            View Agents
+          </button>
+          <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="showView('admin')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M12 1v6m0 6v6m-9-9h6m6 0h6"></path>
+            </svg>
+            Admin Panel
+          </button>
+        </div>
+      </div>
+
+      <!-- System Info -->
+      <div class="card">
+        <h3 style="margin-bottom:16px;">System Info</h3>
+        <div style="display:flex; flex-direction:column; gap:12px; font-size:13px;">
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:var(--muted);">Database</span>
+            <span style="font-weight:600;" id="summaryDbStatus">Connected</span>
           </div>
-          <div style="flex:1;">
-            <div style="color:var(--muted);">Offline</div>
-            <div style="font-weight:600; color:#6b7280;" id="summaryServerOffline">0</div>
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:var(--muted);">OrbisHub.Core</span>
+            <span style="font-weight:600;" id="summaryCoreStatus">Checking...</span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:var(--muted);">Users</span>
+            <span style="font-weight:600;" id="summaryUserCount">0</span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:var(--muted);">DB Size</span>
+            <span style="font-weight:600;" id="summaryDbSize">-</span>
           </div>
         </div>
       </div>
     </div>
   </div>
   
-  <!-- Recent Activity -->
-  <div class="card">
-    <h3>Recent Activity</h3>
-    <div id="summaryRecentActivity" style="margin-top:16px;">
-      <p class="muted">No recent activity</p>
-    </div>
-  </div>
-  
-  <!-- Quick Actions -->
-  <div class="card">
-    <h3>Quick Actions</h3>
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-top:16px;">
-      <button class="btn btn-ghost" onclick="showView('environments'); document.getElementById('addEnvBtn').click();">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+  <!-- System Logs (shown when errors detected) -->
+  <div id="summaryErrorLogsContainer" class="card" style="display:none; border-left:3px solid #ef4444;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2">
           <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="16"></line>
-          <line x1="8" y1="12" x2="16" y2="12"></line>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
         </svg>
-        Add Environment
-      </button>
-      <button class="btn btn-ghost" onclick="showView('servers'); document.getElementById('addServerBtn').click();">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
-          <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-          <line x1="12" y1="6" x2="12" y2="6"></line>
+        <h3 style="margin:0; color:#ef4444;">System Errors Detected</h3>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('summaryErrorLogsContainer').style.display='none'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
-        Add Server
+        Dismiss
       </button>
+    </div>
+    <div id="summaryErrorLogs" style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:16px; max-height:300px; overflow-y:auto; font-family:monospace; font-size:12px; line-height:1.6;">
+      <div class="muted">Checking for errors...</div>
     </div>
   </div>
 </div>
@@ -2067,6 +2254,7 @@
           </div>
           <div class="settings-row-control">
             <select class="input" id="settingsRefreshInterval" style="width: 150px;">
+              <option value="10">10 seconds</option>
               <option value="30">30 seconds</option>
               <option value="60" selected>1 minute</option>
               <option value="300">5 minutes</option>

@@ -789,6 +789,37 @@ ipcMain.handle('db-execute', async (event, query, params = []) => {
     }
 });
 
+// Get database size
+ipcMain.handle('db-get-size', async (event) => {
+    try {
+        if (!dbPool) {
+            return { success: false, error: 'Database not connected' };
+        }
+        
+        const query = `
+            SELECT 
+                SUM(CAST(FILEPROPERTY(name, 'SpaceUsed') AS bigint) * 8.0 / 1024.0) AS SizeInMB
+            FROM sys.database_files
+            WHERE type_desc = 'ROWS'
+        `;
+        
+        const request = dbPool.request();
+        const result = await request.query(query);
+        
+        if (result.recordset && result.recordset.length > 0) {
+            return { 
+                success: true, 
+                sizeInMB: result.recordset[0].SizeInMB || 0 
+            };
+        }
+        
+        return { success: true, sizeInMB: 0 };
+    } catch (error) {
+        console.error('Database size query error:', error);
+        return { success: false, error: error.message };
+    }
+});
+
 // Hash password
 ipcMain.handle('hash-password', async (event, password) => {
     try {
@@ -965,6 +996,18 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
             )
         `);
         migrations.push('AuditLogs table created');
+        
+        // Settings table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Settings' AND xtype='U')
+            CREATE TABLE Settings (
+                id INT IDENTITY(1,1) PRIMARY KEY,
+                settingsJson NVARCHAR(MAX) NOT NULL,
+                created_at DATETIME DEFAULT GETDATE(),
+                updated_at DATETIME DEFAULT GETDATE()
+            )
+        `);
+        migrations.push('Settings table created');
         
         // No pipeline tables created
         

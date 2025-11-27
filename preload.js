@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Database Queries
     dbQuery: (query, params) => ipcRenderer.invoke('db-query', query, params),
     dbExecute: (query, params) => ipcRenderer.invoke('db-execute', query, params),
+    dbGetSize: () => ipcRenderer.invoke('db-get-size'),
     
     // HTTP Requests (for Core Service API)
     httpRequest: (url, options) => ipcRenderer.invoke('http-request', url, options),
