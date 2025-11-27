@@ -925,6 +925,69 @@ async function testServerConnection(ipAddress, serverName, port = 3389) {
     }
 }
 
+// Dedicated function for health checks that doesn't assume server is up on error
+async function testServerConnectionForHealthCheck(ipAddress, serverName, port = 3389) {
+    try {
+        
+        const response = await fetch(`${API_BASE_URL}/api/test-server`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                ipAddress: ipAddress,
+                serverName: serverName,
+                port
+            }),
+            signal: AbortSignal.timeout(5000) // 5 second timeout
+        })
+        
+        const result = await response.json()
+
+        if (result.success && result.reachable) {
+            return true
+        } else {
+            return false
+        }
+    } catch (error) {
+        // For health checks, treat errors as server being down
+        console.warn(`Health check error for ${serverName}:`, error.message)
+        return false
+    }
+}
+
+// Dedicated function for health checks that doesn't assume server is up on error
+async function testServerConnectionForHealthCheck(ipAddress, serverName, port = 3389) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/test-server`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                ipAddress: ipAddress,
+                serverName: serverName,
+                port
+            }),
+            signal: AbortSignal.timeout(10000)
+        })
+        
+        if (!response.ok) {
+            return false
+        }
+        
+        const result = await response.json()
+
+        if (result.success && result.reachable) {
+            return true
+        } else {
+            return false
+        }
+    } catch (error) {
+        return false
+    }
+}
+
 async function connectToServer(server) {
 	const db = store.readSync()
 	
@@ -1722,6 +1785,34 @@ if (serverSearchInput) {
 		}
 		renderServers(filters)
 	})
+}
+
+// Check server health button
+const checkServerHealthBtn = document.getElementById('checkServerHealthBtn')
+if (checkServerHealthBtn) {
+    checkServerHealthBtn.addEventListener('click', async () => {
+        checkServerHealthBtn.disabled = true
+        checkServerHealthBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px; animation: spin 1s linear infinite;">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            Checking...
+        `
+        
+        await checkAllServerHealth(true)
+        
+        checkServerHealthBtn.disabled = false
+        checkServerHealthBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            Check Health
+        `
+    })
 }
 
 // moved: environment form submission handled in views/environments.js
@@ -3080,7 +3171,7 @@ async function renderAllViews() {
         await renderAuditLogs()
 
         // Builds/Scripts removed; skip rendering those views
-        renderIntegrations()
+        // renderIntegrations() // Commented out - function doesn't exist
 
 
     } catch (error) {
@@ -5133,13 +5224,90 @@ function initRefreshButtons() {
 }
 
 // ========== STATUS MONITORING ==========
-// Disabled
 let serverStatusCheck = null
 let dbStatusCheck = null
+let serverHealthCheckInterval = null
 
 function initStatusMonitoring() {
-    // Disabled
+    // Check server health every 2 minutes
+    if (serverHealthCheckInterval) {
+        clearInterval(serverHealthCheckInterval)
+    }
+    
+    // Initial check
+    checkAllServerHealth()
+    
+    // Set up periodic checking (every 2 minutes)
+    serverHealthCheckInterval = setInterval(() => {
+        checkAllServerHealth()
+    }, 120000) // 120000ms = 2 minutes
+}
 
+async function checkAllServerHealth(showToast = false) {
+    const db = store.readSync()
+    const servers = db.servers || []
+    
+    if (servers.length === 0) {
+        if (showToast) {
+            ToastManager.info('No Servers', 'No servers configured to check', 3000)
+        }
+        return
+    }
+    
+    if (showToast) {
+        ToastManager.info('Health Check', `Checking ${servers.length} server(s)...`, 3000)
+    }
+    
+    let updatedCount = 0
+    let onlineCount = 0
+    let offlineCount = 0
+    
+    for (const server of servers) {
+        const port = server.port || (server.os === 'Linux' ? 22 : 3389)
+        const oldHealth = server.health
+        
+        try {
+            const isReachable = await testServerConnectionForHealthCheck(server.ipAddress, server.displayName, port)
+            const newHealth = isReachable ? 'ok' : 'error'
+            
+            if (isReachable) onlineCount++
+            else offlineCount++
+            
+            if (oldHealth !== newHealth) {
+                server.health = newHealth
+                updatedCount++
+            }
+        } catch (error) {
+            offlineCount++
+            if (oldHealth !== 'error') {
+                server.health = 'error'
+                updatedCount++
+            }
+        }
+    }
+    
+    // Always save the current health status
+    db.servers = servers
+    await store.write(db) // Sync to database so changes persist
+    
+    // Refresh UI - always refresh if manually triggered, or if on servers view
+    const serversView = document.getElementById('view-servers')
+    const isOnServersView = serversView && (
+        serversView.classList.contains('view--active') || 
+        serversView.style.display !== 'none'
+    )
+    
+    if (showToast || isOnServersView) {
+        renderServers()
+    }
+    
+    if (showToast) {
+        if (offlineCount > 0) {
+            ToastManager.warning('Health Check Complete', `${onlineCount} online, ${offlineCount} offline`, 5000)
+        } else {
+            ToastManager.success('Health Check Complete', `All ${onlineCount} server(s) online`, 4000)
+        }
+    }
 }
 
 async function checkServerStatus() {

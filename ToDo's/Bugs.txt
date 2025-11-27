@@ -1,0 +1,1 @@
+1. In "Remote Desktop Manager" server status is not being checked - 
