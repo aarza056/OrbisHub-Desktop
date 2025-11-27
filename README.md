@@ -67,6 +67,30 @@ OrbisHub Desktop is a full-featured desktop application built with Electron that
 - **Uptime Reporting** - WMI/CIM queries for Windows, /proc/uptime for Linux
 - **Network Diagnostics** - Detailed connection troubleshooting information
 
+### 🤖 Orbis Agents
+- **Remote Monitoring** - PowerShell-based agents for Windows machines
+- **Automatic Registration** - Self-registering agents with persistent identity
+- **Remote Execution** - Execute PowerShell and CMD scripts remotely
+- **System Metrics** - Collect CPU, Memory, Disk usage in real-time
+- **Job Queue** - FIFO job management with timeout handling
+- **Heartbeat Monitoring** - Track agent online/offline status
+- **One-Click Deployment** - Deploy agents to remote machines easily
+
+### 🔧 Core Service
+- **REST API Controller** - ASP.NET Core Windows Service
+- **Agent Management** - Central hub for all agent communications
+- **Job Orchestration** - Manage job queue and execution
+- **Background Services** - Timeout handling and health monitoring
+- **Swagger Documentation** - Interactive API documentation
+- **Event Logging** - Windows Event Log integration
+- **High Availability** - Auto-start on boot with service recovery
+
+### 🔍 ElasticSearch Integration
+- **Log Aggregation** - Centralized log collection and indexing
+- **Real-Time Search** - Query logs with ElasticSearch queries
+- **Analytics** - Log analysis and visualization
+- **Cluster Support** - Connect to ElasticSearch clusters
+
 ### 🔄 Auto-Update System
 - **GitHub Releases Integration** - Automatic update detection
 - **Background Downloads** - Non-intrusive update installation
@@ -179,6 +203,47 @@ OrbisHub Desktop is a full-featured desktop application built with Electron that
 - Credential mapping
 - Description and metadata storage
 
+### Orbis Agents System
+- **Agent Registration** - Automatic agent discovery and registration
+- **Heartbeat Monitoring** - Track agent health (30-second intervals)
+- **Job Execution** - Remote script and command execution
+- **System Metrics** - CPU, Memory, Disk, Network monitoring
+- **Job Types Supported:**
+  - RunScript (PowerShell/CMD)
+  - GetSystemInfo (system details)
+  - GetProcessList (running processes)
+  - GetServiceList (Windows services)
+  - RestartService (service management)
+- **Agent Dashboard** - Real-time agent status visualization
+- **Job History** - Track job execution results and logs
+- **Agent Deployment** - One-click installer for remote machines
+
+### OrbisHub Core Service
+- **Windows Service** - Runs as system service with auto-start
+- **ASP.NET Core API** - RESTful API on configurable port (default: 5000)
+- **Agent Endpoints:**
+  - POST /api/agents/register - Agent registration
+  - POST /api/agents/{id}/heartbeat - Health check
+  - GET /api/agents/{id}/jobs - Poll for pending jobs
+  - PUT /api/agents/jobs/{id}/result - Submit job results
+- **Desktop Endpoints:**
+  - GET /api/agents - List all agents
+  - POST /api/jobs - Create new job
+  - GET /api/jobs - List all jobs
+- **Background Services:**
+  - Database health monitoring
+  - Job timeout detection and cleanup
+  - Stale agent detection
+- **Logging** - Windows Event Log integration
+- **Swagger UI** - API documentation at /swagger
+
+### Notifications System
+- **Email Notifications** - SMTP integration for alerts
+- **Desktop Notifications** - Toast notifications for events
+- **Daily Summaries** - Scheduled report generation
+- **Environment Alerts** - Health status change notifications
+- **Test Notifications** - Verify notification configuration
+
 ## 🚀 Installation
 
 ### Prerequisites
@@ -270,6 +335,34 @@ OrbisHub-Desktop/
 │   │   └── toast.js       # Toast notification manager
 │   └── views/
 │       └── environments.js # Environment rendering logic
+├── Functions/
+│   └── OrbisAgent/        # Agent module
+│       ├── agent-api.js   # Agent backend API
+│       ├── agent-ui.js    # Agent dashboard UI
+│       ├── agent-ui.css   # Agent styling
+│       ├── agent-client.ps1 # PowerShell agent client
+│       └── README.md      # Agent documentation
+├── OrbisAgent/            # Standalone agent deployment
+│   ├── OrbisAgent.ps1     # Main agent script
+│   ├── Install-OrbisAgent.ps1 # Installation script
+│   ├── Uninstall-OrbisAgent.ps1
+│   ├── Test-Agent.ps1     # Testing utilities
+│   └── Installer/         # MSI installer for agents
+├── OrbisHub.CoreService/  # ASP.NET Core Windows Service
+│   ├── Program.cs         # Service entry point
+│   ├── appsettings.json   # Configuration
+│   ├── Controllers/       # API controllers
+│   │   ├── AgentsController.cs
+│   │   ├── AgentJobsController.cs
+│   │   ├── AgentDownloadController.cs
+│   │   └── JobsController.cs
+│   ├── Data/              # Repositories
+│   │   ├── AgentRepository.cs
+│   │   └── JobRepository.cs
+│   ├── Services/          # Background services
+│   ├── Models/            # Data models
+│   └── Database/
+│       └── InitializeSchema.sql
 ├── assets/
 │   ├── icon.ico           # Application icon
 │   └── media/             # Logos and images
@@ -494,6 +587,22 @@ Stored in: `%APPDATA%\orbis-desktop\db-config.json`
 **AuditLogs Table:**
 - id, action, entityType, entityName
 - user, username, timestamp, ip, details (JSON)
+
+**Agents Table:**
+- id, machineName, ipAddress, os, version
+- status (online/offline/error/idle)
+- lastHeartbeat, metadata (JSON)
+- created_at, serverId
+
+**AgentJobs Table:**
+- id, agentId, type, script, status
+- result, error, createdAt, startedAt, completedAt
+- createdBy, timeoutMinutes
+
+**AgentMetrics Table:**
+- id, agentId, timestamp
+- cpuPercent, memoryPercent, diskPercent
+- networkIn, networkOut, customMetrics (JSON)
 
 ### IPC Architecture
 ```

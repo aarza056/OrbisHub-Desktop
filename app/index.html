@@ -356,13 +356,6 @@
     </svg>
     Remote Desktop Manager
   </button>
-  <button class="nav__btn" data-view="admin-integrations">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
-      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-    </svg>
-    Integrations
-  </button>
   <button class="nav__btn" data-view="admin-credentials">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -630,13 +623,6 @@
         <p class="muted">Manage user accounts and permissions</p>
       </div>
     </div>
-    <div class="admin-card" data-admin-section="integrations">
-      <div class="admin-card__bg"></div>
-      <div class="admin-card__content">
-        <h2>Integrations</h2>
-        <p class="muted">Connect to external services (Exchange, SMTP, APIs)</p>
-      </div>
-    </div>
     <div class="admin-card" data-admin-section="credentials">
       <div class="admin-card__bg"></div>
       <div class="admin-card__content">
@@ -901,19 +887,6 @@
   <p class="muted" style="margin-bottom:20px;">Manage your remote servers and connect using saved credentials. Click on server icons to establish remote desktop connections.</p>
   <div id="serversList" class="grid"></div>
 </div>
-</section>
-
-<!-- Admin Integrations Management -->
-<section id="view-admin-integrations" class="view">
-  <div class="view__header">
-    <h1>Integrations</h1>
-    <div style="flex:1"></div>
-    <button id="addIntegrationBtn" class="btn">+ Add Integration</button>
-  </div>
-  <div class="view__toolbar">
-    <input id="integrationSearchInput" class="input" placeholder="Search integrations..." />
-  </div>
-  <div id="integrationList" class="grid"></div>
 </section>
 
 <!-- Admin Credentials Management -->
@@ -1415,12 +1388,6 @@
         </select>
       </label>
       
-      <label class="label">Notification Channel
-        <select id="notifySystemChannel" class="input" style="margin-top:8px;">
-          <option value="">-- Select Integration --</option>
-        </select>
-      </label>
-      
       <label class="label">Recipients
         <input type="text" id="notifySystemRecipients" class="input" placeholder="email@example.com, user@domain.com" style="margin-top:8px;">
         <span style="font-size:11px; color:var(--muted); margin-top:4px; display:block;">Comma-separated email addresses or usernames</span>
@@ -1441,12 +1408,6 @@
       
       <label class="label">Delivery Time
         <input type="time" id="notifySummaryTime" class="input" value="09:00" style="margin-top:8px;">
-      </label>
-      
-      <label class="label">Notification Channel
-        <select id="notifySummaryChannel" class="input" style="margin-top:8px;">
-          <option value="">-- Select Integration --</option>
-        </select>
       </label>
       
       <label class="label">Recipients
@@ -1472,12 +1433,6 @@
           <option value="all">Any Status Change</option>
           <option value="unhealthy">Unhealthy Only</option>
           <option value="critical">Critical Only</option>
-        </select>
-      </label>
-      
-      <label class="label">Notification Channel
-        <select id="notifyHealthChannel" class="input" style="margin-top:8px;">
-          <option value="">-- Select Integration --</option>
         </select>
       </label>
       
@@ -1518,7 +1473,7 @@
     <div class="doc-hero">
       <h1>OrbisHub</h1>
       <p class="doc-hero-tagline">By Admins, For Admins</p>
-      <p class="doc-hero-description">A comprehensive system administration and DevOps dashboard for managing environments, servers, remote connections, integrations, and notifications—all from one centralized interface.</p>
+      <p class="doc-hero-description">A comprehensive system administration and DevOps dashboard for managing environments, servers, remote connections, and notifications—all from one centralized interface.</p>
     </div>
 
     <!-- Quick Start -->
@@ -1531,7 +1486,6 @@
           <li><strong>Add Credentials:</strong> Navigate to Credentials in System Administrators to securely store login credentials for your servers.</li>
           <li><strong>Register Servers:</strong> Go to Remote Desktop Manager and add your infrastructure with IP addresses and assigned credentials for one-click RDP access.</li>
           <li><strong>Create Environments:</strong> Define your deployment targets (Production, Staging, Dev) to organize your infrastructure logically.</li>
-          <li><strong>Set Up Integrations:</strong> Configure Exchange, SMTP, Slack, or Teams integrations for notifications and automated communications.</li>
         </ol>
         <div class="doc-tip">
           <strong>💡 Pro Tip:</strong> Press <kbd>Ctrl+`</kbd> to open the Command Palette for quick navigation!
@@ -1553,7 +1507,8 @@
             <li>Environment and server health status</li>
             <li>Recent activity feed with timeline</li>
             <li>Quick action buttons for common tasks</li>
-            
+            <li>System health indicators</li>
+            <li>User activity tracking</li>
           </ul>
         </div>
 
@@ -1567,6 +1522,8 @@
             <li>User activity and session tracking</li>
             <li>Position and squad organization</li>
             <li>Password change enforcement</li>
+            <li>Account lockout after failed attempts</li>
+            <li>Session timeout after inactivity</li>
           </ul>
         </div>
 
@@ -1580,6 +1537,8 @@
             <li>Environment-specific configurations</li>
             <li>Card locking to prevent accidental changes</li>
             <li>Deployment tracking and history</li>
+            <li>URL management for quick access</li>
+            <li>Server mapping and association</li>
           </ul>
         </div>
 
@@ -1588,39 +1547,43 @@
           <h3>Remote Desktop Manager</h3>
           <p>One-click remote server connections</p>
           <ul class="doc-feature-list">
-            <li>Store server details with IP addresses</li>
-            <li>Assign saved credentials to servers</li>
-            <li>One-click RDP connection launch via mstsc</li>
+            <li>Native RDP connections via mstsc.exe</li>
+            <li>SSH/PuTTY integration for Linux servers</li>
+            <li>Server inventory with IP addresses</li>
             <li>Server grouping (Production, Stage, Test, Dev)</li>
             <li>Health monitoring and status tracking</li>
+            <li>Connection history and tracking</li>
             <li>Card locking for production servers</li>
           </ul>
         </div>
 
         <div class="doc-feature-card">
-          <div class="doc-feature-icon">�</div>
-          <h3>Integrations</h3>
-          <p>Connect external services and communication tools</p>
+          <div class="doc-feature-icon">🔐</div>
+          <h3>Credentials</h3>
+          <p>Secure credential storage and management</p>
           <ul class="doc-feature-list">
-            <li>Exchange Server for email automation</li>
-            <li>SMTP server configuration</li>
-            <li>Slack and Microsoft Teams webhooks</li>
-            <li>REST API and custom webhook support</li>
-            <li>Connection testing before deployment</li>
-            <li>Secure storage of integration credentials</li>
+            <li>AES-256 encrypted credential storage</li>
+            <li>Username, password, and domain support</li>
+            <li>Credential assignment to servers</li>
+            <li>Deployment credential integration</li>
+            <li>Credential auditing and tracking</li>
+            <li>Protection against deletion when in use</li>
+            <li>External system credential mapping</li>
           </ul>
         </div>
 
         <div class="doc-feature-card">
-          <div class="doc-feature-icon">�</div>
-          <h3>Credentials</h3>
-          <p>Secure credential storage and management</p>
+          <div class="doc-feature-icon">💬</div>
+          <h3>Team Messaging</h3>
+          <p>Secure peer-to-peer communication</p>
           <ul class="doc-feature-list">
-            <li>Store usernames, passwords, and domains</li>
-            <li>Used for RDP connections and integrations</li>
-            <li>Encrypted storage in database</li>
-            <li>Easy assignment to servers and services</li>
-            <li>Credential auditing and tracking</li>
+            <li>Direct messaging between users</li>
+            <li>AES-256-CBC message encryption</li>
+            <li>File attachments with secure storage</li>
+            <li>Unread notifications</li>
+            <li>Read receipts</li>
+            <li>Real-time desktop notifications</li>
+            <li>Persistent conversation history</li>
           </ul>
         </div>
 
@@ -1629,24 +1592,58 @@
           <h3>Audit Logs</h3>
           <p>Complete activity tracking and compliance</p>
           <ul class="doc-feature-list">
-            <li>Track all user actions and changes</li>
+            <li>Track all user actions (create, update, delete, connect)</li>
             <li>Timestamp and user attribution</li>
-            <li>Filter by action type and date</li>
-            <li>Export logs for compliance</li>
+            <li>IP address logging for all actions</li>
+            <li>Filter by action type, entity, user, or keyword</li>
+            <li>Export logs for compliance reporting</li>
             <li>RDP connection tracking</li>
+            <li>Old vs new value comparison</li>
+          </ul>
+        </div>
+
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">🤖</div>
+          <h3>Orbis Agents</h3>
+          <p>Remote machine monitoring and script execution</p>
+          <ul class="doc-feature-list">
+            <li>PowerShell agent for Windows machines</li>
+            <li>Automatic agent registration and heartbeat</li>
+            <li>Remote script execution (PowerShell/CMD)</li>
+            <li>System metrics collection (CPU, Memory, Disk)</li>
+            <li>Job queue management</li>
+            <li>Real-time agent status monitoring</li>
+            <li>One-click agent deployment</li>
+          </ul>
+        </div>
+
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">🔧</div>
+          <h3>Core Service</h3>
+          <p>Central controller for OrbisHub ecosystem</p>
+          <ul class="doc-feature-list">
+            <li>ASP.NET Core REST API</li>
+            <li>Windows Service with auto-start</li>
+            <li>Agent registration and heartbeat monitoring</li>
+            <li>Job queue management (FIFO)</li>
+            <li>Background timeout handling services</li>
+            <li>Windows Event Log logging</li>
+            <li>Swagger API documentation</li>
           </ul>
         </div>
 
         <div class="doc-feature-card">
           <div class="doc-feature-icon">🗄️</div>
-          <h3>Database Setup</h3>
+          <h3>Database Management</h3>
           <p>SQL Server integration and schema management</p>
           <ul class="doc-feature-list">
             <li>SQL Server connection configuration</li>
+            <li>Windows and SQL Authentication support</li>
             <li>Schema initialization and migration</li>
-            <li>Data migration tools</li>
-            <li>Connection testing and validation</li>
             <li>Automated table creation</li>
+            <li>Connection pooling</li>
+            <li>Trust certificate for self-signed certs</li>
+            <li>Database setup wizard</li>
           </ul>
         </div>
 
@@ -1658,12 +1655,54 @@
             <li>System alerts for errors and warnings</li>
             <li>Daily summary reports with scheduling</li>
             <li>Environment health change alerts</li>
-            <li>Integration with Exchange, SMTP, Slack, Teams</li>
+            <li>Email notification support</li>
             <li>Test notification functionality</li>
+            <li>Desktop toast notifications</li>
           </ul>
         </div>
 
-        
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">🔗</div>
+          <h3>External Integrations</h3>
+          <p>Connect to external systems and services</p>
+          <ul class="doc-feature-list">
+            <li>Exchange Server integration</li>
+            <li>SharePoint connectivity</li>
+            <li>Connection string management</li>
+            <li>Integration testing</li>
+            <li>Credential mapping</li>
+            <li>Custom metadata storage</li>
+          </ul>
+        </div>
+
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">📈</div>
+          <h3>Monitoring & Diagnostics</h3>
+          <p>Server health checks and uptime tracking</p>
+          <ul class="doc-feature-list">
+            <li>ICMP ping and TCP port probing</li>
+            <li>Multi-port fallback mechanism</li>
+            <li>WMI/CIM queries for Windows uptime</li>
+            <li>/proc/uptime parsing for Linux</li>
+            <li>Real-time connectivity testing</li>
+            <li>Network diagnostics</li>
+            <li>Health status indicators</li>
+          </ul>
+        </div>
+
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">🔄</div>
+          <h3>Auto-Update System</h3>
+          <p>Automatic update detection and installation</p>
+          <ul class="doc-feature-list">
+            <li>GitHub Releases integration</li>
+            <li>Background update downloads</li>
+            <li>Version management</li>
+            <li>Update notifications</li>
+            <li>User-controlled update process</li>
+            <li>Rollback support</li>
+          </ul>
+        </div>
 
         <div class="doc-feature-card">
           <div class="doc-feature-icon">🔍</div>
@@ -1674,6 +1713,21 @@
             <li>Log aggregation and search</li>
             <li>Real-time log monitoring</li>
             <li>Analytics and visualization</li>
+          </ul>
+        </div>
+
+        <div class="doc-feature-card">
+          <div class="doc-feature-icon">🛡️</div>
+          <h3>Security Features</h3>
+          <p>Enterprise-grade security controls</p>
+          <ul class="doc-feature-list">
+            <li>PBKDF2 password hashing with salt</li>
+            <li>Strong password policies</li>
+            <li>Account lockout protection (5 failed attempts)</li>
+            <li>Session management (10-min timeout)</li>
+            <li>Force password change on first login</li>
+            <li>Activity tracking with IP logging</li>
+            <li>Role-based access control</li>
           </ul>
         </div>
       </div>
@@ -2440,89 +2494,6 @@
 <menu class="row end">
 <button value="cancel" class="btn btn-ghost">Cancel</button>
 <button id="confirmDeleteUserBtn" type="submit" value="confirm" class="btn btn-danger">Delete</button>
-</menu>
-</form>
-</dialog>
-
-<!-- Integration Modals -->
-<dialog id="integrationModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
-<h2>Add Integration</h2>
-<label class="label">Integration Name
-<input id="integrationName" class="input" placeholder="e.g., Exchange Server" required />
-</label>
-<label class="label">Integration Type
-<select id="integrationType" class="input">
-<option>Exchange Server</option>
-<option>SMTP Server</option>
-<option>Slack</option>
-<option>Microsoft Teams</option>
-<option>REST API</option>
-<option>Webhook</option>
-<option>Other</option>
-</select>
-</label>
-<label class="label">Connection Details
-<textarea id="integrationConnection" class="input" placeholder="Server URL, API endpoint, or connection string..." rows="4" required></textarea>
-</label>
-<label class="label">Description
-<input id="integrationDescription" class="input" placeholder="Optional description" />
-</label>
-<menu class="row end">
-<button id="saveIntegrationBtn" type="submit" value="default" class="btn">Save</button>
-</menu>
-</form>
-</dialog>
-
-<dialog id="editIntegrationModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
-<h2>Edit Integration</h2>
-<input type="hidden" id="editIntegrationId" />
-<label class="label">Integration Name
-<input id="editIntegrationName" class="input" placeholder="e.g., Exchange Server" required />
-</label>
-<label class="label">Integration Type
-<select id="editIntegrationType" class="input">
-<option>Exchange Server</option>
-<option>SMTP Server</option>
-<option>Slack</option>
-<option>Microsoft Teams</option>
-<option>REST API</option>
-<option>Webhook</option>
-<option>Other</option>
-</select>
-</label>
-<label class="label">Connection Details
-<textarea id="editIntegrationConnection" class="input" placeholder="Server URL, API endpoint, or connection string..." rows="4" required></textarea>
-</label>
-<label class="label">Description
-<input id="editIntegrationDescription" class="input" placeholder="Optional description" />
-</label>
-<menu class="row end">
-<button id="saveEditIntegrationBtn" type="submit" value="default" class="btn">Save Changes</button>
-</menu>
-</form>
-</dialog>
-
-<dialog id="deleteIntegrationModal" class="modal">
-<form method="dialog" class="card">
-<h2>Delete Integration</h2>
-<p>Are you sure you want to delete this integration? This action cannot be undone.</p>
-<menu class="row end">
-<button value="cancel" class="btn btn-ghost">Cancel</button>
-<button id="confirmDeleteIntegrationBtn" type="submit" value="default" class="btn btn-danger">Delete</button>
 </menu>
 </form>
 </dialog>
