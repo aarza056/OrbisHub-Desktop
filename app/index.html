@@ -418,6 +418,14 @@
 
 <div class="nav__group nav__group--bottom">
   <div class="nav__label">System</div>
+  <button class="nav__btn" id="configStatusNavBtn" data-view="system-configuration">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M12 1v6m0 6v6m-9-9h6m6 0h6"></path>
+    </svg>
+    System Configuration
+    <span class="nav-badge" id="configNavBadge" style="display:none; margin-left:auto;">1</span>
+  </button>
   <button class="nav__btn" data-view="settings">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
       <circle cx="12" cy="12" r="3"></circle>
@@ -457,15 +465,6 @@
   </svg>
   <span>Messages</span>
   <span class="nav-badge" id="navUnreadBadge" style="display:none;">0</span>
-</button>
-<!-- Configuration Status Button -->
-<button class="config-status-btn" id="configStatusBtn" title="System Configuration">
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="3"></circle>
-    <path d="M12 1v6m0 6v6m-9-9h6m6 0h6"></path>
-  </svg>
-  <span id="configStatusText">Configure System</span>
-  <span class="config-status-badge" id="configStatusBadge">1</span>
 </button>
 <div class="user-menu">
   <button class="user-menu__btn" id="userMenuBtn">
@@ -1577,6 +1576,171 @@
 </section>
 
 <!-- Documentation -->
+<!-- System Configuration -->
+<section id="view-system-configuration" class="view">
+  <div class="view__header">
+    <h1>🔧 System Configuration</h1>
+    <div style="flex:1"></div>
+  </div>
+  
+  <div class="documentation-container">
+    <!-- OrbisHub CoreService Section -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">🔧 OrbisHub CoreService</h2>
+      
+      <!-- CoreService Status Card -->
+      <div class="doc-card">
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>CoreService Connection</h3>
+            <p>Connect to your OrbisHub CoreService API for agent management and job orchestration</p>
+          </div>
+          <div class="settings-row-control">
+            <span class="status-badge" id="coreServiceStatusBadge">Not Configured</span>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Server Address</h3>
+            <p>IP address or hostname where CoreService is running (e.g., http://192.168.1.100:5000)</p>
+          </div>
+          <div class="settings-row-control" style="flex-direction: column; align-items: flex-end; gap: 8px;">
+            <input 
+              type="text" 
+              class="input" 
+              id="coreServiceAddress" 
+              placeholder="http://localhost:5000"
+              value=""
+              style="width: 300px;"
+            />
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-ghost" id="testCoreServiceBtn">Test Connection</button>
+              <button class="btn btn-primary" id="saveCoreServiceBtn">Save</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Installation Guide -->
+      <div class="doc-card">
+        <h3>📦 Installation Guide</h3>
+        <p style="margin-bottom: 16px;">Follow these steps to install OrbisHub CoreService on your server.</p>
+        
+        <div class="doc-tip" style="margin-bottom: 20px;">
+          <strong>📍 Pre-Built Location:</strong> If you have OrbisHub Desktop installed, the compiled CoreService is located at:<br>
+          <code style="background: var(--bg-secondary); padding: 4px 8px; border-radius: 4px; margin-top: 8px; display: inline-block;">C:\Program Files\OrbisHub Desktop\resources\CoreService</code>
+        </div>
+
+        <!-- Step 1: Copy Files -->
+        <details class="doc-faq-item" open>
+          <summary><strong>Step 1: Copy CoreService Files to Server</strong></summary>
+          <div style="padding: 12px 0;">
+            <p>Copy the entire CoreService folder to your target server:</p>
+            <pre class="doc-code" style="font-size: 12px;">
+# On the source machine (where OrbisHub Desktop is installed)
+Copy-Item "C:\Program Files\OrbisHub Desktop\resources\CoreService" `
+  -Destination "\\\\ServerName\\C$\\OrbisHub\\CoreService" -Recurse
+
+# Or copy to a local path on the server
+Copy-Item "C:\Program Files\OrbisHub Desktop\resources\CoreService" `
+  -Destination "C:\\OrbisHub\\CoreService" -Recurse</pre>
+          </div>
+        </details>
+
+        <!-- Step 2: Configure -->
+        <details class="doc-faq-item">
+          <summary><strong>Step 2: Configure the Service</strong></summary>
+          <div style="padding: 12px 0;">
+            <p>Edit <code>appsettings.json</code> in the copied CoreService folder:</p>
+            <pre class="doc-code" style="font-size: 12px;">
+{
+  "OrbisHub": {
+    "ServiceName": "OrbisHub Core Service",
+    "ServiceUrl": "http://0.0.0.0:5000",
+    "ConnectionString": "Server=localhost;Database=OrbisHub;Integrated Security=true;TrustServerCertificate=True;",
+    "HeartbeatTimeoutMinutes": 5,
+    "JobTimeoutMinutes": 30
+  }
+}</pre>
+            <p style="margin-top: 12px;"><strong>Important Settings:</strong></p>
+            <ul style="margin-left: 20px; font-size: 13px;">
+              <li><strong>ServiceUrl:</strong> Use <code>0.0.0.0</code> to listen on all network interfaces</li>
+              <li><strong>ConnectionString:</strong> Your SQL Server connection details</li>
+              <li><strong>HeartbeatTimeoutMinutes:</strong> How long before an agent is considered offline</li>
+            </ul>
+          </div>
+        </details>
+
+                <!-- Step 3: Install Service -->
+        <details class="doc-faq-item">
+          <summary><strong>Step 3: Install as Windows Service</strong></summary>
+          <div style="padding: 12px 0;">
+            <p>Open PowerShell or Command Prompt <strong>as Administrator</strong> on the server:</p>
+            <pre class="doc-code" style="font-size: 12px;">
+# Create the service (adjust path to match your installation location)
+sc.exe create OrbisHubCoreService `
+  binPath= "C:\\OrbisHub\\CoreService\\OrbisHub.CoreService.exe" `
+  start= auto
+
+# Set service description
+sc.exe description OrbisHubCoreService `
+  "Central controller for OrbisHub agents and clients"
+
+# Start the service
+sc.exe start OrbisHubCoreService</pre>
+            <div class="doc-warning" style="margin-top: 12px;">
+              <strong>⚠️ Important:</strong> Ensure there is a space after <code>binPath=</code> and <code>start=</code> when using <code>sc.exe</code>.
+            </div>
+          </div>
+        </details>
+
+        <!-- Step 4: Verify -->
+        <details class="doc-faq-item">
+          <summary><strong>Step 4: Verify Installation</strong></summary>
+          <div style="padding: 12px 0;">
+            <p>Check service status:</p>
+            <pre class="doc-code" style="font-size: 12px;">
+Get-Service OrbisHubCoreService</pre>
+            <p style="margin-top: 12px;">Test the API:</p>
+            <pre class="doc-code" style="font-size: 12px;">
+Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
+            <p style="margin-top: 12px;">Expected response:</p>
+            <pre class="doc-code" style="font-size: 12px;">
+{
+  "status": "healthy",
+  "timestamp": "2025-11-29T10:30:00Z",
+  "version": "1.0.0"
+}</pre>
+          </div>
+        </details>
+
+        <!-- Troubleshooting -->
+        <details class="doc-faq-item">
+          <summary><strong>🔍 Troubleshooting</strong></summary>
+          <div style="padding: 12px 0;">
+            <ul style="margin-left: 20px; font-size: 13px;">
+              <li><strong>Service won't start:</strong> Check Windows Event Viewer for errors</li>
+              <li><strong>Port already in use:</strong> Change the port in <code>appsettings.json</code></li>
+              <li><strong>Database connection fails:</strong> Verify SQL Server is running and connection string is correct</li>
+              <li><strong>Access denied:</strong> Ensure the service runs with appropriate permissions</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+
+      <!-- API Documentation Link -->
+      <div class="doc-card">
+        <h3>📚 API Documentation</h3>
+        <p>Once CoreService is running, you can access the Swagger API documentation at:</p>
+        <code style="background: var(--bg-secondary); padding: 8px 12px; border-radius: 4px; display: inline-block; margin-top: 8px;">
+          http://your-server:5000/swagger
+        </code>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="view-admin-documentation" class="view">
   <div class="view__header">
     <h1>📚 OrbisHub Documentation</h1>

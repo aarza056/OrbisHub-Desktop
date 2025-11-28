@@ -3429,6 +3429,49 @@ function updateSummaryNotificationBadge(systemHealth, hasErrors) {
     }
 }
 
+async function checkCoreServiceStatus(elCoreStatus) {
+    try {
+        const coreUrl = window.AgentAPI ? window.AgentAPI.coreServiceUrl : null;
+        
+        if (!coreUrl) {
+            elCoreStatus.textContent = '⚠ Not Configured';
+            elCoreStatus.style.color = '#f59e0b';
+            return;
+        }
+        
+        if (window.electronAPI && window.electronAPI.httpRequest) {
+            const response = await Promise.race([
+                window.electronAPI.httpRequest(coreUrl + '/health', {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                }),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Timeout')), 3000)
+                )
+            ]);
+            
+            if (response && response.ok) {
+                elCoreStatus.textContent = '✓ Running';
+                elCoreStatus.style.color = '#10b981';
+            } else {
+                elCoreStatus.textContent = '⚠ Error';
+                elCoreStatus.style.color = '#f59e0b';
+            }
+        } else {
+            elCoreStatus.textContent = '⚠ Unknown';
+            elCoreStatus.style.color = '#f59e0b';
+        }
+    } catch (e) {
+        console.error('Core Service check failed:', e);
+        if (e.message === 'Timeout') {
+            elCoreStatus.textContent = '✗ Timeout';
+        } else {
+            elCoreStatus.textContent = '✗ Offline';
+        }
+        elCoreStatus.style.color = '#ef4444';
+    }
+}
+
 async function updateSummaryDashboard() {
     // Ensure the summary view DOM is loaded
     const healthPercentageEl = document.getElementById('summaryHealthPercentage')
@@ -3445,7 +3488,14 @@ async function updateSummaryDashboard() {
     
     // Refresh servers from API
     try {
-        const serversResponse = await fetch(`${API_BASE_URL}/api/load-data`)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 2000) // 2 second timeout
+        
+        const serversResponse = await fetch(`${API_BASE_URL}/api/load-data`, {
+            signal: controller.signal
+        })
+        clearTimeout(timeoutId)
+        
         const serversResult = await serversResponse.json()
         if (serversResult.success && serversResult.data) {
             const db = store.readSync()
@@ -3456,7 +3506,10 @@ async function updateSummaryDashboard() {
             store.write(db, true) // Skip sync back to DB
         }
     } catch (error) {
-        console.error('Failed to refresh servers for summary:', error)
+        if (error.name !== 'AbortError') {
+            console.error('Failed to refresh servers for summary:', error)
+        }
+        // Continue rendering with cached data
     }
     
     const db = store.readSync()
@@ -3595,45 +3648,13 @@ async function updateSummaryDashboard() {
         }
     }
     
-    // OrbisHub.Core Service status
-    const elCoreStatus = document.getElementById('summaryCoreStatus')
+    // OrbisHub.Core Service status - check immediately
+    const elCoreStatus = document.getElementById('summaryCoreStatus');
     if (elCoreStatus) {
-        try {
-            const coreUrl = window.AgentAPI ? window.AgentAPI.coreServiceUrl : 'http://192.168.11.56:5000'
-            
-            // Use Electron's HTTP request to avoid CORS issues
-            if (window.electronAPI && window.electronAPI.httpRequest) {
-                const response = await window.electronAPI.httpRequest(`${coreUrl}/api/agents`, {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                })
-                
-                if (response.ok) {
-                    elCoreStatus.textContent = '✓ Running'
-                    elCoreStatus.style.color = '#10b981'
-                } else {
-                    elCoreStatus.textContent = '⚠ Error'
-                    elCoreStatus.style.color = '#f59e0b'
-                }
-            } else {
-                // Fallback to regular fetch
-                const response = await fetch(`${coreUrl}/api/agents`, { 
-                    method: 'GET',
-                    signal: AbortSignal.timeout(3000)
-                })
-                if (response.ok) {
-                    elCoreStatus.textContent = '✓ Running'
-                    elCoreStatus.style.color = '#10b981'
-                } else {
-                    elCoreStatus.textContent = '⚠ Error'
-                    elCoreStatus.style.color = '#f59e0b'
-                }
-            }
-        } catch (e) {
-            console.error('Core Service check failed:', e)
-            elCoreStatus.textContent = '✗ Offline'
-            elCoreStatus.style.color = '#ef4444'
-        }
+        elCoreStatus.textContent = 'Checking...';
+        elCoreStatus.style.color = '#94a3b8';
+        
+        checkCoreServiceStatus(elCoreStatus);
     }
     
     // Database size
@@ -4478,10 +4499,14 @@ async function showApp() {
     if (appMain) appMain.style.display = 'block'
     // Update user menu with current user info
     updateUserMenu()
-    // Reload and apply settings after login
-    const settings = readSettings()
+    // Load CoreService configuration after login
+    await initCoreServiceConfig()
+    
+    // Load settings directly from database on app launch
+    const settings = await loadSettingsFromDatabase()
     applySettings(settings)
     populateSettingsForm(settings)
+    
     // Initialize app content after showing
     await renderAllViews()
     // Initialize from URL parameters
@@ -6465,9 +6490,38 @@ function getDefaultSettings() {
 
 function readSettings() {
     const db = store.readSync()
-    db.settings = { ...getDefaultSettings(), ...(db.settings || {}) }
-    store.write(db, true)
-    return db.settings
+    // Merge defaults with existing settings, but preserve saved values
+    const merged = { ...getDefaultSettings(), ...(db.settings || {}) }
+    db.settings = merged
+    // Note: Don't write here - just read. Writing happens in saveSettings()
+    console.log('📖 readSettings returning:', { 
+        autoRefresh: merged.autoRefresh, 
+        refreshInterval: merged.refreshInterval 
+    })
+    return merged
+}
+
+async function loadSettingsFromDatabase() {
+    try {
+        console.log('🔍 Loading settings directly from database...')
+        const dbData = await store.loadFromDatabase()
+        if (dbData && dbData.settings) {
+            // Update memory cache with loaded data
+            const db = store.readSync()
+            db.settings = { ...getDefaultSettings(), ...dbData.settings }
+            memoryCache = db
+            console.log('✅ Settings loaded from database:', {
+                autoRefresh: db.settings.autoRefresh,
+                refreshInterval: db.settings.refreshInterval
+            })
+            return db.settings
+        }
+        console.log('⚠️ No settings in database, using defaults')
+        return getDefaultSettings()
+    } catch (error) {
+        console.error('❌ Failed to load settings from database:', error)
+        return getDefaultSettings()
+    }
 }
 
 async function saveSettings(patch) {
@@ -6479,6 +6533,11 @@ async function saveSettings(patch) {
 
 function applySettings(settings) {
     try {
+        console.log('🔧 applySettings called with:', { 
+            autoRefresh: settings.autoRefresh, 
+            refreshInterval: settings.refreshInterval,
+            coreServiceUrl: window.AgentAPI?.coreServiceUrl 
+        })
 
         const body = document.body
         if (!body) {
@@ -6503,8 +6562,13 @@ function applySettings(settings) {
         body.classList.toggle('no-animations', settings.animations === false)
 
         // Auto-refresh handling
-        if (__autoRefreshTimer) { clearInterval(__autoRefreshTimer); __autoRefreshTimer = null }
+        if (__autoRefreshTimer) { 
+            console.log('⏹️ Clearing existing auto-refresh timer')
+            clearInterval(__autoRefreshTimer); 
+            __autoRefreshTimer = null 
+        }
         if (settings.autoRefresh) {
+            console.log('✅ Starting auto-refresh with interval:', settings.refreshInterval, 'seconds')
             const intervalMs = Math.max(5, Number(settings.refreshInterval || 60)) * 1000
             const tick = async () => {
                 try {
@@ -6523,6 +6587,9 @@ function applySettings(settings) {
             // Call tick immediately to provide instant feedback, then set up interval
             tick()
             __autoRefreshTimer = setInterval(tick, intervalMs)
+            console.log('✅ Auto-refresh timer started, timer ID:', __autoRefreshTimer)
+        } else {
+            console.log('⏸️ Auto-refresh is disabled in settings')
         }
     } catch {}
 }
@@ -9214,6 +9281,236 @@ if (window.electronAPI) {
     initializeAutoUpdater()
 }
 
+// ========== SYSTEM CONFIGURATION - CORESERVICE ==========
+// Test CoreService connection
+document.getElementById('testCoreServiceBtn')?.addEventListener('click', async () => {
+    const addressInput = document.getElementById('coreServiceAddress')
+    const statusBadge = document.getElementById('coreServiceStatusBadge')
+    const testBtn = document.getElementById('testCoreServiceBtn')
+    
+    const address = addressInput.value.trim()
+    if (!address) {
+        showToast('Please enter a CoreService address', 'warning')
+        return
+    }
+    
+    testBtn.disabled = true
+    testBtn.textContent = 'Testing...'
+    statusBadge.textContent = 'Testing...'
+    statusBadge.className = 'status-badge status-warning'
+    
+    try {
+        // Test /health endpoint
+        const response = await fetch(`${address}/health`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(5000) // 5 second timeout
+        })
+        
+        if (response.ok) {
+            const data = await response.json()
+            statusBadge.textContent = `Connected (v${data.version || '1.0.0'})`
+            statusBadge.className = 'status-badge status-success'
+            showToast('CoreService connection successful!', 'success')
+        } else {
+            throw new Error(`HTTP ${response.status}`)
+        }
+    } catch (error) {
+        console.error('CoreService connection test failed:', error)
+        statusBadge.textContent = 'Connection Failed'
+        statusBadge.className = 'status-badge status-error'
+        showToast(`Connection failed: ${error.message}`, 'error')
+    } finally {
+        testBtn.disabled = false
+        testBtn.textContent = 'Test Connection'
+    }
+})
+
+// Save CoreService configuration
+document.getElementById('saveCoreServiceBtn')?.addEventListener('click', async () => {
+    const addressInput = document.getElementById('coreServiceAddress')
+    const statusBadge = document.getElementById('coreServiceStatusBadge')
+    const saveBtn = document.getElementById('saveCoreServiceBtn')
+    
+    const address = addressInput.value.trim()
+    if (!address) {
+        showToast('Please enter a CoreService address', 'warning')
+        return
+    }
+    
+    // Validate URL format
+    try {
+        new URL(address)
+    } catch (error) {
+        showToast('Invalid URL format. Use http://hostname:port', 'error')
+        return
+    }
+    
+    saveBtn.disabled = true
+    saveBtn.textContent = 'Saving...'
+    
+    try {
+        console.log('Saving CoreService address:', address)
+        
+        // Ensure SystemSettings table exists first
+        const createResult = await window.DB.execute(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SystemSettings')
+            BEGIN
+                CREATE TABLE SystemSettings (
+                    SettingKey NVARCHAR(100) PRIMARY KEY,
+                    SettingValue NVARCHAR(MAX),
+                    UpdatedAt DATETIME2 DEFAULT GETDATE()
+                )
+            END
+        `)
+        console.log('Create table result:', createResult)
+        
+        // Check if setting already exists
+        const existing = await window.DB.query(
+            `SELECT SettingKey FROM SystemSettings WHERE SettingKey = @param0`,
+            [{ value: 'CoreServiceAddress' }]
+        )
+        console.log('Existing CoreService config:', existing)
+        
+        let saveResult
+        // Update or insert
+        if (existing && existing.success && existing.data && existing.data.length > 0) {
+            console.log('Updating existing CoreService config')
+            saveResult = await window.DB.execute(
+                `UPDATE SystemSettings SET SettingValue = @param0, UpdatedAt = GETDATE() WHERE SettingKey = @param1`,
+                [{ value: address }, { value: 'CoreServiceAddress' }]
+            )
+            console.log('Update result:', saveResult)
+        } else {
+            console.log('Inserting new CoreService config')
+            saveResult = await window.DB.execute(
+                `INSERT INTO SystemSettings (SettingKey, SettingValue, UpdatedAt) VALUES (@param0, @param1, GETDATE())`,
+                [{ value: 'CoreServiceAddress' }, { value: address }]
+            )
+            console.log('Insert result:', saveResult)
+        }
+        
+        // Verify the save by reading it back
+        const verification = await window.DB.query(
+            `SELECT * FROM SystemSettings WHERE SettingKey = @param0`,
+            [{ value: 'CoreServiceAddress' }]
+        )
+        console.log('Verification query result:', verification)
+        
+        if (!verification || !verification.success || !verification.data || verification.data.length === 0) {
+            throw new Error('Data was not saved to database')
+        }
+        
+        console.log('CoreService configuration saved and verified successfully')
+        statusBadge.textContent = 'Configured'
+        statusBadge.className = 'status-badge status-info'
+        showToast('CoreService configuration saved!', 'success')
+        
+        // Update global config if AgentAPI exists
+        if (window.AgentAPI) {
+            window.AgentAPI.coreServiceUrl = address
+        }
+    } catch (error) {
+        console.error('Failed to save CoreService config:', error)
+        showToast(`Failed to save: ${error.message}`, 'error')
+    } finally {
+        saveBtn.disabled = false
+        saveBtn.textContent = 'Save'
+    }
+})
+
+// Load CoreService configuration when System Configuration view is shown
+async function loadCoreServiceConfig() {
+    console.log('Loading CoreService configuration...')
+    const addressInput = document.getElementById('coreServiceAddress')
+    const statusBadge = document.getElementById('coreServiceStatusBadge')
+    
+    // Check if elements exist before trying to set values
+    if (!addressInput || !statusBadge) {
+        console.warn('CoreService config elements not found in DOM')
+        return
+    }
+    
+    try {
+        // Ensure SystemSettings table exists
+        await window.DB.execute(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SystemSettings')
+            BEGIN
+                CREATE TABLE SystemSettings (
+                    SettingKey NVARCHAR(100) PRIMARY KEY,
+                    SettingValue NVARCHAR(MAX),
+                    UpdatedAt DATETIME2 DEFAULT GETDATE()
+                )
+            END
+        `)
+        
+        const results = await window.DB.query(
+            `SELECT SettingValue FROM SystemSettings WHERE SettingKey = @param0`,
+            [{ value: 'CoreServiceAddress' }]
+        )
+        
+        console.log('CoreService config query results:', results)
+        
+        if (results && results.success && results.data && results.data.length > 0 && results.data[0].SettingValue) {
+            const savedAddress = results.data[0].SettingValue
+            console.log('Loading saved CoreService address:', savedAddress)
+            addressInput.value = savedAddress
+            statusBadge.textContent = 'Configured'
+            statusBadge.className = 'status-badge status-info'
+            
+            // Update global config if AgentAPI exists
+            if (window.AgentAPI) {
+                window.AgentAPI.coreServiceUrl = savedAddress
+            }
+        } else {
+            console.log('No saved CoreService configuration found')
+            // No saved configuration - keep placeholder visible
+            addressInput.value = ''
+            statusBadge.textContent = 'Not Configured'
+            statusBadge.className = 'status-badge status-error'
+        }
+    } catch (error) {
+        console.error('Failed to load CoreService config:', error)
+        // Table might not exist yet, that's okay
+        addressInput.value = ''
+        statusBadge.textContent = 'Not Configured'
+        statusBadge.className = 'status-badge status-error'
+    }
+}
+
+// Load CoreService configuration globally on app startup
+async function initCoreServiceConfig() {
+    try {
+        const results = await window.DB.query(
+            `SELECT SettingValue FROM SystemSettings WHERE SettingKey = @param0`,
+            [{ value: 'CoreServiceAddress' }]
+        )
+        
+        if (results && results.success && results.data && results.data.length > 0 && results.data[0].SettingValue) {
+            const savedAddress = results.data[0].SettingValue
+            console.log('Loaded CoreService address on startup:', savedAddress)
+            
+            // Update global config if AgentAPI exists
+            if (window.AgentAPI) {
+                window.AgentAPI.coreServiceUrl = savedAddress
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load CoreService config on startup:', error)
+    }
+}
+
+// Call loadCoreServiceConfig when system-configuration view is shown
+const originalShowView = showView
+showView = async function(name, updateUrl = true) {
+    await originalShowView.call(this, name, updateUrl)
+    
+    if (name === 'system-configuration') {
+        // Small delay to ensure DOM elements are rendered
+        setTimeout(() => loadCoreServiceConfig(), 100)
+    }
+}
+
 // ========== ORBISAGENT MODULE INITIALIZATION ==========
 // Initialize OrbisAgent UI when view is shown
 document.addEventListener('DOMContentLoaded', () => {
@@ -9221,6 +9518,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.AgentUI) {
         window.AgentUI.init()
     }
+    
+    // Load CoreService configuration on app startup
+    initCoreServiceConfig()
     
     // Note: Agent view rendering is handled by the showView() function
     // No need for duplicate event listeners here
