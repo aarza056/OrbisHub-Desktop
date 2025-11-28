@@ -6494,29 +6494,19 @@ function readSettings() {
     const merged = { ...getDefaultSettings(), ...(db.settings || {}) }
     db.settings = merged
     // Note: Don't write here - just read. Writing happens in saveSettings()
-    console.log('📖 readSettings returning:', { 
-        autoRefresh: merged.autoRefresh, 
-        refreshInterval: merged.refreshInterval 
-    })
     return merged
 }
 
 async function loadSettingsFromDatabase() {
     try {
-        console.log('🔍 Loading settings directly from database...')
         const dbData = await store.loadFromDatabase()
         if (dbData && dbData.settings) {
             // Update memory cache with loaded data
             const db = store.readSync()
             db.settings = { ...getDefaultSettings(), ...dbData.settings }
             memoryCache = db
-            console.log('✅ Settings loaded from database:', {
-                autoRefresh: db.settings.autoRefresh,
-                refreshInterval: db.settings.refreshInterval
-            })
             return db.settings
         }
-        console.log('⚠️ No settings in database, using defaults')
         return getDefaultSettings()
     } catch (error) {
         console.error('❌ Failed to load settings from database:', error)
@@ -6533,12 +6523,6 @@ async function saveSettings(patch) {
 
 function applySettings(settings) {
     try {
-        console.log('🔧 applySettings called with:', { 
-            autoRefresh: settings.autoRefresh, 
-            refreshInterval: settings.refreshInterval,
-            coreServiceUrl: window.AgentAPI?.coreServiceUrl 
-        })
-
         const body = document.body
         if (!body) {
             console.error('❌ document.body not found!')
@@ -6563,12 +6547,10 @@ function applySettings(settings) {
 
         // Auto-refresh handling
         if (__autoRefreshTimer) { 
-            console.log('⏹️ Clearing existing auto-refresh timer')
             clearInterval(__autoRefreshTimer); 
             __autoRefreshTimer = null 
         }
         if (settings.autoRefresh) {
-            console.log('✅ Starting auto-refresh with interval:', settings.refreshInterval, 'seconds')
             const intervalMs = Math.max(5, Number(settings.refreshInterval || 60)) * 1000
             const tick = async () => {
                 try {
@@ -6587,9 +6569,6 @@ function applySettings(settings) {
             // Call tick immediately to provide instant feedback, then set up interval
             tick()
             __autoRefreshTimer = setInterval(tick, intervalMs)
-            console.log('✅ Auto-refresh timer started, timer ID:', __autoRefreshTimer)
-        } else {
-            console.log('⏸️ Auto-refresh is disabled in settings')
         }
     } catch {}
 }
@@ -9350,8 +9329,6 @@ document.getElementById('saveCoreServiceBtn')?.addEventListener('click', async (
     saveBtn.textContent = 'Saving...'
     
     try {
-        console.log('Saving CoreService address:', address)
-        
         // Ensure SystemSettings table exists first
         const createResult = await window.DB.execute(`
             IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SystemSettings')
@@ -9363,31 +9340,25 @@ document.getElementById('saveCoreServiceBtn')?.addEventListener('click', async (
                 )
             END
         `)
-        console.log('Create table result:', createResult)
         
         // Check if setting already exists
         const existing = await window.DB.query(
             `SELECT SettingKey FROM SystemSettings WHERE SettingKey = @param0`,
             [{ value: 'CoreServiceAddress' }]
         )
-        console.log('Existing CoreService config:', existing)
         
         let saveResult
         // Update or insert
         if (existing && existing.success && existing.data && existing.data.length > 0) {
-            console.log('Updating existing CoreService config')
             saveResult = await window.DB.execute(
                 `UPDATE SystemSettings SET SettingValue = @param0, UpdatedAt = GETDATE() WHERE SettingKey = @param1`,
                 [{ value: address }, { value: 'CoreServiceAddress' }]
             )
-            console.log('Update result:', saveResult)
         } else {
-            console.log('Inserting new CoreService config')
             saveResult = await window.DB.execute(
                 `INSERT INTO SystemSettings (SettingKey, SettingValue, UpdatedAt) VALUES (@param0, @param1, GETDATE())`,
                 [{ value: 'CoreServiceAddress' }, { value: address }]
             )
-            console.log('Insert result:', saveResult)
         }
         
         // Verify the save by reading it back
@@ -9395,13 +9366,10 @@ document.getElementById('saveCoreServiceBtn')?.addEventListener('click', async (
             `SELECT * FROM SystemSettings WHERE SettingKey = @param0`,
             [{ value: 'CoreServiceAddress' }]
         )
-        console.log('Verification query result:', verification)
         
         if (!verification || !verification.success || !verification.data || verification.data.length === 0) {
             throw new Error('Data was not saved to database')
         }
-        
-        console.log('CoreService configuration saved and verified successfully')
         statusBadge.textContent = 'Configured'
         statusBadge.className = 'status-badge status-info'
         showToast('CoreService configuration saved!', 'success')
@@ -9421,7 +9389,6 @@ document.getElementById('saveCoreServiceBtn')?.addEventListener('click', async (
 
 // Load CoreService configuration when System Configuration view is shown
 async function loadCoreServiceConfig() {
-    console.log('Loading CoreService configuration...')
     const addressInput = document.getElementById('coreServiceAddress')
     const statusBadge = document.getElementById('coreServiceStatusBadge')
     
@@ -9449,11 +9416,8 @@ async function loadCoreServiceConfig() {
             [{ value: 'CoreServiceAddress' }]
         )
         
-        console.log('CoreService config query results:', results)
-        
         if (results && results.success && results.data && results.data.length > 0 && results.data[0].SettingValue) {
             const savedAddress = results.data[0].SettingValue
-            console.log('Loading saved CoreService address:', savedAddress)
             addressInput.value = savedAddress
             statusBadge.textContent = 'Configured'
             statusBadge.className = 'status-badge status-info'
@@ -9463,7 +9427,6 @@ async function loadCoreServiceConfig() {
                 window.AgentAPI.coreServiceUrl = savedAddress
             }
         } else {
-            console.log('No saved CoreService configuration found')
             // No saved configuration - keep placeholder visible
             addressInput.value = ''
             statusBadge.textContent = 'Not Configured'
@@ -9488,7 +9451,6 @@ async function initCoreServiceConfig() {
         
         if (results && results.success && results.data && results.data.length > 0 && results.data[0].SettingValue) {
             const savedAddress = results.data[0].SettingValue
-            console.log('Loaded CoreService address on startup:', savedAddress)
             
             // Update global config if AgentAPI exists
             if (window.AgentAPI) {
