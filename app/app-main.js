@@ -686,33 +686,6 @@ if (editUserModal) {
     editUserModal.addEventListener('click', (e) => { if (e.target === editUserModal) closeEditUserModal() })
     
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && editUserModal.hasAttribute('open')) closeEditUserModal() })
-    
-    const editForm = editUserModal.querySelector('form')
-    if (editForm) editForm.addEventListener('submit', (e) => {
-        e.preventDefault()
-        const id = document.getElementById('editUserId').value
-        const name = document.getElementById('editUserName').value.trim()
-        const username = document.getElementById('editUserUsername').value.trim()
-        const password = document.getElementById('editUserPassword').value.trim()
-        const changePassword = document.getElementById('editUserChangePassword').checked
-        const email = document.getElementById('editUserEmail').value.trim()
-        const role = document.getElementById('editUserRole').value
-        if (!id || !name || !username || !email) return
-        
-        const db = store.readSync()
-        const user = db.users.find(x => x.id === id)
-        if (user) {
-            user.name = name
-            user.username = username
-            if (password) user.password = password // Only update if new password provided
-            user.changePasswordOnLogin = changePassword
-            user.email = email
-            user.role = role
-            store.write(db)
-            renderUsers()
-        }
-        closeEditUserModal()
-    })
 }
 
 // moved: environment delete modal handling is in views/environments.js
@@ -2051,12 +2024,54 @@ if (saveEditUserBtn) {
                 user.role = role
                 store.write(db)
                 
+                // Update database with all changes
+                try {
+                    if (password) {
+                        // If password was changed, update it in the database
+                        await window.electronAPI.dbExecute(
+                            'UPDATE Users SET name = @param0, username = @param1, password = @param2, email = @param3, position = @param4, squad = @param5, role = @param6, changePasswordOnLogin = @param7 WHERE id = @param8',
+                            [
+                                { value: name },
+                                { value: username },
+                                { value: user.password },
+                                { value: email },
+                                { value: position || '—' },
+                                { value: squad || '—' },
+                                { value: role },
+                                { value: changePassword ? 1 : 0 },
+                                { value: id }
+                            ]
+                        )
+                    } else {
+                        // Update without changing password
+                        await window.electronAPI.dbExecute(
+                            'UPDATE Users SET name = @param0, username = @param1, email = @param2, position = @param3, squad = @param4, role = @param5, changePasswordOnLogin = @param6 WHERE id = @param7',
+                            [
+                                { value: name },
+                                { value: username },
+                                { value: email },
+                                { value: position || '—' },
+                                { value: squad || '—' },
+                                { value: role },
+                                { value: changePassword ? 1 : 0 },
+                                { value: id }
+                            ]
+                        )
+                    }
+                } catch (dbError) {
+                    console.error('Failed to update user in database:', dbError)
+                    ToastManager.error('Update Failed', 'Failed to save changes to database', 3000)
+                    try { editUserModal.close() } catch (e) { editUserModal.removeAttribute('open') }
+                    return
+                }
+                
                 // Audit log with old and new values
                 logAudit('update', 'user', name, { 
                     old: oldValues,
                     new: { name, username, email, position: position || '—', squad: squad || '—', role }
                 })
                 
+                ToastManager.success('User Updated', `${name} has been updated successfully`, 3000)
                 renderUsers()
             }
             try { editUserModal.close() } catch (e) { editUserModal.removeAttribute('open') }

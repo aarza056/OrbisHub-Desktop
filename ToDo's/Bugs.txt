@@ -1,2 +1,3 @@
 1. In "Remote Desktop Manager" server status is not being checked - Fixed
 2. ❌ Error initializing app data: ReferenceError: renderIntegrations is not defined - Fixed
+3. Add Notification indicator after Summary if there is and error or system <100% - Fixed
