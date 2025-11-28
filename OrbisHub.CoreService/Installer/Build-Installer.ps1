@@ -145,6 +145,8 @@ foreach ($wxsFile in $wxsFiles) {
         -ext WixUtilExtension `
         -dVersion=$Version `
         -dConfiguration=$Configuration `
+        "-dProjectRoot=$projectRoot" `
+        "-dPublishDir=$publishDir" `
         $wxsFile
     
     if ($LASTEXITCODE -ne 0) {

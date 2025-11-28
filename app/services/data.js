@@ -9,6 +9,14 @@
       const envsQ = await db.query('SELECT * FROM Environments', []);
       const credsQ = await db.query('SELECT * FROM Credentials', []);
       const logsQ = await db.query('SELECT TOP 1000 * FROM AuditLogs ORDER BY [timestamp] DESC', []);
+      
+      // Try to load settings, but don't fail if table doesn't exist yet
+      let settingsQ = { success: false, data: null };
+      try {
+        settingsQ = await db.query('SELECT TOP 1 * FROM Settings ORDER BY id DESC', []);
+      } catch (err) {
+        console.warn('Settings table not found, using defaults:', err.message);
+      }
 
       const users = usersQ.success && usersQ.data ? usersQ.data.map(u => ({
         id: u.id,
@@ -115,14 +123,40 @@
         details: (() => { try { return a.details && typeof a.details === 'string' && a.details.trim().startsWith('{') ? JSON.parse(a.details) : (a.details || {}) } catch { return {} } })()
       })) : [];
 
-      return { success: true, data: { users, servers, environments, credentials, auditLogs } };
+      // Settings
+      let settings = null;
+      if (settingsQ.success && settingsQ.data && settingsQ.data.length > 0) {
+        try {
+          settings = JSON.parse(settingsQ.data[0].settingsJson || '{}');
+        } catch {
+          settings = null;
+        }
+      }
+
+      return { success: true, data: { users, servers, environments, credentials, auditLogs, settings } };
     } catch (error) {
       return { success: false, error: error.message };
     }
   }
 
-  async function syncAll({ users = [], servers = [], environments = [], credentials = [], auditLogs = [] }) {
+  async function syncAll({ users = [], servers = [], environments = [], credentials = [], auditLogs = [], settings = null }) {
     try {
+      // Settings (wrap in try-catch in case table doesn't exist yet)
+      if (settings) {
+        try {
+          const settingsJson = JSON.stringify(settings);
+          await db.execute(
+            `IF EXISTS (SELECT 1 FROM Settings)
+               UPDATE Settings SET settingsJson = @param0, updated_at = GETDATE()
+             ELSE
+               INSERT INTO Settings (settingsJson, created_at, updated_at) VALUES (@param0, GETDATE(), GETDATE())`,
+            [{ value: settingsJson }]
+          );
+        } catch (err) {
+          console.warn('Could not save settings to database (table may not exist):', err.message);
+        }
+      }
+      
       // Users
       for (const user of users) {
         // Hash password if it's not already hashed (doesn't contain ':')

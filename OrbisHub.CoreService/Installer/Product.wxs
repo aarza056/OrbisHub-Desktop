@@ -32,7 +32,7 @@
     <Property Id="SQLPASSWORD" Secure="yes" Hidden="yes" />
     
     <!-- UI Icon -->
-    <Icon Id="OrbisIcon.ico" SourceFile="..\..\assets\icon.ico2" />
+    <Icon Id="OrbisIcon.ico" SourceFile="$(var.ProjectRoot)\..\assets\icon.ico2" />
     <Property Id="ARPPRODUCTICON" Value="OrbisIcon.ico" />
     
     <!-- Add/Remove Programs properties -->
@@ -335,24 +335,24 @@
       <!-- Main executable and DLLs -->
       <Component Id="MainExecutable" Guid="A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D">
         <File Id="CoreServiceExe" 
-              Source="..\publish\OrbisHub.CoreService.exe" 
+              Source="$(var.PublishDir)\OrbisHub.CoreService.exe" 
               KeyPath="yes" />
       </Component>
 
       <!-- Configuration Files -->
       <Component Id="ConfigFiles" Guid="B2C3D4E5-F6A7-4B8C-9D0E-1F2A3B4C5D6E">
         <File Id="AppSettingsJSON" 
-              Source="..\publish\appsettings.json" 
+              Source="$(var.PublishDir)\appsettings.json" 
               KeyPath="yes" />
-        <File Id="AppSettingsProdJSON" 
-              Source="..\publish\appsettings.Production.json" 
+        <File Id="AppSettingsDevJSON" 
+              Source="$(var.PublishDir)\appsettings.Development.json" 
               KeyPath="no" />
       </Component>
 
       <!-- All DLL files from publish folder -->
       <Component Id="RuntimeFiles" Guid="C3D4E5F6-A7B8-4C9D-0E1F-2A3B4C5D6E7F">
         <File Id="OrbisHub.CoreService.dll" 
-              Source="..\publish\OrbisHub.CoreService.dll" 
+              Source="$(var.PublishDir)\OrbisHub.CoreService.dll" 
               KeyPath="yes" />
       </Component>
       

@@ -1700,7 +1700,8 @@ table tbody tr td:first-child {
     }
 }
 
-.agent-card {
+/* Disabled - causes jumping on refresh */
+/* .agent-card {
     animation: fadeIn 0.3s ease;
 }
 
@@ -1709,7 +1710,7 @@ table tbody tr td:first-child {
 .agent-card:nth-child(3) { animation-delay: 0.15s; }
 .agent-card:nth-child(4) { animation-delay: 0.2s; }
 .agent-card:nth-child(5) { animation-delay: 0.25s; }
-.agent-card:nth-child(6) { animation-delay: 0.3s; }
+.agent-card:nth-child(6) { animation-delay: 0.3s; } */
 
 /* ========== Utility Classes ========== */
 

@@ -330,7 +330,6 @@ const store = {
             }
         }
         if (!db.locks) db.locks = {}
-        if (!db.integrations) db.integrations = []
         if (!db.credentials) db.credentials = []
         if (!db.auditLogs) db.auditLogs = []
         if (!db.servers) db.servers = []
@@ -357,13 +356,32 @@ const store = {
             servers: [],
             users: [],
             credentials: [],
-            integrations: [],
             auditLogs: [],
             jobs: [],
             notificationSettings: {
                 system: { enabled: false, level: 'all', channel: '', recipients: '' },
                 summary: { enabled: false, time: '09:00', channel: '', recipients: '' },
                 health: { enabled: false, status: 'all', channel: '', recipients: '' }
+            },
+            settings: {
+                compactMode: false,
+                fontSize: 'medium',
+                desktopNotifications: true,
+                errorNotifications: true,
+                soundEffects: false,
+                autoRefresh: false,
+                refreshInterval: 60,
+                autoBackup: false,
+                dataRetentionDays: 30,
+                exportFormat: 'json',
+                autoLock: false,
+                sessionTimeout: 15,
+                showPasswords: false,
+                auditLogging: true,
+                animations: true,
+                lazyLoading: true,
+                itemsPerPage: 50,
+                cacheDuration: 300
             },
             locks: {},
             features: { claude_sonnet_4: true }
@@ -391,7 +409,8 @@ const store = {
                 servers: db.servers || [],
                 credentials: db.credentials || [],
                 users: db.users || [],
-                auditLogs: db.auditLogs || []
+                auditLogs: db.auditLogs || [],
+                settings: db.settings || getDefaultSettings()
             })
         })
         const result = await response.json()
@@ -667,33 +686,6 @@ if (editUserModal) {
     editUserModal.addEventListener('click', (e) => { if (e.target === editUserModal) closeEditUserModal() })
     
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && editUserModal.hasAttribute('open')) closeEditUserModal() })
-    
-    const editForm = editUserModal.querySelector('form')
-    if (editForm) editForm.addEventListener('submit', (e) => {
-        e.preventDefault()
-        const id = document.getElementById('editUserId').value
-        const name = document.getElementById('editUserName').value.trim()
-        const username = document.getElementById('editUserUsername').value.trim()
-        const password = document.getElementById('editUserPassword').value.trim()
-        const changePassword = document.getElementById('editUserChangePassword').checked
-        const email = document.getElementById('editUserEmail').value.trim()
-        const role = document.getElementById('editUserRole').value
-        if (!id || !name || !username || !email) return
-        
-        const db = store.readSync()
-        const user = db.users.find(x => x.id === id)
-        if (user) {
-            user.name = name
-            user.username = username
-            if (password) user.password = password // Only update if new password provided
-            user.changePasswordOnLogin = changePassword
-            user.email = email
-            user.role = role
-            store.write(db)
-            renderUsers()
-        }
-        closeEditUserModal()
-    })
 }
 
 // moved: environment delete modal handling is in views/environments.js
@@ -924,6 +916,69 @@ async function testServerConnection(ipAddress, serverName, port = 3389) {
 
         // If backend is not available or timeout, return true to not block server creation
         return true
+    }
+}
+
+// Dedicated function for health checks that doesn't assume server is up on error
+async function testServerConnectionForHealthCheck(ipAddress, serverName, port = 3389) {
+    try {
+        
+        const response = await fetch(`${API_BASE_URL}/api/test-server`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                ipAddress: ipAddress,
+                serverName: serverName,
+                port
+            }),
+            signal: AbortSignal.timeout(5000) // 5 second timeout
+        })
+        
+        const result = await response.json()
+
+        if (result.success && result.reachable) {
+            return true
+        } else {
+            return false
+        }
+    } catch (error) {
+        // For health checks, treat errors as server being down
+        console.warn(`Health check error for ${serverName}:`, error.message)
+        return false
+    }
+}
+
+// Dedicated function for health checks that doesn't assume server is up on error
+async function testServerConnectionForHealthCheck(ipAddress, serverName, port = 3389) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/test-server`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                ipAddress: ipAddress,
+                serverName: serverName,
+                port
+            }),
+            signal: AbortSignal.timeout(10000)
+        })
+        
+        if (!response.ok) {
+            return false
+        }
+        
+        const result = await response.json()
+
+        if (result.success && result.reachable) {
+            return true
+        } else {
+            return false
+        }
+    } catch (error) {
+        return false
     }
 }
 
@@ -1283,282 +1338,6 @@ function userRow(u) {
     
     return el
 }
-
-
-// ========== DATABASE MANAGEMENT ==========
-function renderIntegrations(filter = '') {
-    const integrationListEl = document.getElementById('integrationList')
-    if (!integrationListEl) return
-    const db = store.readSync()
-    const q = (filter || '').toLowerCase()
-    integrationListEl.innerHTML = ''
-    
-    const integrations = db.integrations || []
-    integrations
-        .filter(i => !q || i.name.toLowerCase().includes(q) || i.type.toLowerCase().includes(q))
-        .forEach(integration => {
-            const el = document.createElement('div')
-            el.className = 'card integration'
-            
-            // Check if card is locked
-            const locked = isCardLocked('integration', integration.id)
-            if (locked) {
-                el.classList.add('is-locked')
-            }
-            
-            el.innerHTML = `
-                ${createLockButton('integration', integration.id)}
-                <div class="title">${integration.name}</div>
-                <div class="meta muted">${integration.type}</div>
-                ${integration.description ? `<div class="muted" style="font-size:12px; margin-top:8px;">${integration.description}</div>` : ''}
-                <div class="muted" style="font-size:11px; margin-top:8px; font-family:monospace; word-break:break-all; opacity:0.7;">
-                    ${integration.connection ? integration.connection.substring(0, 60) + (integration.connection.length > 60 ? '...' : '') : ''}
-                </div>
-                <div style="margin-top:16px; display:grid; grid-template-columns:auto auto; gap:8px; width:fit-content;">
-                    <button class="btn" data-action="test" data-id="${integration.id}" style="background:linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color:white; border:none; font-size:13px; padding:8px 12px; display:flex; align-items:center; gap:6px; white-space:nowrap;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                        Test Connection
-                    </button>
-                    <button class="btn btn-ghost" data-action="edit" data-id="${integration.id}" style="white-space:nowrap;">Edit</button>
-                    <button class="btn btn-ghost" data-action="delete" data-id="${integration.id}" style="white-space:nowrap;">Delete</button>
-                </div>
-            `
-            
-            // Lock button event listener
-            const lockBtn = el.querySelector('.card-lock-btn')
-            if (lockBtn) {
-                lockBtn.addEventListener('click', (e) => {
-                    e.stopPropagation()
-                    toggleCardLock(el, 'integration', integration.id)
-                })
-            }
-            
-            el.querySelectorAll('button[data-action]').forEach(b => b.addEventListener('click', (ev) => {
-                const id = b.dataset.id
-                const action = b.dataset.action
-                const db = store.readSync()
-                const integration = (db.integrations || []).find(x => x.id === id)
-                if (integration) onIntegrationAction(integration, action, b)
-            }))
-            
-            integrationListEl.appendChild(el)
-        })
-}
-
-function onIntegrationAction(integration, action, buttonEl) {
-    if (action === 'edit') {
-        openEditIntegration(integration)
-    } else if (action === 'delete') {
-        integrationToDelete = integration
-        try {
-            deleteIntegrationModal.showModal()
-        } catch (e) {
-            deleteIntegrationModal.setAttribute('open', '')
-        }
-    } else if (action === 'test') {
-        testIntegrationConnection(integration, buttonEl)
-    }
-}
-
-async function testIntegrationConnection(integration, buttonEl) {
-    // Disable button and show loading
-    buttonEl.disabled = true
-    const originalHTML = buttonEl.innerHTML
-    buttonEl.innerHTML = `
-        <div class="spinner-ring" style="width:14px; height:14px; border-width:2px; margin-right:6px;"></div>
-        Testing...
-    `
-    
-    try {
-        // Call backend API to test integration connection
-
-        const response = await fetch(`${API_BASE_URL}/api/test-integration`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                type: integration.type,
-                connection: integration.connection
-            })
-        })
-        
-        const result = await response.json()
-        
-        if (result.success) {
-            // Success
-            buttonEl.innerHTML = `
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-                Connected!
-            `
-            buttonEl.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-            
-            // Log audit
-            logAudit('test', 'integration', integration.name, { status: 'success' })
-        } else {
-            throw new Error(result.error || 'Connection failed')
-        }
-        
-    } catch (error) {
-        console.error('Integration connection test failed:', error)
-        
-        // Show error
-        buttonEl.innerHTML = `
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="15" y1="9" x2="9" y2="15"></line>
-                <line x1="9" y1="9" x2="15" y2="15"></line>
-            </svg>
-            Failed
-        `
-        buttonEl.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
-        
-        // Show error details
-        alert(`Connection test failed: ${error.message}`)
-        
-        // Log audit
-        logAudit('test', 'integration', integration.name, { status: 'failed', error: error.message })
-    }
-    
-    // Reset after 3 seconds
-    setTimeout(() => {
-        buttonEl.disabled = false
-        buttonEl.innerHTML = originalHTML
-        buttonEl.style.background = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
-    }, 3000)
-}
-
-function openEditIntegration(integration) {
-    document.getElementById('editIntegrationId').value = integration.id
-    document.getElementById('editIntegrationName').value = integration.name
-    document.getElementById('editIntegrationType').value = integration.type || ''
-    document.getElementById('editIntegrationConnection').value = integration.connection || ''
-    document.getElementById('editIntegrationDescription').value = integration.description || ''
-    
-    const modal = document.getElementById('editIntegrationModal')
-    if (modal) {
-        try {
-            modal.showModal()
-        } catch (e) {
-            modal.setAttribute('open', '')
-        }
-    }
-}
-
-let integrationToDelete = null
-
-// Add Integration button
-const addIntegrationBtn = document.getElementById('addIntegrationBtn')
-if (addIntegrationBtn) {
-    addIntegrationBtn.addEventListener('click', () => {
-        // Clear form
-        document.getElementById('integrationName').value = ''
-        document.getElementById('integrationType').value = 'Exchange Server'
-        document.getElementById('integrationConnection').value = ''
-        document.getElementById('integrationDescription').value = ''
-        
-        const modal = document.getElementById('integrationModal')
-        if (modal) {
-            try {
-                modal.showModal()
-            } catch (e) {
-                modal.setAttribute('open', '')
-            }
-        }
-    })
-}
-
-// Save Integration button
-const saveIntegrationBtn = document.getElementById('saveIntegrationBtn')
-if (saveIntegrationBtn) {
-    saveIntegrationBtn.addEventListener('click', () => {
-        const name = document.getElementById('integrationName').value.trim()
-        const type = document.getElementById('integrationType').value
-        const connection = document.getElementById('integrationConnection').value.trim()
-        const description = document.getElementById('integrationDescription').value.trim()
-        
-        if (!name || !connection) {
-            alert('Please fill in all required fields.')
-            return
-        }
-        
-        const db = store.readSync()
-        db.integrations = db.integrations || []
-        db.integrations.push({
-            id: Date.now() + Math.random(),
-            name,
-            type,
-            connection,
-            description,
-            createdAt: new Date().toISOString()
-        })
-        store.write(db)
-        renderIntegrations()
-        logAudit('create', 'integration', name)
-    })
-}
-
-// Save Edit Integration button
-const saveEditIntegrationBtn = document.getElementById('saveEditIntegrationBtn')
-if (saveEditIntegrationBtn) {
-    saveEditIntegrationBtn.addEventListener('click', () => {
-        const id = parseFloat(document.getElementById('editIntegrationId').value)
-        const name = document.getElementById('editIntegrationName').value.trim()
-        const type = document.getElementById('editIntegrationType').value
-        const connection = document.getElementById('editIntegrationConnection').value.trim()
-        const description = document.getElementById('editIntegrationDescription').value.trim()
-        
-        if (!name || !connection) {
-            alert('Please fill in all required fields.')
-            return
-        }
-        
-        const db = store.readSync()
-        const integration = db.integrations.find(x => x.id === id)
-        if (integration) {
-            integration.name = name
-            integration.type = type
-            integration.connection = connection
-            integration.description = description
-            integration.updatedAt = new Date().toISOString()
-            store.write(db)
-            renderIntegrations()
-            logAudit('update', 'integration', name)
-        }
-    })
-}
-
-// Delete Integration confirmation
-const confirmDeleteIntegrationBtn = document.getElementById('confirmDeleteIntegrationBtn')
-const deleteIntegrationModal = document.getElementById('deleteIntegrationModal')
-if (confirmDeleteIntegrationBtn && deleteIntegrationModal) {
-    confirmDeleteIntegrationBtn.addEventListener('click', () => {
-        if (integrationToDelete) {
-            const db = store.readSync()
-            const idx = db.integrations.findIndex(x => x.id === integrationToDelete.id)
-            if (idx > -1) {
-                const integrationName = db.integrations[idx].name
-                db.integrations.splice(idx, 1)
-                store.write(db)
-                logAudit('delete', 'integration', integrationName)
-                integrationToDelete = null
-                renderIntegrations()
-            }
-        }
-    })
-}
-
-// Integration search input
-const integrationSearchInput = document.getElementById('integrationSearchInput')
-if (integrationSearchInput) {
-    integrationSearchInput.addEventListener('input', (e) => renderIntegrations(e.target.value))
-}
-
-
 
 
 // ========== CREDENTIALS MANAGEMENT ==========
@@ -2002,6 +1781,34 @@ if (serverSearchInput) {
 	})
 }
 
+// Check server health button
+const checkServerHealthBtn = document.getElementById('checkServerHealthBtn')
+if (checkServerHealthBtn) {
+    checkServerHealthBtn.addEventListener('click', async () => {
+        checkServerHealthBtn.disabled = true
+        checkServerHealthBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px; animation: spin 1s linear infinite;">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            Checking...
+        `
+        
+        await checkAllServerHealth(true)
+        
+        checkServerHealthBtn.disabled = false
+        checkServerHealthBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            Check Health
+        `
+    })
+}
+
 // moved: environment form submission handled in views/environments.js
 
 // Wire Admin create user action
@@ -2217,12 +2024,54 @@ if (saveEditUserBtn) {
                 user.role = role
                 store.write(db)
                 
+                // Update database with all changes
+                try {
+                    if (password) {
+                        // If password was changed, update it in the database
+                        await window.electronAPI.dbExecute(
+                            'UPDATE Users SET name = @param0, username = @param1, password = @param2, email = @param3, position = @param4, squad = @param5, role = @param6, changePasswordOnLogin = @param7 WHERE id = @param8',
+                            [
+                                { value: name },
+                                { value: username },
+                                { value: user.password },
+                                { value: email },
+                                { value: position || '—' },
+                                { value: squad || '—' },
+                                { value: role },
+                                { value: changePassword ? 1 : 0 },
+                                { value: id }
+                            ]
+                        )
+                    } else {
+                        // Update without changing password
+                        await window.electronAPI.dbExecute(
+                            'UPDATE Users SET name = @param0, username = @param1, email = @param2, position = @param3, squad = @param4, role = @param5, changePasswordOnLogin = @param6 WHERE id = @param7',
+                            [
+                                { value: name },
+                                { value: username },
+                                { value: email },
+                                { value: position || '—' },
+                                { value: squad || '—' },
+                                { value: role },
+                                { value: changePassword ? 1 : 0 },
+                                { value: id }
+                            ]
+                        )
+                    }
+                } catch (dbError) {
+                    console.error('Failed to update user in database:', dbError)
+                    ToastManager.error('Update Failed', 'Failed to save changes to database', 3000)
+                    try { editUserModal.close() } catch (e) { editUserModal.removeAttribute('open') }
+                    return
+                }
+                
                 // Audit log with old and new values
                 logAudit('update', 'user', name, { 
                     old: oldValues,
                     new: { name, username, email, position: position || '—', squad: squad || '—', role }
                 })
                 
+                ToastManager.success('User Updated', `${name} has been updated successfully`, 3000)
                 renderUsers()
             }
             try { editUserModal.close() } catch (e) { editUserModal.removeAttribute('open') }
@@ -3330,18 +3179,6 @@ async function renderAllViews() {
         console.error('❌ Failed to load data:', error)
     }
     
-    // Restore last active view or default to summary
-    try {
-        const lastView = null 
-        if (lastView) {
-            showView(lastView)
-        } else {
-            showView('summary')
-        }
-    } catch (e) {
-        showView('summary')
-    }
-    
     // Render all views using cached data
     try {
 
@@ -3358,12 +3195,24 @@ async function renderAllViews() {
         await renderAuditLogs()
 
         // Builds/Scripts removed; skip rendering those views
-        renderIntegrations()
+        // renderIntegrations() // Commented out - function doesn't exist
 
 
     } catch (error) {
         console.error('❌ Error initializing app data:', error)
         // Still show the app even if some data fails to load
+    }
+    
+    // Restore last active view or default to summary (after data is loaded)
+    try {
+        const lastView = null 
+        if (lastView) {
+            await showView(lastView)
+        } else {
+            await showView('summary')
+        }
+    } catch (e) {
+        await showView('summary')
     }
 }
 
@@ -3792,8 +3641,55 @@ if (testNotificationBtn) {
 // SUMMARY DASHBOARD
 // ============================================
 
-function updateSummaryDashboard() {
+let summaryStartTime = Date.now()
+let summaryActivityFilter = 'all'
+
+function updateSummaryNotificationBadge(systemHealth, hasErrors) {
+    const badge = document.getElementById('summaryNotificationBadge')
+    if (!badge) return
+    
+    if (systemHealth < 100 || hasErrors) {
+        badge.style.display = 'inline-flex'
+    } else {
+        badge.style.display = 'none'
+    }
+}
+
+async function updateSummaryDashboard() {
+    // Ensure the summary view DOM is loaded
+    const healthPercentageEl = document.getElementById('summaryHealthPercentage')
+    if (!healthPercentageEl) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    
+    // On first call after login, wait a bit longer to ensure all DOM elements are rendered
+    const summaryStatusBanner = document.getElementById('summaryStatusBanner')
+    if (summaryStatusBanner && !summaryStatusBanner.dataset.initialized) {
+        summaryStatusBanner.dataset.initialized = 'true'
+        await new Promise(resolve => setTimeout(resolve, 200))
+    }
+    
+    // Refresh servers from API
+    try {
+        const serversResponse = await fetch(`${API_BASE_URL}/api/load-data`)
+        const serversResult = await serversResponse.json()
+        if (serversResult.success && serversResult.data) {
+            const db = store.readSync()
+            db.servers = serversResult.data.servers || []
+            db.environments = serversResult.data.environments || db.environments || []
+            db.credentials = serversResult.data.credentials || db.credentials || []
+            db.users = serversResult.data.users || db.users || []
+            store.write(db, true) // Skip sync back to DB
+        }
+    } catch (error) {
+        console.error('Failed to refresh servers for summary:', error)
+    }
+    
     const db = store.readSync()
+    
+    // Update last refresh time
+    const lastUpdateEl = document.getElementById('summaryLastUpdate')
+    if (lastUpdateEl) lastUpdateEl.textContent = 'Just now'
     
     // Environments stats
     const environments = db.environments || []
@@ -3806,6 +3702,19 @@ function updateSummaryDashboard() {
     const elEnvIssues = document.getElementById('summaryEnvIssues')
     if (elEnvIssues) elEnvIssues.textContent = issueEnvs
     
+    // Update environment health bar
+    const envHealthBar = document.getElementById('summaryEnvHealthBar')
+    if (envHealthBar) {
+        if (environments.length > 0) {
+            const healthPercentage = (healthyEnvs / environments.length) * 100
+            envHealthBar.style.width = healthPercentage + '%'
+            envHealthBar.style.opacity = '1'
+        } else {
+            envHealthBar.style.width = '100%'
+            envHealthBar.style.opacity = '0.3'
+        }
+    }
+    
     // Servers stats
     const servers = db.servers || []
     const elSrvCount = document.getElementById('summaryServerCount')
@@ -3817,66 +3726,522 @@ function updateSummaryDashboard() {
     const elSrvOffline = document.getElementById('summaryServerOffline')
     if (elSrvOffline) elSrvOffline.textContent = offlineServers
     
-    // No script/build stats
+    // Update server health bar
+    const serverHealthBar = document.getElementById('summaryServerHealthBar')
+    if (serverHealthBar) {
+        if (servers.length > 0) {
+            const healthPercentage = (onlineServers / servers.length) * 100
+            serverHealthBar.style.width = healthPercentage + '%'
+            serverHealthBar.style.opacity = '1'
+        } else {
+            serverHealthBar.style.width = '100%'
+            serverHealthBar.style.opacity = '0.3'
+        }
+    }
+    
+    // Agents stats - fetch from API
+    let agents = []
+    let activeAgents = 0
+    let inactiveAgents = 0
+    
+    try {
+        if (window.AgentAPI) {
+            agents = await window.AgentAPI.getAllAgents()
+            // Count active agents (last heartbeat within 5 minutes)
+            const fiveMinutesAgo = Date.now() - (5 * 60 * 1000)
+            activeAgents = agents.filter(a => {
+                if (!a.lastHeartbeat) return false
+                const lastHeartbeat = new Date(a.lastHeartbeat + 'Z').getTime()
+                return lastHeartbeat > fiveMinutesAgo
+            }).length
+            inactiveAgents = agents.length - activeAgents
+        }
+    } catch (error) {
+        console.error('Failed to fetch agents for summary:', error)
+    }
+    
+    const elAgentCount = document.getElementById('summaryAgentCount')
+    if (elAgentCount) elAgentCount.textContent = agents.length
+    const elAgentActive = document.getElementById('summaryAgentActive')
+    if (elAgentActive) elAgentActive.textContent = activeAgents
+    const elAgentInactive = document.getElementById('summaryAgentInactive')
+    if (elAgentInactive) elAgentInactive.textContent = inactiveAgents
+    
+    // Update agent health bar
+    const agentHealthBar = document.getElementById('summaryAgentHealthBar')
+    if (agentHealthBar) {
+        if (agents.length > 0) {
+            const healthPercentage = (activeAgents / agents.length) * 100
+            agentHealthBar.style.width = healthPercentage + '%'
+            agentHealthBar.style.opacity = '1'
+        } else {
+            agentHealthBar.style.width = '100%'
+            agentHealthBar.style.opacity = '0.3'
+        }
+    }
+    
+    // Credentials stats
+    const credentials = db.credentials || []
+    const elCredCount = document.getElementById('summaryCredCount')
+    if (elCredCount) elCredCount.textContent = credentials.length
+    const elCredValid = document.getElementById('summaryCredValid')
+    if (elCredValid) elCredValid.textContent = credentials.length
+    const credTypes = [...new Set(credentials.map(c => c.type || 'Unknown'))].length
+    const elCredTypes = document.getElementById('summaryCredTypes')
+    if (elCredTypes) elCredTypes.textContent = credTypes
+    
+    // Update credential health bar
+    const credHealthBar = document.getElementById('summaryCredHealthBar')
+    if (credHealthBar) {
+        credHealthBar.style.width = '100%'
+        credHealthBar.style.opacity = credentials.length > 0 ? '1' : '0.3'
+    }
+    
+    // System info
+    const users = db.users || []
+    const elUserCount = document.getElementById('summaryUserCount')
+    if (elUserCount) elUserCount.textContent = users.length
+    
+    // Database status
+    const elDbStatus = document.getElementById('summaryDbStatus')
+    if (elDbStatus) {
+        try {
+            // Check if we can read from the database
+            const testDb = store.readSync()
+            if (testDb) {
+                elDbStatus.textContent = '✓ Connected'
+                elDbStatus.style.color = '#10b981'
+            } else {
+                elDbStatus.textContent = '⚠ Unknown'
+                elDbStatus.style.color = '#f59e0b'
+            }
+        } catch (e) {
+            elDbStatus.textContent = '✗ Error'
+            elDbStatus.style.color = '#ef4444'
+        }
+    }
+    
+    // OrbisHub.Core Service status
+    const elCoreStatus = document.getElementById('summaryCoreStatus')
+    if (elCoreStatus) {
+        try {
+            const coreUrl = window.AgentAPI ? window.AgentAPI.coreServiceUrl : 'http://192.168.11.56:5000'
+            
+            // Use Electron's HTTP request to avoid CORS issues
+            if (window.electronAPI && window.electronAPI.httpRequest) {
+                const response = await window.electronAPI.httpRequest(`${coreUrl}/api/agents`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                
+                if (response.ok) {
+                    elCoreStatus.textContent = '✓ Running'
+                    elCoreStatus.style.color = '#10b981'
+                } else {
+                    elCoreStatus.textContent = '⚠ Error'
+                    elCoreStatus.style.color = '#f59e0b'
+                }
+            } else {
+                // Fallback to regular fetch
+                const response = await fetch(`${coreUrl}/api/agents`, { 
+                    method: 'GET',
+                    signal: AbortSignal.timeout(3000)
+                })
+                if (response.ok) {
+                    elCoreStatus.textContent = '✓ Running'
+                    elCoreStatus.style.color = '#10b981'
+                } else {
+                    elCoreStatus.textContent = '⚠ Error'
+                    elCoreStatus.style.color = '#f59e0b'
+                }
+            }
+        } catch (e) {
+            console.error('Core Service check failed:', e)
+            elCoreStatus.textContent = '✗ Offline'
+            elCoreStatus.style.color = '#ef4444'
+        }
+    }
+    
+    // Database size
+    const elDbSize = document.getElementById('summaryDbSize')
+    if (elDbSize) {
+        try {
+            if (window.electronAPI && window.electronAPI.dbGetSize) {
+                const result = await window.electronAPI.dbGetSize()
+                if (result.success && result.sizeInMB !== undefined) {
+                    const sizeMB = parseFloat(result.sizeInMB)
+                    if (sizeMB >= 1024) {
+                        elDbSize.textContent = `${(sizeMB / 1024).toFixed(2)} GB`
+                    } else {
+                        elDbSize.textContent = `${sizeMB.toFixed(2)} MB`
+                    }
+                } else {
+                    elDbSize.textContent = '-'
+                }
+            } else {
+                elDbSize.textContent = '-'
+            }
+        } catch (e) {
+            console.error('Failed to get DB size:', e)
+            elDbSize.textContent = '-'
+        }
+    }
+    
+    // Update uptime
+    updateSummaryUptime()
+    
+    // Calculate overall system health including infrastructure services
+    const totalItems = environments.length + servers.length + agents.length
+    const healthyItems = healthyEnvs + onlineServers + activeAgents
+    
+    // Check infrastructure health (DB and Core Service)
+    const dbHealthy = elDbStatus && elDbStatus.textContent.includes('✓') ? 1 : 0
+    const coreHealthy = elCoreStatus && elCoreStatus.textContent.includes('✓') ? 1 : 0
+    const infrastructureTotal = 2 // DB + Core Service
+    const infrastructureHealthy = dbHealthy + coreHealthy
+    
+    // If no items exist, only use infrastructure health
+    let overallHealth = 100
+    let isEmptyState = totalItems === 0
+    
+    if (isEmptyState) {
+        // Only infrastructure services exist
+        if (infrastructureTotal > 0) {
+            overallHealth = (infrastructureHealthy / infrastructureTotal) * 100
+            isEmptyState = false // We have infrastructure to monitor
+        }
+    } else {
+        // Combine resource health (70%) and infrastructure health (30%)
+        const resourceHealth = (healthyItems / totalItems) * 100
+        const infraHealth = (infrastructureHealthy / infrastructureTotal) * 100
+        overallHealth = (resourceHealth * 0.7) + (infraHealth * 0.3)
+    }
+    
+    // Update health ring
+    const healthCircle = document.getElementById('summaryHealthCircle')
+    const healthPercentage = document.getElementById('summaryHealthPercentage')
+    
+    if (healthCircle && healthPercentage) {
+        if (isEmptyState) {
+            // Show dash for empty state
+            healthPercentage.textContent = '--'
+            healthCircle.style.strokeDashoffset = 201 // Full circle
+            healthCircle.style.stroke = 'var(--muted)'
+        } else {
+            const circumference = 2 * Math.PI * 32
+            const offset = circumference - (overallHealth / 100) * circumference
+            healthCircle.style.strokeDashoffset = offset
+            healthPercentage.textContent = Math.round(overallHealth) + '%'
+            
+            // Update color based on health
+            if (overallHealth >= 90) {
+                healthCircle.style.stroke = '#10b981'
+            } else if (overallHealth >= 70) {
+                healthCircle.style.stroke = '#f59e0b'
+            } else {
+                healthCircle.style.stroke = '#ef4444'
+            }
+        }
+    }
+    
+    // Update system status text
+    const systemStatus = document.getElementById('summarySystemStatus')
+    if (systemStatus) {
+        if (isEmptyState) {
+            systemStatus.textContent = 'No Data'
+            systemStatus.style.color = 'var(--muted)'
+        } else if (overallHealth >= 90) {
+            systemStatus.textContent = 'Operational'
+            systemStatus.style.color = '#10b981'
+        } else if (overallHealth >= 70) {
+            systemStatus.textContent = 'Degraded'
+            systemStatus.style.color = '#f59e0b'
+        } else {
+            systemStatus.textContent = 'Issues Detected'
+            systemStatus.style.color = '#ef4444'
+        }
+    }
+    
+    // Check for errors and update error logs
+    updateErrorLogs({
+        environments,
+        servers,
+        agents,
+        issueEnvs,
+        offlineServers,
+        inactiveAgents,
+        dbStatus: elDbStatus ? elDbStatus.textContent : '',
+        coreStatus: elCoreStatus ? elCoreStatus.textContent : ''
+    })
+    
+    // Update notification badge based on health and errors
+    const hasErrors = issueEnvs > 0 || offlineServers > 0 || inactiveAgents > 0 || 
+                      (elDbStatus && !elDbStatus.textContent.includes('✓')) ||
+                      (elCoreStatus && !elCoreStatus.textContent.includes('✓'))
+    updateSummaryNotificationBadge(isEmptyState ? 100 : overallHealth, hasErrors)
     
     // Recent activity
     updateRecentActivity(db)
 }
 
+function updateErrorLogs(data) {
+    const errorLogsContainer = document.getElementById('summaryErrorLogsContainer')
+    const errorLogsEl = document.getElementById('summaryErrorLogs')
+    
+    if (!errorLogsContainer || !errorLogsEl) return
+    
+    const errors = []
+    const timestamp = new Date().toLocaleString()
+    
+    // Check for database errors
+    if (data.dbStatus && data.dbStatus.includes('✗')) {
+        errors.push({
+            severity: 'critical',
+            component: 'Database Connection',
+            message: 'Unable to connect to SQL Server database',
+            details: 'Check if SQL Server is running and database credentials are correct. Go to Admin Panel > Database Setup to reconfigure.',
+            action: 'Verify SQL Server service is running and connection settings are correct',
+            time: timestamp
+        })
+    }
+    
+    // Check for Core Service errors
+    if (data.coreStatus && data.coreStatus.includes('✗')) {
+        errors.push({
+            severity: 'critical',
+            component: 'OrbisHub.Core Service',
+            message: 'Core Service is not responding',
+            details: 'The OrbisHub.Core Windows Service is offline or unreachable. Agent management and job execution are unavailable.',
+            action: 'Start the OrbisHub.Core service or verify the service URL is correct in Agent settings',
+            time: timestamp
+        })
+    } else if (data.coreStatus && data.coreStatus.includes('⚠')) {
+        errors.push({
+            severity: 'warning',
+            component: 'OrbisHub.Core Service',
+            message: 'Core Service returned an HTTP error',
+            details: 'The service is running but returned an error response. This may indicate configuration issues or the service is starting up.',
+            action: 'Check the Core Service logs for errors or wait a moment and refresh',
+            time: timestamp
+        })
+    }
+    
+    // Check for environment issues
+    if (data.issueEnvs > 0) {
+        errors.push({
+            severity: 'warning',
+            component: 'Environments',
+            message: `${data.issueEnvs} environment${data.issueEnvs > 1 ? 's have' : ' has'} health issues`,
+            details: 'One or more environments are marked as unhealthy. This may indicate connectivity problems or service outages.',
+            action: 'Review the Environments view to see which environments are affected and check their health status',
+            time: timestamp
+        })
+    }
+    
+    // Check for offline servers
+    if (data.offlineServers > 0) {
+        errors.push({
+            severity: 'warning',
+            component: 'Servers',
+            message: `${data.offlineServers} server${data.offlineServers > 1 ? 's are' : ' is'} offline or unreachable`,
+            details: 'These servers failed health checks or are not responding to ping/connection attempts.',
+            action: 'Check network connectivity, firewall rules, and verify servers are powered on',
+            time: timestamp
+        })
+    }
+    
+    // Check for inactive agents
+    if (data.inactiveAgents > 0) {
+        errors.push({
+            severity: 'warning',
+            component: 'Agents',
+            message: `${data.inactiveAgents} agent${data.inactiveAgents > 1 ? 's are' : ' is'} inactive (no heartbeat in 5+ minutes)`,
+            details: 'Agents have not reported a heartbeat recently. They may be stopped, the machine is offline, or network issues exist.',
+            action: 'Check if the OrbisAgent service is running on affected machines and verify network connectivity',
+            time: timestamp
+        })
+    }
+    
+    // Show/hide error logs container
+    if (errors.length > 0) {
+        errorLogsContainer.style.display = 'block'
+        
+        // Format errors as detailed log entries
+        const logHtml = errors.map(error => {
+            const severityColor = error.severity === 'critical' ? '#ef4444' : 
+                                 error.severity === 'warning' ? '#f59e0b' : '#3b82f6'
+            const severityLabel = error.severity.toUpperCase()
+            const severityIcon = error.severity === 'critical' ? '🔴' : '⚠️'
+            
+            return `
+                <div style="margin-bottom:12px; padding:12px; background:var(--panel); border-left:4px solid ${severityColor}; border-radius:6px;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                        <span style="font-size:16px;">${severityIcon}</span>
+                        <span style="color:${severityColor}; font-weight:700; font-size:11px; letter-spacing:0.5px;">[${severityLabel}]</span>
+                        <span style="color:var(--text); font-weight:600; font-size:13px;">${error.component}</span>
+                        <span style="color:var(--muted); font-size:10px; margin-left:auto;">${error.time}</span>
+                    </div>
+                    <div style="color:var(--text); font-size:13px; margin-bottom:6px; font-weight:500; padding-left:24px;">
+                        ${error.message}
+                    </div>
+                    ${error.details ? `
+                        <div style="color:var(--muted); font-size:12px; line-height:1.5; padding-left:24px; margin-bottom:6px;">
+                            ${error.details}
+                        </div>
+                    ` : ''}
+                    ${error.action ? `
+                        <div style="padding-left:24px; margin-top:8px;">
+                            <div style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px; background:var(--bg); border:1px solid var(--border); border-radius:4px; font-size:11px;">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                                <span style="color:var(--primary); font-weight:500;">Suggested Action:</span>
+                                <span style="color:var(--text);">${error.action}</span>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `
+        }).join('')
+        
+        errorLogsEl.innerHTML = logHtml
+    } else {
+        errorLogsContainer.style.display = 'none'
+    }
+}
+
+function updateSummaryUptime() {
+    const elUptime = document.getElementById('summaryUptime')
+    if (!elUptime) return
+    
+    const uptimeMs = Date.now() - summaryStartTime
+    const hours = Math.floor(uptimeMs / 3600000)
+    const minutes = Math.floor((uptimeMs % 3600000) / 60000)
+    
+    if (hours > 0) {
+        elUptime.textContent = `${hours}h ${minutes}m`
+    } else {
+        elUptime.textContent = `${minutes}m`
+    }
+}
+
+function filterSummaryActivity(filter) {
+    summaryActivityFilter = filter
+    
+    // Update button states
+    document.getElementById('activityFilterAll')?.classList.toggle('active', filter === 'all')
+    document.getElementById('activityFilterEnv')?.classList.toggle('active', filter === 'environments')
+    document.getElementById('activityFilterSrv')?.classList.toggle('active', filter === 'servers')
+    
+    const db = store.readSync()
+    updateRecentActivity(db)
+}
+
+// Update uptime every minute
+setInterval(updateSummaryUptime, 60000)
+
 function updateRecentActivity(db) {
     const activityContainer = document.getElementById('summaryRecentActivity')
+    if (!activityContainer) return
+    
     const activities = []
     
-    // Activities removed
-    
     // Get recently added environments
-    const environments = (db.environments || []).slice(-3).reverse()
-    environments.forEach(env => {
-        activities.push({
-            type: 'environment',
-            icon: '🌍',
-            text: `Environment "${env.name}" created`,
-            time: env.createdAt || Date.now(),
-            status: 'info'
+    if (summaryActivityFilter === 'all' || summaryActivityFilter === 'environments') {
+        const environments = (db.environments || []).slice(-5).reverse()
+        environments.forEach(env => {
+            activities.push({
+                type: 'environment',
+                icon: '🌍',
+                text: `Environment "${env.name}" created`,
+                time: env.createdAt || Date.now(),
+                status: 'info',
+                action: () => showView('environments')
+            })
         })
-    })
+    }
     
     // Get recently added servers
-    const servers = (db.servers || []).slice(-3).reverse()
-    servers.forEach(server => {
-        activities.push({
-            type: 'server',
-            icon: '🖥️',
-            text: `Server "${server.displayName || server.hostname || server.ipAddress || 'Server'}" added`,
-            time: server.createdAt || Date.now(),
-            status: 'info'
+    if (summaryActivityFilter === 'all' || summaryActivityFilter === 'servers') {
+        const servers = (db.servers || []).slice(-5).reverse()
+        servers.forEach(server => {
+            activities.push({
+                type: 'server',
+                icon: '🖥️',
+                text: `Server "${server.displayName || server.hostname || server.ipAddress || 'Server'}" added`,
+                time: server.createdAt || Date.now(),
+                status: 'info',
+                action: () => showView('servers')
+            })
         })
-    })
+    }
     
-    // Sort by time and take latest 10
+    // Get recent audit logs for additional context
+    if (summaryActivityFilter === 'all') {
+        const audits = (db.auditLogs || []).slice(-3).reverse()
+        audits.forEach(audit => {
+            let icon = '📝'
+            let status = 'info'
+            if (audit.action && audit.action.includes('delete')) {
+                icon = '🗑️'
+                status = 'warning'
+            } else if (audit.action && audit.action.includes('update')) {
+                icon = '✏️'
+            }
+            
+            activities.push({
+                type: 'audit',
+                icon: icon,
+                text: audit.action || 'Activity logged',
+                time: audit.timestamp || Date.now(),
+                status: status,
+                user: audit.username
+            })
+        })
+    }
+    
+    // Sort by time and take latest 15
     activities.sort((a, b) => b.time - a.time)
-    const recentActivities = activities.slice(0, 10)
+    const recentActivities = activities.slice(0, 15)
     
     if (recentActivities.length === 0) {
-        activityContainer.innerHTML = '<p class="muted">No recent activity</p>'
+        activityContainer.innerHTML = `
+            <div style="text-align:center; padding:40px 20px;">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="opacity:0.3; margin-bottom:12px;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <p class="muted">No recent activity</p>
+            </div>
+        `
         return
     }
     
-    if (!activityContainer) return
     activityContainer.innerHTML = recentActivities.map(activity => {
         const timeAgo = getTimeAgo(activity.time)
         const statusColor = activity.status === 'success' ? '#10b981' : 
-                           activity.status === 'failed' ? '#ef4444' : 
-                           'var(--muted)'
+                           activity.status === 'failed' || activity.status === 'warning' ? '#f59e0b' : 
+                           activity.status === 'error' ? '#ef4444' :
+                           'var(--primary)'
+        
+        const clickable = activity.action ? 'cursor:pointer; transition: background 0.2s;' : ''
+        const hoverEffect = activity.action ? 'onmouseover="this.style.background=\'var(--ring)\'" onmouseout="this.style.background=\'var(--bg-secondary)\'"' : ''
+        const onclick = activity.action ? `onclick="(${activity.action.toString()})()"` : ''
         
         return `
-            <div style="display:flex; align-items:center; gap:12px; padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; margin-bottom:8px;">
-                <div style="font-size:24px;">${activity.icon}</div>
-                <div style="flex:1;">
-                    <div style="font-size:14px; font-weight:500;">${activity.text}</div>
-                    <div style="font-size:12px; color:var(--muted); margin-top:2px;">${timeAgo}</div>
+            <div style="display:flex; align-items:center; gap:12px; padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; margin-bottom:8px; ${clickable}" ${hoverEffect} ${onclick}>
+                <div style="font-size:20px; flex-shrink:0;">${activity.icon}</div>
+                <div style="flex:1; min-width:0;">
+                    <div style="font-size:13px; font-weight:500; margin-bottom:2px;">${activity.text}</div>
+                    <div style="font-size:11px; color:var(--muted); display:flex; gap:8px; align-items:center;">
+                        <span>${timeAgo}</span>
+                        ${activity.user ? `<span>•</span><span>${activity.user}</span>` : ''}
+                    </div>
                 </div>
-                <div style="width:8px; height:8px; border-radius:50%; background:${statusColor};"></div>
+                <div style="width:6px; height:6px; border-radius:50%; background:${statusColor}; flex-shrink:0;"></div>
             </div>
         `
     }).join('')
@@ -3990,7 +4355,7 @@ async function showView(name, updateUrl = true) {
 
         switch (actual) {
             case 'summary':
-                updateSummaryDashboard()
+                await updateSummaryDashboard()
                 break
                 
             case 'servers':
@@ -4020,15 +4385,9 @@ async function showView(name, updateUrl = true) {
                 break
                 
             case 'agents':
-                // Only render agents dashboard if it hasn't been loaded yet
+                // Always refresh agents when clicking the nav button
                 if (window.AgentUI) {
-                    const agentsList = document.getElementById('agentsList');
-                    // Check if agents list is empty or not yet rendered
-                    if (!agentsList || agentsList.children.length === 0 || 
-                        agentsList.innerHTML.includes('Loading agents...') ||
-                        agentsList.innerHTML.includes('No Agents Connected')) {
-                        window.AgentUI.renderAgentsDashboard();
-                    }
+                    window.AgentUI.renderAgentsDashboard();
                 }
                 break
                 
@@ -4367,6 +4726,10 @@ async function showApp() {
     if (appMain) appMain.style.display = 'block'
     // Update user menu with current user info
     updateUserMenu()
+    // Reload and apply settings after login
+    const settings = readSettings()
+    applySettings(settings)
+    populateSettingsForm(settings)
     // Initialize app content after showing
     await renderAllViews()
     // Initialize from URL parameters
@@ -5411,13 +5774,90 @@ function initRefreshButtons() {
 }
 
 // ========== STATUS MONITORING ==========
-// Disabled
 let serverStatusCheck = null
 let dbStatusCheck = null
+let serverHealthCheckInterval = null
 
 function initStatusMonitoring() {
-    // Disabled
+    // Check server health every 2 minutes
+    if (serverHealthCheckInterval) {
+        clearInterval(serverHealthCheckInterval)
+    }
+    
+    // Initial check
+    checkAllServerHealth()
+    
+    // Set up periodic checking (every 2 minutes)
+    serverHealthCheckInterval = setInterval(() => {
+        checkAllServerHealth()
+    }, 120000) // 120000ms = 2 minutes
+}
 
+async function checkAllServerHealth(showToast = false) {
+    const db = store.readSync()
+    const servers = db.servers || []
+    
+    if (servers.length === 0) {
+        if (showToast) {
+            ToastManager.info('No Servers', 'No servers configured to check', 3000)
+        }
+        return
+    }
+    
+    if (showToast) {
+        ToastManager.info('Health Check', `Checking ${servers.length} server(s)...`, 3000)
+    }
+    
+    let updatedCount = 0
+    let onlineCount = 0
+    let offlineCount = 0
+    
+    for (const server of servers) {
+        const port = server.port || (server.os === 'Linux' ? 22 : 3389)
+        const oldHealth = server.health
+        
+        try {
+            const isReachable = await testServerConnectionForHealthCheck(server.ipAddress, server.displayName, port)
+            const newHealth = isReachable ? 'ok' : 'error'
+            
+            if (isReachable) onlineCount++
+            else offlineCount++
+            
+            if (oldHealth !== newHealth) {
+                server.health = newHealth
+                updatedCount++
+            }
+        } catch (error) {
+            offlineCount++
+            if (oldHealth !== 'error') {
+                server.health = 'error'
+                updatedCount++
+            }
+        }
+    }
+    
+    // Always save the current health status
+    db.servers = servers
+    await store.write(db) // Sync to database so changes persist
+    
+    // Refresh UI - always refresh if manually triggered, or if on servers view
+    const serversView = document.getElementById('view-servers')
+    const isOnServersView = serversView && (
+        serversView.classList.contains('view--active') || 
+        serversView.style.display !== 'none'
+    )
+    
+    if (showToast || isOnServersView) {
+        renderServers()
+    }
+    
+    if (showToast) {
+        if (offlineCount > 0) {
+            ToastManager.warning('Health Check Complete', `${onlineCount} online, ${offlineCount} offline`, 5000)
+        } else {
+            ToastManager.success('Health Check Complete', `All ${onlineCount} server(s) online`, 4000)
+        }
+    }
 }
 
 async function checkServerStatus() {
@@ -5888,744 +6328,6 @@ function showNotification(message, type = 'info') {
 }
 
 // ============================================
-// AI CHAT ASSISTANT
-// ============================================
-
-// Initialize AI chat when document is ready
-function initAIChat() {
-    const aiChatWidget = document.getElementById('aiChatWidget')
-    const aiChatToggle = document.getElementById('aiChatToggle')
-    const assistantTopBtn = document.getElementById('assistantTopBtn')
-    const closeChatBtn = document.getElementById('closeChatBtn')
-    const aiChatInput = document.getElementById('aiChatInput')
-    const aiChatSend = document.getElementById('aiChatSend')
-    const aiChatMessages = document.getElementById('aiChatMessages')
-
-    let chatHistory = []
-
-    // If chat UI is completely absent, skip initialization quietly
-    if (!aiChatWidget && !aiChatToggle && !assistantTopBtn && !closeChatBtn && !aiChatInput && !aiChatSend && !aiChatMessages) {
-        return
-    }
-
-    // Toggle chat widget
-    if (aiChatToggle) {
-        aiChatToggle.addEventListener('click', () => {
-
-            aiChatWidget.classList.toggle('is-open')
-            if (aiChatWidget.classList.contains('is-open')) {
-                aiChatInput.focus()
-            }
-        })
-    } else {
-        // Not an error on pages without the toggle; just skip
-
-    }
-
-    // Topbar Assistant button opens the chat
-    if (assistantTopBtn) {
-        assistantTopBtn.addEventListener('click', () => {
-            aiChatWidget.classList.add('is-open')
-            aiChatInput && aiChatInput.focus()
-        })
-    }
-
-    if (closeChatBtn) {
-        closeChatBtn.addEventListener('click', () => {
-
-            aiChatWidget.classList.remove('is-open')
-        })
-    }
-
-    // Send message
-    function sendMessage() {
-        const message = aiChatInput.value.trim()
-        if (!message) return
-
-        // Add user message to chat
-        addUserMessage(message)
-        chatHistory.push({ role: 'user', content: message })
-        
-        // Clear input
-        aiChatInput.value = ''
-        
-        // Show typing indicator
-        showTypingIndicator()
-        
-        // Get AI response
-        getAIResponse(message)
-    }
-
-    if (aiChatSend) {
-        aiChatSend.addEventListener('click', sendMessage)
-    }
-
-    if (aiChatInput) {
-        aiChatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                sendMessage()
-            }
-        })
-    }
-
-    function addUserMessage(message) {
-        const messageEl = document.createElement('div')
-        messageEl.className = 'user-message'
-        messageEl.innerHTML = `
-            <div class="user-message-avatar">${currentUser?.name?.charAt(0).toUpperCase() || 'U'}</div>
-            <div class="user-message-content">${escapeHtml(message)}</div>
-        `
-        aiChatMessages.appendChild(messageEl)
-        scrollChatToBottom()
-    }
-
-    function addAIMessage(message) {
-        // Remove typing indicator if exists
-        const typingIndicator = aiChatMessages.querySelector('.ai-typing-container')
-        if (typingIndicator) {
-            typingIndicator.remove()
-        }
-        
-        const messageEl = document.createElement('div')
-        messageEl.className = 'ai-message'
-        messageEl.innerHTML = `
-            <div class="ai-message-avatar">
-                <img src="media/qeri.png" alt="Քեռի AI" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
-            </div>
-            <div class="ai-message-content">${formatAIMessage(message)}</div>
-        `
-        aiChatMessages.appendChild(messageEl)
-        scrollChatToBottom()
-    }
-
-    function showTypingIndicator() {
-        const typingEl = document.createElement('div')
-        typingEl.className = 'ai-message ai-typing-container'
-        typingEl.innerHTML = `
-            <div class="ai-message-avatar">
-                <img src="media/qeri.png" alt="Քեռի AI" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
-            </div>
-            <div class="ai-message-content">
-                <div class="ai-typing">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </div>
-            </div>
-        `
-        aiChatMessages.appendChild(typingEl)
-        scrollChatToBottom()
-    }
-
-    function scrollChatToBottom() {
-        aiChatMessages.scrollTop = aiChatMessages.scrollHeight
-    }
-
-    function formatAIMessage(message) {
-        // Basic markdown-like formatting
-        let formatted = escapeHtml(message)
-        
-        // Convert **bold** to <strong>
-        formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        
-        // Convert *italic* to <em>
-        formatted = formatted.replace(/\*(.+?)\*/g, '<em>$1</em>')
-        
-        // Convert `code` to <code>
-        formatted = formatted.replace(/`(.+?)`/g, '<code style="background: var(--bg); padding: 2px 6px; border-radius: 4px; font-family: monospace;">$1</code>')
-        
-        // Convert line breaks to <br>
-        formatted = formatted.replace(/\n/g, '<br>')
-        
-        return formatted
-    }
-
-    function escapeHtml(text) {
-        const div = document.createElement('div')
-        div.textContent = text
-        return div.innerHTML
-    }
-
-    // Simple AI using Hugging Face Inference API (free, no API key needed for basic models)
-    async function getAIResponse(userMessage) {
-        try {
-            // First, check if this is a command (create, delete, update)
-            const commandResult = handleCommand(userMessage)
-            if (commandResult) {
-                addAIMessage(commandResult)
-                chatHistory.push({ role: 'assistant', content: commandResult })
-                return
-            }
-            
-            // Use a simple conversational model
-            const response = await fetch('https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    inputs: userMessage,
-                    parameters: {
-                        max_length: 200,
-                        temperature: 0.7
-                    }
-                })
-            })
-            
-            if (!response.ok) {
-                throw new Error('AI service temporarily unavailable')
-            }
-            
-            const data = await response.json()
-            let aiResponse = data[0]?.generated_text || "I'm having trouble understanding. Could you rephrase that?"
-            
-            // Remove the user's input from the response if it's included
-            if (aiResponse.startsWith(userMessage)) {
-                aiResponse = aiResponse.substring(userMessage.length).trim()
-            }
-            
-            chatHistory.push({ role: 'assistant', content: aiResponse })
-            addAIMessage(aiResponse)
-            
-        } catch (error) {
-            console.error('AI Error:', error)
-            
-            // Fallback to simple rule-based responses
-            const fallbackResponse = getFallbackResponse(userMessage)
-            chatHistory.push({ role: 'assistant', content: fallbackResponse })
-            addAIMessage(fallbackResponse)
-        }
-    }
-    
-    // Handle commands like "create environment", "add server", etc.
-    function handleCommand(message) {
-        const lowerMessage = message.toLowerCase()
-        
-        // ========== CREATE COMMANDS ==========
-        
-        // CREATE ENVIRONMENT
-        if ((lowerMessage.includes('create') || lowerMessage.includes('add')) && (lowerMessage.includes('environment') || lowerMessage.includes('env'))) {
-            const nameMatch = message.match(/(?:named?|called)\s+["']?([^"'\n]+?)["']?(?:\s+at|\s+url|\s+with|$)/i)
-            const urlMatch = message.match(/(?:url|at|on)\s+["']?(https?:\/\/[^\s"']+)["']?/i)
-            const typeMatch = message.match(/(?:type|environment)\s+(production|staging|development|testing)/i)
-            
-            if (!nameMatch || !urlMatch) {
-                return "To create an environment, I need a name and URL. For example:\n`Create environment named Prod at https://example.com`"
-            }
-            
-            const name = nameMatch[1].trim()
-            const url = urlMatch[1].trim()
-            const type = typeMatch ? typeMatch[1].charAt(0).toUpperCase() + typeMatch[1].slice(1) : 'Production'
-            
-            try {
-                const db = store.readSync()
-                const newEnv = {
-                    id: uid(),
-                    name,
-                    url,
-                    type,
-                    health: 'ok',
-                    deployerCredentialId: null,
-                    mappedServers: []
-                }
-                if (!db.environments) db.environments = []
-                db.environments.push(newEnv)
-                store.write(db)
-                logAudit('create', 'environment', name, { url, type })
-                window.renderEnvs && window.renderEnvs()
-                
-                return `✅ Environment **${name}** created successfully!\n\n• URL: ${url}\n• Type: ${type}\n\nYou can find it in the Environments section.`
-            } catch (error) {
-                return `❌ Failed to create environment: ${error.message}`
-            }
-        }
-        
-        // CREATE SERVER
-        if ((lowerMessage.includes('create') || lowerMessage.includes('add')) && lowerMessage.includes('server')) {
-            const nameMatch = message.match(/(?:named?|called)\s+["']?([^"'\n]+?)["']?(?:\s+with|\s+ip|$)/i)
-            const ipMatch = message.match(/(?:ip|address)\s+["']?([\d\.]+)["']?/i)
-            const hostnameMatch = message.match(/(?:hostname)\s+["']?([^\s"'\n]+)["']?/i)
-            const typeMatch = message.match(/(?:type)\s+(front end|back end|win server|web server)/i)
-            const groupMatch = message.match(/(?:group|in)\s+(production|staging|development|testing)/i)
-            
-            if (!nameMatch || !ipMatch) {
-                return "To create a server, I need a name and IP address. For example:\n`Create server named Web01 with IP 192.168.1.10`"
-            }
-            
-            const displayName = nameMatch[1].trim()
-            const ip = ipMatch[1].trim()
-            const hostname = hostnameMatch ? hostnameMatch[1].trim() : displayName.toLowerCase().replace(/\s/g, '-')
-            const type = typeMatch ? typeMatch[1].split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'Web Server'
-            const group = groupMatch ? groupMatch[1].charAt(0).toUpperCase() + groupMatch[1].slice(1) : 'Ungrouped'
-            
-            try {
-                const db = store.readSync()
-                const newServer = {
-                    id: uid(),
-                    displayName,
-                    hostname,
-                    ipAddress: ip,
-                    type,
-                    status: 'active',
-                    serverGroup: group
-                }
-                db.servers.push(newServer)
-                store.write(db)
-                logAudit('create', 'server', displayName, { hostname, ip, type, group })
-                renderServers()
-                
-                return `✅ Server **${displayName}** created successfully!\n\n• IP: ${ip}\n• Hostname: ${hostname}\n• Type: ${type}\n• Group: ${group}\n\nYou can find it in the Servers section.`
-            } catch (error) {
-                return `❌ Failed to create server: ${error.message}`
-            }
-        }
-        
-        // CREATE USER
-        if ((lowerMessage.includes('create') || lowerMessage.includes('add')) && lowerMessage.includes('user')) {
-            const nameMatch = message.match(/(?:named?|called)\s+["']?([^"'\n]+?)["']?(?:\s+with|\s+email|$)/i)
-            const usernameMatch = message.match(/(?:username)\s+["']?([^\s"'\n]+)["']?/i)
-            const emailMatch = message.match(/(?:email)\s+["']?([^\s"'\n]+)["']?/i)
-            const passwordMatch = message.match(/(?:password)\s+["']?([^\s"'\n]+)["']?/i)
-            const roleMatch = message.match(/(?:role|as)\s+(super admin|admin|developer|viewer)/i)
-            
-            if (!nameMatch || !emailMatch) {
-                return "To create a user, I need a name and email. For example:\n`Create user named John with email john@example.com`"
-            }
-            
-            const name = nameMatch[1].trim()
-            const email = emailMatch[1].trim()
-            const username = usernameMatch ? usernameMatch[1].trim() : email.split('@')[0]
-            const password = passwordMatch ? passwordMatch[1].trim() : 'changeme123'
-            const role = roleMatch ? roleMatch[1].split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'Admin'
-            
-            try {
-                const db = store.readSync()
-                const newUser = {
-                    id: uid(),
-                    name,
-                    username,
-                    password,
-                    changePasswordOnLogin: !passwordMatch, // If no password specified, require change
-                    email,
-                    position: '—',
-                    squad: '—',
-                    role,
-                    lastLogin: '—',
-                    ip: '—',
-                    isActive: true
-                }
-                db.users.push(newUser)
-                store.write(db)
-                logAudit('create', 'user', name, { username, email, role })
-                renderUsers()
-                
-                return `✅ User **${name}** created successfully!\n\n• Username: ${username}\n• Email: ${email}\n• Role: ${role}\n• Password: ${password}${!passwordMatch ? ' (will need to change on first login)' : ''}\n\nYou can find them in the Admin section.`
-            } catch (error) {
-                return `❌ Failed to create user: ${error.message}`
-            }
-        }
-        
-        // CREATE DATABASE
-        if ((lowerMessage.includes('create') || lowerMessage.includes('add')) && (lowerMessage.includes('database') || lowerMessage.includes('db'))) {
-            const nameMatch = message.match(/(?:named?|called)\s+["']?([^"'\n]+?)["']?(?:\s+type|\s+server|$)/i)
-            const typeMatch = message.match(/(?:type)\s+(sql server|postgresql|mysql|mongodb|oracle)/i)
-            const serverMatch = message.match(/(?:server|host)\s+["']?([^\s"'\n]+)["']?/i)
-            
-            if (!nameMatch) {
-                return "To create a database, I need a name. For example:\n`Create database named MainDB type SQL Server`"
-            }
-            
-            const name = nameMatch[1].trim()
-            const type = typeMatch ? typeMatch[1].split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'SQL Server'
-            const server = serverMatch ? serverMatch[1].trim() : 'localhost'
-            
-            try {
-                const db = store.readSync()
-                const newDatabase = {
-                    id: uid(),
-                    name,
-                    type,
-                    connectionString: `Server=${server};Database=${name};`,
-                    description: ''
-                }
-                db.databases.push(newDatabase)
-                store.write(db)
-                logAudit('create', 'database', name, { type, server })
-                renderDatabases()
-                
-                return `✅ Database **${name}** created successfully!\n\n• Type: ${type}\n• Server: ${server}\n\nYou can find it in the Databases section.`
-            } catch (error) {
-                return `❌ Failed to create database: ${error.message}`
-            }
-        }
-        
-        // ========== DELETE COMMANDS ==========
-        
-        // DELETE ENVIRONMENT
-        if (lowerMessage.includes('delete') && (lowerMessage.includes('environment') || lowerMessage.includes('env'))) {
-            const nameMatch = message.match(/(?:environment|env)\s+["']?([^"'\n]+)["']?/i)
-            
-            if (!nameMatch) {
-                return "Which environment would you like to delete? For example:\n`Delete environment Prod`"
-            }
-            
-            const name = nameMatch[1].trim()
-            
-            try {
-                const db = store.readSync()
-                if (!db.environments) db.environments = []
-                const index = db.environments.findIndex(e => e.name.toLowerCase() === name.toLowerCase())
-                
-                if (index === -1) {
-                    return `❌ Environment **${name}** not found. Use \`list environments\` to see all environments.`
-                }
-                
-                db.environments.splice(index, 1)
-                store.write(db)
-                logAudit('delete', 'environment', name, {})
-                window.renderEnvs && window.renderEnvs()
-                
-                return `✅ Environment **${name}** deleted successfully!`
-            } catch (error) {
-                return `❌ Failed to delete environment: ${error.message}`
-            }
-        }
-        
-        // DELETE SERVER
-        if (lowerMessage.includes('delete') && lowerMessage.includes('server')) {
-            const nameMatch = message.match(/(?:server)\s+["']?([^"'\n]+)["']?/i)
-            
-            if (!nameMatch) {
-                return "Which server would you like to delete? For example:\n`Delete server Web01`"
-            }
-            
-            const name = nameMatch[1].trim()
-            
-            try {
-                const db = store.readSync()
-                const index = db.servers.findIndex(s => s.displayName.toLowerCase() === name.toLowerCase())
-                
-                if (index === -1) {
-                    return `❌ Server **${name}** not found. Use \`list servers\` to see all servers.`
-                }
-                
-                db.servers.splice(index, 1)
-                store.write(db)
-                logAudit('delete', 'server', name, {})
-                renderServers()
-                
-                return `✅ Server **${name}** deleted successfully!`
-            } catch (error) {
-                return `❌ Failed to delete server: ${error.message}`
-            }
-        }
-        
-        // DELETE USER
-        if (lowerMessage.includes('delete') && lowerMessage.includes('user')) {
-            const nameMatch = message.match(/(?:user)\s+["']?([^"'\n]+)["']?/i)
-            
-            if (!nameMatch) {
-                return "Which user would you like to delete? For example:\n`Delete user John`"
-            }
-            
-            const name = nameMatch[1].trim()
-            
-            try {
-                const db = store.readSync()
-                const index = db.users.findIndex(u => u.name.toLowerCase() === name.toLowerCase() || u.username.toLowerCase() === name.toLowerCase())
-                
-                if (index === -1) {
-                    return `❌ User **${name}** not found. Use \`list users\` to see all users.`
-                }
-                
-                const userName = db.users[index].name
-                db.users.splice(index, 1)
-                store.write(db)
-                logAudit('delete', 'user', userName, {})
-                renderUsers()
-                
-                return `✅ User **${userName}** deleted successfully!`
-            } catch (error) {
-                return `❌ Failed to delete user: ${error.message}`
-            }
-        }
-        
-        // ========== LIST COMMANDS ==========
-        
-        // LIST ENVIRONMENTS
-        if (lowerMessage.includes('list') && (lowerMessage.includes('environment') || lowerMessage.includes('env'))) {
-            const db = store.readSync()
-            const envs = db.environments || []
-            
-            if (envs.length === 0) {
-                return "You don't have any environments yet. Would you like me to create one?"
-            }
-            
-            let response = `📋 You have **${envs.length}** environment(s):\n\n`
-            envs.forEach((env, i) => {
-                response += `${i + 1}. **${env.name}** (${env.type})\n   URL: ${env.url}\n   Health: ${env.health}\n\n`
-            })
-            
-            return response
-        }
-        
-        // LIST SERVERS
-        if (lowerMessage.includes('list') && lowerMessage.includes('server')) {
-            const db = store.readSync()
-            const servers = db.servers || []
-            
-            if (servers.length === 0) {
-                return "You don't have any servers yet. Would you like me to create one?"
-            }
-            
-            let response = `📋 You have **${servers.length}** server(s):\n\n`
-            servers.forEach((server, i) => {
-                response += `${i + 1}. **${server.displayName}** (${server.type})\n   IP: ${server.ipAddress} | Group: ${server.serverGroup}\n\n`
-            })
-            
-            return response
-        }
-        
-        // LIST USERS
-        if (lowerMessage.includes('list') && lowerMessage.includes('user')) {
-            const db = store.readSync()
-            const users = db.users || []
-            
-            if (users.length === 0) {
-                return "You don't have any users yet."
-            }
-            
-            let response = `👥 You have **${users.length}** user(s):\n\n`
-            users.forEach((user, i) => {
-                response += `${i + 1}. **${user.name}** (@${user.username})\n   Email: ${user.email} | Role: ${user.role}\n\n`
-            })
-            
-            return response
-        }
-        
-        // LIST DATABASES
-        if (lowerMessage.includes('list') && (lowerMessage.includes('database') || lowerMessage.includes('db'))) {
-            const db = store.readSync()
-            const databases = db.databases || []
-            
-            if (databases.length === 0) {
-                return "You don't have any databases configured yet."
-            }
-            
-            let response = `🗄️ You have **${databases.length}** database(s):\n\n`
-            databases.forEach((database, i) => {
-                response += `${i + 1}. **${database.name}** (${database.type})\n\n`
-            })
-            
-            return response
-        }
-        
-        // LIST AUDIT LOGS (recent)
-        if (lowerMessage.includes('list') && (lowerMessage.includes('audit') || lowerMessage.includes('log'))) {
-            const db = store.readSync()
-            const logs = db.auditLogs || []
-            
-            if (logs.length === 0) {
-                return "No audit logs yet."
-            }
-            
-            // Show last 10
-            const recent = logs.slice(-10).reverse()
-            let response = `📝 Recent audit logs (last ${recent.length}):\n\n`
-            recent.forEach((log, i) => {
-                const date = new Date(log.timestamp).toLocaleString()
-                response += `${i + 1}. **${log.action}** ${log.entityType} "${log.entityName}" by ${log.user}\n   ${date}\n\n`
-            })
-            
-            return response
-        }
-        
-        // ========== SEARCH/FIND COMMANDS ==========
-        
-        // FIND ENVIRONMENT
-        if ((lowerMessage.includes('find') || lowerMessage.includes('show') || lowerMessage.includes('get')) && (lowerMessage.includes('environment') || lowerMessage.includes('env'))) {
-            const nameMatch = message.match(/(?:environment|env)\s+["']?([^"'\n]+)["']?/i)
-            
-            if (!nameMatch) {
-                return "Which environment would you like to find? For example:\n`Find environment Prod`"
-            }
-            
-            const name = nameMatch[1].trim()
-            const db = store.readSync()
-            const env = db.environments?.find(e => e.name.toLowerCase().includes(name.toLowerCase()))
-            
-            if (!env) {
-                return `❌ Environment containing **${name}** not found. Use \`list environments\` to see all environments.`
-            }
-            
-            let response = `🌍 Environment: **${env.name}**\n\n`
-            response += `• URL: ${env.url}\n`
-            response += `• Type: ${env.type}\n`
-            response += `• Health: ${env.health}\n`
-            response += `• Mapped Servers: ${env.mappedServers?.length || 0}\n`
-            
-            return response
-        }
-        
-        // FIND SERVER
-        if ((lowerMessage.includes('find') || lowerMessage.includes('show') || lowerMessage.includes('get')) && lowerMessage.includes('server')) {
-            const nameMatch = message.match(/(?:server)\s+["']?([^"'\n]+)["']?/i)
-            
-            if (!nameMatch) {
-                return "Which server would you like to find? For example:\n`Find server Web01`"
-            }
-            
-            const name = nameMatch[1].trim()
-            const db = store.readSync()
-            const server = db.servers.find(s => s.displayName.toLowerCase().includes(name.toLowerCase()))
-            
-            if (!server) {
-                return `❌ Server containing **${name}** not found. Use \`list servers\` to see all servers.`
-            }
-            
-            let response = `🖥️ Server: **${server.displayName}**\n\n`
-            response += `• IP Address: ${server.ipAddress}\n`
-            response += `• Hostname: ${server.hostname}\n`
-            response += `• Type: ${server.type}\n`
-            response += `• Group: ${server.serverGroup}\n`
-            response += `• Status: ${server.status}\n`
-            
-            return response
-        }
-        
-        // ========== COUNT/STATS COMMANDS ==========
-        
-        // HOW MANY / COUNT
-        if ((lowerMessage.includes('how many') || lowerMessage.includes('count'))) {
-            const db = store.readSync()
-            
-            if (lowerMessage.includes('environment') || lowerMessage.includes('env')) {
-                const count = (db.environments || []).length
-                return `You have **${count}** environment(s).`
-            }
-            
-            if (lowerMessage.includes('server')) {
-                const count = (db.servers || []).length
-                return `You have **${count}** server(s).`
-            }
-            
-            if (lowerMessage.includes('user')) {
-                const count = (db.users || []).length
-                return `You have **${count}** user(s).`
-            }
-            
-            if (lowerMessage.includes('database')) {
-                const count = (db.databases || []).length
-                return `You have **${count}** database(s).`
-            }
-            
-            // General count
-                 return `📊 **OrbisHub Stats:**\n\n` +
-                     `• Environments: ${(db.environments || []).length}\n` +
-                     `• Servers: ${(db.servers || []).length}\n` +
-                     `• Users: ${(db.users || []).length}\n` +
-                     `• Databases: ${(db.databases || []).length}\n` +
-                     `• Integrations: ${(db.integrations || []).length}\n` +
-                     `• Credentials: ${(db.credentials || []).length}\n` +
-                     `• Audit Logs: ${(db.auditLogs || []).length}\n`
-        }
-        
-        // ========== HELP COMMANDS ==========
-        
-        // WHAT CAN YOU DO / HELP
-        if (lowerMessage.includes('what can you') || lowerMessage.includes('help') || lowerMessage === 'help') {
-            return `🤖 **Քեռի AI - Command Reference**\n\n` +
-                   `**📊 FEATURES:**\n` +
-                   `• **Summary Dashboard** - Real-time statistics and recent activity\n` +
-                   `• **Remote Desktop Manager** - One-click RDP connections to servers\n` +
-                   `• **Integrations** - Connect Exchange, SMTP, Slack, Teams\n` +
-                   `• **Notifications** - Configure system and health alerts\n` +
-                   `• **Credentials** - Secure credential storage and management\n\n` +
-                   `**CREATE:**\n` +
-                   `• \`Create environment named X at https://...\`\n` +
-                   `• \`Create server named X with IP 192.168.1.10\`\n` +
-                   `• \`Create user named X with email x@example.com\`\n` +
-                   `• \`Create database named X type SQL Server\`\n\n` +
-                   `**DELETE:**\n` +
-                   `• \`Delete environment X\`\n` +
-                   `• \`Delete server X\`\n` +
-                   `• \`Delete user X\`\n\n` +
-                   `**LIST:**\n` +
-                   `• \`List environments\` / \`List servers\` / \`List users\`\n` +
-                   `• \`List databases\` / \`List integrations\` / \`List credentials\`\n\n` +
-                   `**FIND:**\n` +
-                   `• \`Find environment X\` / \`Find server X\`\n\n` +
-                   `**STATS:**\n` +
-                   `• \`How many servers?\` / \`Count environments\`\n` +
-                   `• \`Show stats\` - Full system statistics\n\n` +
-                   `Just ask me naturally and I'll understand! 😊`
-        }
-        
-        return null // Not a command
-    }
-
-    // Simple fallback responses when AI is unavailable
-    function getFallbackResponse(message) {
-        const lowerMessage = message.toLowerCase()
-        
-        if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
-            return "Hello! I'm Քեռի AI. How can I help you today?"
-        }
-        
-        if (lowerMessage.includes('summary') || lowerMessage.includes('dashboard')) {
-            return "The **Summary Dashboard** shows real-time statistics for all your resources:\n\n• Environment and server counts\n• Recent activity feed\n• Quick action buttons\n\nCheck it out in the General section!"
-        }
-        
-        if (lowerMessage.includes('rdp') || lowerMessage.includes('remote desktop')) {
-            return "The **Remote Desktop Manager** allows one-click RDP connections to your servers!\n\n• Assign credentials to servers\n• Click Connect to launch mstsc directly\n• No downloads needed\n\nFind it under System Administrators → Remote Desktop Manager."
-        }
-        
-        if (lowerMessage.includes('integration')) {
-            return "**Integrations** connect OrbisHub with external services:\n\n• **Exchange** - Email notifications\n• **SMTP** - Custom email server\n• **Slack** - Team notifications\n• **Microsoft Teams** - Channel alerts\n\nConfigure them in System Administrators → Integrations."
-        }
-        
-        if (lowerMessage.includes('notification') || lowerMessage.includes('alert')) {
-            return "**Notifications** keep you informed:\n\n• **System Alerts** - Critical warnings\n• **Daily Summaries** - Activity reports\n• **Health Monitoring** - Service status\n\nConfigure in System Administrators → Notifications."
-        }
-        
-        if (lowerMessage.includes('credential')) {
-            return "**Credentials** store secure login information:\n\n• Windows accounts\n• Database connections\n• Service accounts\n• API keys\n\nManage them in System Administrators → Credentials.\nAssign them to servers for RDP connections!"
-        }
-        
-        if (lowerMessage.includes('environment') || lowerMessage.includes('env')) {
-            return "I can help with environment management! You can:\n\n• **Create**: `Create environment named Prod at https://example.com`\n• **List**: `List environments`\n\nEnvironments are now in System Administrators section.\nWhat would you like to do?"
-        }
-        
-        if (lowerMessage.includes('server')) {
-            return "I can help with server management! You can:\n\n• **Create**: `Create server named Web01 with IP 192.168.1.10`\n• **List**: `List servers`\n• **Connect**: Use Remote Desktop Manager for RDP connections\n\nWhat would you like to do?"
-        }
-        
-        // Functionality removed
-        
-        if (lowerMessage.includes('user') || lowerMessage.includes('admin')) {
-            return "User management is available in System Administrators → Users / Permissions. You can:\n\n• Create users and assign roles\n• View online/offline status (green/gray indicator)\n• Manage permissions\n\nWhat would you like to know?"
-        }
-        
-        if (lowerMessage.includes('audit') || lowerMessage.includes('log')) {
-            return "Audit logs track all changes in the system. You can view them in System Administrators → Audit Logs. They're paginated and searchable!"
-        }
-        
-        if (lowerMessage.includes('help')) {
-            return "I can help you with:\n\n• **Summary Dashboard** - Statistics and recent activity\n• **Remote Desktop Manager** - RDP connections\n• **Integrations** - External service connections\n• **Notifications** - Alert configuration\n• **Credentials** - Secure credential storage\n• **Environments & Servers** - Infrastructure management\n• **Users & Permissions** - User administration\n\nWhat would you like to know more about?"
-        }
-        
-        if (lowerMessage.includes('thank')) {
-            return "You're welcome! Let me know if you need anything else. 😊"
-        }
-        
-        return "I'm here to help with OrbisHub! You can ask me about:\n\n• Summary Dashboard\n• Remote Desktop Manager\n• Integrations & Notifications\n• Environments & Servers\n• User management\n• General DevOps topics\n\nWhat would you like to know?"
-    }
-}
-
-// Initialize AI chat after a short delay to ensure DOM is ready
-setTimeout(initAIChat, 100)
-
-// ============================================
 // MODERN UI/UX ENHANCEMENTS
 // ============================================
 
@@ -7018,10 +6720,10 @@ function readSettings() {
     return db.settings
 }
 
-function saveSettings(patch) {
+async function saveSettings(patch) {
     const db = store.readSync()
     db.settings = { ...getDefaultSettings(), ...(db.settings || {}), ...(patch || {}) }
-    store.write(db)
+    await store.write(db)
     return db.settings
 }
 
@@ -7059,7 +6761,7 @@ function applySettings(settings) {
                 const visible = document.querySelector('.view.is-visible')
                 if (!visible) return
                 try {
-                    if (visible.id === 'view-summary') updateSummaryDashboard()
+                    if (visible.id === 'view-summary') await updateSummaryDashboard()
                     else if (visible.id === 'view-environments') window.renderEnvs && window.renderEnvs(document.getElementById('search')?.value || '')
                     else if (visible.id === 'view-servers') renderServers && renderServers()
                     else if (visible.id === 'view-admin-audit') renderAuditLogs && renderAuditLogs()
@@ -7098,11 +6800,11 @@ function bindSettingsControls() {
     const onChange = (id, getVal) => {
         const el = document.getElementById(id)
         if (!el) return
-        el.addEventListener('change', () => {
+        el.addEventListener('change', async () => {
 
             const newSettings = getVal(el)
 
-            const settings = saveSettings(newSettings)
+            const settings = await saveSettings(newSettings)
 
             applySettings(settings)
             ToastManager?.success?.('Settings Updated', 'Your change has been saved', 2000)
