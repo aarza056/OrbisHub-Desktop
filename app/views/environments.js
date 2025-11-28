@@ -698,7 +698,6 @@ async function updateEnvAgentUptime(envCardEl, agentId) {
     
     // Also refresh when agents are updated from the Agents view
     window.addEventListener('agentsUpdated', () => {
-      console.log('🔄 Agents updated, refreshing environment card uptimes')
       refresh()
     })
   } catch (e) {
