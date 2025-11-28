@@ -1007,9 +1007,16 @@ async function connectToServer(server) {
 	const modal = document.getElementById('selectCredentialModal')
 	const serverNameEl = document.getElementById('selectedServerName')
 	const credentialSelect = document.getElementById('connectionCredentialSelect')
+	const connectionTypeSelect = document.getElementById('connectionTypeSelect')
 	
 	if (serverNameEl) {
 		serverNameEl.textContent = server.displayName || server.hostname
+	}
+	
+	// Set default connection type based on server OS
+	if (connectionTypeSelect) {
+		const os = server.os || 'Windows'
+		connectionTypeSelect.value = os === 'Linux' ? 'ssh' : 'rdp'
 	}
 	
 	// Populate credential dropdown
@@ -1033,7 +1040,7 @@ async function connectToServer(server) {
 }
 
 // Perform actual connection with selected credential
-async function performServerConnection(server, credential) {
+async function performServerConnection(server, credential, connectionType) {
     if (!server) {
         alert('Error: No server selected')
         return
@@ -1044,8 +1051,8 @@ async function performServerConnection(server, credential) {
         return
     }
 
-    const os = server.os || 'Windows'
-    if (os === 'Linux') {
+    // Use the explicitly selected connection type, not the server OS
+    if (connectionType === 'ssh') {
         // SSH/PuTTY
         try {
             if (window.electronAPI && window.electronAPI.connectSSH) {
@@ -3098,6 +3105,8 @@ function closeSelectCredentialModal() {
     serverToConnect = null
     const credSelect = document.getElementById('connectionCredentialSelect')
     if (credSelect) credSelect.value = ''
+    const typeSelect = document.getElementById('connectionTypeSelect')
+    if (typeSelect) typeSelect.value = 'rdp'
 }
 
 if (selectCredentialModal) {
@@ -3114,8 +3123,15 @@ if (confirmConnectionBtn) {
         e.preventDefault()
         
         const credentialId = document.getElementById('connectionCredentialSelect').value
+        const connectionType = document.getElementById('connectionTypeSelect').value
+        
         if (!credentialId) {
             alert('Please select a credential to connect.')
+            return
+        }
+        
+        if (!connectionType) {
+            alert('Please select a connection type.')
             return
         }
         
@@ -3129,14 +3145,15 @@ if (confirmConnectionBtn) {
                 return
             }
             
-            // Store server reference before closing modal
+            // Store server reference and connection type before closing modal
             const server = serverToConnect
+            const selectedType = connectionType
             
             // Close modal (which sets serverToConnect to null)
             closeSelectCredentialModal()
             
-            // Perform the connection with the stored server reference
-            await performServerConnection(server, credential)
+            // Perform the connection with the stored server reference and selected type
+            await performServerConnection(server, credential, selectedType)
         } else {
             closeSelectCredentialModal()
         }

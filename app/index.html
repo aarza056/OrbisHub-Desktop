@@ -3215,6 +3215,14 @@ Channels
 <h2>Select Credential</h2>
 <p class="muted" style="margin-bottom:16px;">Choose a credential to connect to <strong id="selectedServerName"></strong></p>
 
+<label class="label">Connection Type
+<select id="connectionTypeSelect" class="input" required>
+<option value="rdp">RDP (Remote Desktop)</option>
+<option value="ssh">SSH (Secure Shell)</option>
+</select>
+<span style="font-size:12px; color:var(--muted); margin-top:4px; display:block;">Select the connection protocol</span>
+</label>
+
 <label class="label">Credential
 <select id="connectionCredentialSelect" class="input" required>
 <option value="">-- Select Credential --</option>
