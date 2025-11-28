@@ -292,7 +292,7 @@
 <menu class="row" style="margin: 16px 0 24px 0; gap: 8px; padding: 0;">
 <button type="button" id="envDetailsDeployBtn" class="btn" style="background: linear-gradient(135deg, #5a4fcf 0%, #5e2a84 100%); color: white; border: none;">Deploy</button>
 <button type="button" id="envDetailsSolutionsBtn" class="btn" style="background: linear-gradient(135deg, #d946a6 0%, #c21e56 100%); color: white; border: none;">Show Solutions</button>
-<button type="button" id="envDetailsMapServersBtn" class="btn" style="background: linear-gradient(135deg, #0ea770 0%, #0c8599 100%); color: white; border: none;">Map Servers</button>
+<button type="button" id="envDetailsMapServersBtn" class="btn" style="background: linear-gradient(135deg, #0ea770 0%, #0c8599 100%); color: white; border: none;">Map Agent</button>
 </menu>
 <div id="envDetailsContent" style="margin: 24px 0;">
   <!-- Details will be populated by JavaScript -->
@@ -346,7 +346,7 @@
       <line x1="2" y1="12" x2="22" y2="12"></line>
       <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
     </svg>
-    Environments
+    Farm Systems
   </button>
   <button class="nav__btn" data-view="servers">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
@@ -548,7 +548,7 @@
         </div>
       </div>
       <div class="summary-metric-card__value" id="summaryEnvCount">0</div>
-      <div class="summary-metric-card__label">Environments</div>
+      <div class="summary-metric-card__label">Farm Systems</div>
       <div class="summary-metric-card__details">
         <div class="summary-metric-detail">
           <span class="summary-metric-detail__label">Healthy</span>
@@ -672,7 +672,7 @@
         <h3 style="margin:0;">Recent Activity</h3>
         <div style="display:flex; gap:8px;">
           <button class="btn btn-ghost btn-sm" onclick="filterSummaryActivity('all')" id="activityFilterAll">All</button>
-          <button class="btn btn-ghost btn-sm" onclick="filterSummaryActivity('environments')" id="activityFilterEnv">Environments</button>
+          <button class="btn btn-ghost btn-sm" onclick="filterSummaryActivity('environments')" id="activityFilterEnv">Farm Systems</button>
           <button class="btn btn-ghost btn-sm" onclick="filterSummaryActivity('servers')" id="activityFilterSrv">Servers</button>
         </div>
       </div>
@@ -693,7 +693,7 @@
               <line x1="12" y1="8" x2="12" y2="16"></line>
               <line x1="8" y1="12" x2="16" y2="12"></line>
             </svg>
-            Add Environment
+            Add Farm System
           </button>
           <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="showView('servers'); document.getElementById('addServerBtn').click();">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -771,13 +771,21 @@
 
 <section id="view-environments" class="view">
 <div class="view__header">
-  <h1>Environments</h1>
+  <h1>Farm Systems</h1>
   <div style="flex:1"></div>
-  <button id="addEnvBtn" class="btn">+ Add Environment</button>
+  <button id="refreshEnvBtn" class="btn btn-ghost" title="Refresh health and agent uptimes">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="23 4 23 10 17 10"></polyline>
+      <polyline points="1 20 1 14 7 14"></polyline>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+    </svg>
+    Refresh
+  </button>
+  <button id="addEnvBtn" class="btn">+ Add Farm System</button>
   
 </div>
 <div class="view__toolbar">
-  <input id="search" class="input" placeholder="Search environments by name or URL..." style="flex:1; max-width: 600px;" />
+  <input id="search" class="input" placeholder="Search farm systems by name or URL..." style="flex:1; max-width: 600px;" />
 </div>
 <div class="stack">
   <div id="envList" class="grid"></div>
@@ -940,7 +948,7 @@
             </label>
             <label class="permission-item">
               <input type="checkbox" checked disabled>
-              <span>Manage Environments</span>
+              <span>Manage Farm Systems</span>
             </label>
             <label class="permission-item">
               <input type="checkbox" checked disabled>
@@ -982,7 +990,7 @@
             </label>
             <label class="permission-item">
               <input type="checkbox" id="opManageEnvs" checked>
-              <span>Manage Environments</span>
+              <span>Manage Farm Systems</span>
             </label>
             <label class="permission-item">
               <input type="checkbox" id="opManageServers" checked>
@@ -1027,7 +1035,7 @@
             </label>
             <label class="permission-item">
               <input type="checkbox" id="viewManageEnvs">
-              <span>Manage Environments</span>
+              <span>Manage Farm Systems</span>
             </label>
             <label class="permission-item">
               <input type="checkbox" id="viewManageServers">
@@ -1211,7 +1219,7 @@
     </select>
     <select id="auditEntityFilter" class="input" style="width:150px;">
       <option value="">All Types</option>
-      <option value="environment">Environments</option>
+      <option value="environment">Farm Systems</option>
       <option value="user">Users</option>
       <option value="database">Databases</option>
       <option value="credential">Credentials</option>
@@ -1529,8 +1537,8 @@
           <div style="font-size:12px; color:var(--muted);">User accounts & auth</div>
         </div>
         <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
-          <div style="font-weight:600; margin-bottom:4px;">Environments</div>
-          <div style="font-size:12px; color:var(--muted);">Environment configs</div>
+          <div style="font-weight:600; margin-bottom:4px;">Farm Systems</div>
+          <div style="font-size:12px; color:var(--muted);">Farm system configs</div>
         </div>
         <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
           <div style="font-weight:600; margin-bottom:4px;">Servers</div>
@@ -1680,7 +1688,7 @@
           <li><strong>View Summary Dashboard:</strong> Start at the Summary page to see an overview of your entire system—environments, servers, and recent activity.</li>
           <li><strong>Add Credentials:</strong> Navigate to Credentials in System Administrators to securely store login credentials for your servers.</li>
           <li><strong>Register Servers:</strong> Go to Remote Desktop Manager and add your infrastructure with IP addresses and assigned credentials for one-click RDP access.</li>
-          <li><strong>Create Environments:</strong> Define your deployment targets (Production, Staging, Dev) to organize your infrastructure logically.</li>
+          <li><strong>Create Farm Systems:</strong> Define your deployment targets (Production, Staging, Dev) to organize your infrastructure logically.</li>
         </ol>
         <div class="doc-tip">
           <strong>💡 Pro Tip:</strong> Press <kbd>Ctrl+`</kbd> to open the Command Palette for quick navigation!
@@ -1938,7 +1946,7 @@
         </div>
         <div class="doc-shortcut-item">
           <kbd>Ctrl</kbd> + <kbd>E</kbd>
-          <span>Add Environment</span>
+          <span>Add Farm System</span>
         </div>
         <div class="doc-shortcut-item">
           <kbd>Ctrl</kbd> + <kbd>S</kbd>
@@ -2554,7 +2562,7 @@
         </div>
         <div class="doc-shortcut-item">
           <kbd>Ctrl</kbd> + <kbd>E</kbd>
-          <span>Add Environment</span>
+          <span>Add Farm System</span>
         </div>
         <div class="doc-shortcut-item">
           <kbd>Ctrl</kbd> + <kbd>S</kbd>
@@ -2580,7 +2588,7 @@
 <!-- Modals -->
 <dialog id="envModal" class="modal">
 <form class="card">
-<h2>Add Environment</h2>
+<h2>Add Farm System</h2>
 <label class="label">Display name
 <input id="envName" class="input" placeholder="e.g., Prod EU" required />
 </label>
@@ -2658,12 +2666,12 @@
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 </button>
-<h2>Map Servers to <span id="mapServersEnvName"></span></h2>
-<p style="color:var(--muted); font-size:14px; margin-bottom:20px;">Select servers from any type, then click Save to map them all at once.</p>
+<h2>Map Agent to <span id="mapServersEnvName"></span></h2>
+<p style="color:var(--muted); font-size:14px; margin-bottom:20px;">Select an OrbisAgent to monitor uptime for this Farm System.</p>
 
-<label class="label">Available Servers (by Type)
+<label class="label">Available Agents
 <div id="mapServersAllTypes" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
-<div style="color: var(--muted); font-size: 14px; padding: 8px;">Loading servers...</div>
+<div style="color: var(--muted); font-size: 14px; padding: 8px;">Loading agents...</div>
 </div>
 </label>
 <menu class="row end">
