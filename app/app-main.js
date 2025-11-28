@@ -4545,6 +4545,13 @@ async function showView(name, updateUrl = true) {
                     startConversationPolling(window.currentChatUserId)
                 }
                 break
+                
+            case 'tickets':
+                // Initialize ticket management system
+                if (window.TicketUI) {
+                    await window.TicketUI.init();
+                }
+                break
         }
     } catch (error) {
 
