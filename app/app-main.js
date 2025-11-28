@@ -6846,16 +6846,21 @@ function applySettings(settings) {
         if (settings.autoRefresh) {
             const intervalMs = Math.max(5, Number(settings.refreshInterval || 60)) * 1000
             const tick = async () => {
-                // Refresh the currently visible view in a lightweight way
-                const visible = document.querySelector('.view.is-visible')
-                if (!visible) return
                 try {
-                    if (visible.id === 'view-summary') await updateSummaryDashboard()
-                    else if (visible.id === 'view-environments') window.renderEnvs && window.renderEnvs(document.getElementById('search')?.value || '')
-                    else if (visible.id === 'view-servers') renderServers && renderServers()
-                    else if (visible.id === 'view-admin-audit') renderAuditLogs && renderAuditLogs()
+                    // Always refresh summary dashboard data in the background
+                    await updateSummaryDashboard()
+                    
+                    // Also refresh the currently visible view if it's not the summary
+                    const visible = document.querySelector('.view.is-visible')
+                    if (visible && visible.id !== 'view-summary') {
+                        if (visible.id === 'view-environments') window.renderEnvs && window.renderEnvs(document.getElementById('search')?.value || '')
+                        else if (visible.id === 'view-servers') renderServers && renderServers()
+                        else if (visible.id === 'view-admin-audit') renderAuditLogs && renderAuditLogs()
+                    }
                 } catch {}
             }
+            // Call tick immediately to provide instant feedback, then set up interval
+            tick()
             __autoRefreshTimer = setInterval(tick, intervalMs)
         }
     } catch {}
