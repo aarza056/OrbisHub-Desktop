@@ -1851,102 +1851,108 @@ if (addUserBtn && createUserModal) {
     
     // Escape key
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && createUserModal.hasAttribute('open')) closeCreateUserModal() })
-}
-
-if (createUserBtn) {
-    createUserBtn.addEventListener('click', async (e) => {
-        e.preventDefault()
-        const name = document.getElementById('userName').value.trim()
-        const username = document.getElementById('userUsername').value.trim()
-        const password = document.getElementById('userPassword').value.trim()
-        const changePassword = document.getElementById('userChangePassword').checked
-        const email = document.getElementById('userEmail').value.trim()
-        const position = document.getElementById('userPosition').value.trim()
-        const squad = document.getElementById('userSquad').value.trim()
-        const role = document.getElementById('userRole').value
-        if (!name || !email || !username || !password) return
-        
-        // Validate password
-        const validation = validatePassword(password)
-        if (!validation.isValid) {
-            const errorDiv = document.getElementById('createUserPasswordError')
-            const errorList = document.getElementById('createUserPasswordErrorList')
-            if (errorDiv && errorList) {
-                errorList.innerHTML = validation.errors.map(err => `<li>${err}</li>`).join('')
-                errorDiv.style.display = 'block'
+    
+    // Handle form submission (works with Enter key and button click)
+    const createUserForm = createUserModal.querySelector('form')
+    if (createUserForm) {
+        createUserForm.addEventListener('submit', async (e) => {
+            e.preventDefault()
+            
+            const name = document.getElementById('userName').value.trim()
+            const username = document.getElementById('userUsername').value.trim()
+            const password = document.getElementById('userPassword').value.trim()
+            const changePassword = document.getElementById('userChangePassword').checked
+            const email = document.getElementById('userEmail').value.trim()
+            const position = document.getElementById('userPosition').value.trim()
+            const squad = document.getElementById('userSquad').value.trim()
+            const role = document.getElementById('userRole').value
+            if (!name || !email || !username || !password) return
+            
+            // Validate password
+            const validation = validatePassword(password)
+            if (!validation.isValid) {
+                const errorDiv = document.getElementById('createUserPasswordError')
+                const errorList = document.getElementById('createUserPasswordErrorList')
+                if (errorDiv && errorList) {
+                    errorList.innerHTML = validation.errors.map(err => `<li>${err}</li>`).join('')
+                    errorDiv.style.display = 'block'
+                }
+                return
             }
-            return
-        }
-        
-        // Hide error if validation passes
-        const errorDiv = document.getElementById('createUserPasswordError')
-        if (errorDiv) errorDiv.style.display = 'none'
-        
-        // Hash password before storing
-        const hashResult = await window.electronAPI.hashPassword(password)
-        if (!hashResult || !hashResult.success) {
-            alert('Failed to secure password')
-            return
-        }
-        
-        const newUser = { 
-            id: uid(), 
-            name,
-            username,
-            password: hashResult.hash,
-            changePasswordOnLogin: changePassword,
-            email,
-            position: position || '—',
-            squad: squad || '—',
-            role,
-            lastLogin: '—',
-            lastActivity: Date.now(),
-            ip: '—',
-            isActive: true
-        }
-        
-        const db = store.readSync()
-        db.users = db.users || []
-        db.users.unshift(newUser)
-        store.write(db)
-        
-        // Sync to database
-        try {
-            await window.Data.syncAll({ users: db.users })
-        } catch (error) {
-            console.error('Failed to sync user to database:', error)
-        }
-        
-        // Audit log for user creation
-        logAudit('create', 'user', name, { username, email, role })
-        
-        // Audit log for password set
-        await window.Audit.log({
-            id: uid(),
-            action: 'password_set',
-            entityType: 'user',
-            entityName: name,
-            user: window.sessionUser ? window.sessionUser.name : 'System',
-            username: window.sessionUser ? window.sessionUser.username : 'system',
-            timestamp: new Date().toISOString(),
-            ip: getLocalIP(),
-            details: { targetUser: username, reason: 'User creation' }
+            
+            // Hide error if validation passes
+            const errorDiv = document.getElementById('createUserPasswordError')
+            if (errorDiv) errorDiv.style.display = 'none'
+            
+            // Hash password before storing
+            const hashResult = await window.electronAPI.hashPassword(password)
+            if (!hashResult || !hashResult.success) {
+                alert('Failed to secure password')
+                return
+            }
+            
+            const newUser = { 
+                id: uid(), 
+                name,
+                username,
+                password: hashResult.hash,
+                changePasswordOnLogin: changePassword,
+                email,
+                position: position || '—',
+                squad: squad || '—',
+                role,
+                lastLogin: '—',
+                lastActivity: Date.now(),
+                ip: '—',
+                isActive: true
+            }
+            
+            const db = store.readSync()
+            db.users = db.users || []
+            db.users.unshift(newUser)
+            store.write(db)
+            
+            // Sync to database
+            try {
+                await window.Data.syncAll({ users: db.users })
+            } catch (error) {
+                console.error('Failed to sync user to database:', error)
+            }
+            
+            // Audit log for user creation
+            logAudit('create', 'user', name, { username, email, role })
+            
+            // Audit log for password set
+            await window.Audit.log({
+                id: uid(),
+                action: 'password_set',
+                entityType: 'user',
+                entityName: name,
+                user: window.sessionUser ? window.sessionUser.name : 'System',
+                username: window.sessionUser ? window.sessionUser.username : 'system',
+                timestamp: new Date().toISOString(),
+                ip: getLocalIP(),
+                details: { targetUser: username, reason: 'User creation' }
+            })
+            
+            // clear inputs
+            document.getElementById('userName').value = ''
+            document.getElementById('userUsername').value = ''
+            document.getElementById('userPassword').value = ''
+            document.getElementById('userChangePassword').checked = false
+            document.getElementById('userEmail').value = ''
+            document.getElementById('userPosition').value = ''
+            document.getElementById('userSquad').value = ''
+            document.getElementById('userRole').value = 'Admin'
+            
+            // Show success notification
+            ToastManager.success('User Created', `${name} has been created successfully`, 3000)
+            
+            // Refresh user list and close modal
+            await renderUsers()
+            closeCreateUserModal()
         })
-        
-        // clear inputs
-        document.getElementById('userName').value = ''
-        document.getElementById('userUsername').value = ''
-        document.getElementById('userPassword').value = ''
-        document.getElementById('userChangePassword').checked = false
-        document.getElementById('userEmail').value = ''
-        document.getElementById('userPosition').value = ''
-        document.getElementById('userSquad').value = ''
-        document.getElementById('userRole').value = 'Admin'
-        
-        // Refresh user list and close modal
-        await renderUsers()
-        closeCreateUserModal()
-    })
+    }
 }
 
 // Wire up edit user form submission
@@ -1956,6 +1962,7 @@ if (saveEditUserBtn) {
     if (editUserForm) {
         editUserForm.addEventListener('submit', async (e) => {
             e.preventDefault()
+            
             const id = document.getElementById('editUserId').value
             const name = document.getElementById('editUserName').value.trim()
             const username = document.getElementById('editUserUsername').value.trim()
@@ -2127,6 +2134,10 @@ if (confirmDeleteUserBtn) {
                 
                 // Audit log for deletion
                 await logAudit('delete', 'user', deleted.name, { username: deleted.username, email: deleted.email, role: deleted.role })
+                
+                // Show success notification
+                ToastManager.success('User Deleted', `${deleted.name} has been deleted successfully`, 3000)
+                
                 renderUsers()
             }
         }
