@@ -681,11 +681,26 @@ function closeEditUserModal() {
 
 if (editUserModal) {
     const cancelEdit = editUserModal.querySelector('button[value="cancel"]')
-    if (cancelEdit) cancelEdit.addEventListener('click', (e) => { e.preventDefault(); closeEditUserModal() })
+    if (cancelEdit) {
+        cancelEdit.addEventListener('click', (e) => { e.preventDefault(); closeEditUserModal() })
+        cancelEdit.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault() })
+    }
     
     editUserModal.addEventListener('click', (e) => { if (e.target === editUserModal) closeEditUserModal() })
     
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && editUserModal.hasAttribute('open')) closeEditUserModal() })
+    
+    // Add Enter key handler to all inputs
+    const editUserInputs = editUserModal.querySelectorAll('input, select, textarea')
+    editUserInputs.forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                const submitBtn = document.getElementById('saveEditUserBtn')
+                if (submitBtn) submitBtn.click()
+            }
+        })
+    })
 }
 
 // moved: environment delete modal handling is in views/environments.js
@@ -1844,13 +1859,28 @@ if (addUserBtn && createUserModal) {
     
     // Cancel button
     const cancelBtn = createUserModal.querySelector('button[value="cancel"]')
-    if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeCreateUserModal() })
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeCreateUserModal() })
+        cancelBtn.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault() })
+    }
     
     // Backdrop click
     createUserModal.addEventListener('click', (e) => { if (e.target === createUserModal) closeCreateUserModal() })
     
     // Escape key
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && createUserModal.hasAttribute('open')) closeCreateUserModal() })
+    
+    // Add Enter key handler to all inputs
+    const createUserInputs = createUserModal.querySelectorAll('input, select, textarea')
+    createUserInputs.forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                const submitBtn = document.getElementById('createUserBtn')
+                if (submitBtn) submitBtn.click()
+            }
+        })
+    })
     
     // Handle form submission (works with Enter key and button click)
     const createUserForm = createUserModal.querySelector('form')
@@ -2490,23 +2520,37 @@ if (addCredentialBtn && credentialModal) {
     })
     
     const cancelBtn = credentialModal.querySelector('button[value="cancel"]')
-    if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeCredentialModal() })
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeCredentialModal() })
+        cancelBtn.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault() })
+    }
     
     credentialModal.addEventListener('click', (e) => { if (e.target === credentialModal) closeCredentialModal() })
-}
-
-// Save new credential
-const saveCredBtn = document.getElementById('saveCredBtn')
-if (saveCredBtn) {
-    saveCredBtn.addEventListener('click', async (e) => {
-        e.preventDefault()
-        const name = document.getElementById('credName').value.trim()
-        const type = document.getElementById('credType').value
-        const username = document.getElementById('credUsername').value.trim()
-        const password = document.getElementById('credPassword').value.trim()
-        const description = document.getElementById('credDescription').value.trim()
-        
-        if (!name) return
+    
+    // Add Enter key handler to all inputs
+    const inputs = credentialModal.querySelectorAll('input, select, textarea')
+    inputs.forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                const submitBtn = document.getElementById('saveCredBtn')
+                if (submitBtn) submitBtn.click()
+            }
+        })
+    })
+    
+    // Handle form submission
+    const credForm = credentialModal.querySelector('form')
+    if (credForm) {
+        credForm.addEventListener('submit', async (e) => {
+            e.preventDefault()
+            const name = document.getElementById('credName').value.trim()
+            const type = document.getElementById('credType').value
+            const username = document.getElementById('credUsername').value.trim()
+            const password = document.getElementById('credPassword').value.trim()
+            const description = document.getElementById('credDescription').value.trim()
+            
+            if (!name) return
         
         const newCred = {
             id: uid(),
@@ -2551,87 +2595,107 @@ if (saveCredBtn) {
             console.error('❌ Failed to save credential:', error)
             alert('Failed to save credential: ' + error.message)
         }
-    })
+        })
+    }
 }
 
 // Edit credential modal
 if (editCredentialModal) {
     const cancelBtn = editCredentialModal.querySelector('button[value="cancel"]')
-    if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeEditCredentialModal() })
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeEditCredentialModal() })
+        // Prevent Enter from triggering close button
+        cancelBtn.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault() })
+    }
     
     editCredentialModal.addEventListener('click', (e) => { if (e.target === editCredentialModal) closeEditCredentialModal() })
+    
+    // Add Enter key handler to all inputs to explicitly submit form
+    const inputs = editCredentialModal.querySelectorAll('input, select, textarea')
+    inputs.forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                const submitBtn = document.getElementById('saveEditCredBtn')
+                if (submitBtn) submitBtn.click()
+            }
+        })
+    })
 }
 
 // Save edited credential
 const saveEditCredBtn = document.getElementById('saveEditCredBtn')
-if (saveEditCredBtn) {
-    saveEditCredBtn.addEventListener('click', async (e) => {
-        e.preventDefault()
-        const id = document.getElementById('editCredId').value
-        const name = document.getElementById('editCredName').value.trim()
-        const type = document.getElementById('editCredType').value
-        const username = document.getElementById('editCredUsername').value.trim()
-        const password = document.getElementById('editCredPassword').value.trim()
-        const description = document.getElementById('editCredDescription').value.trim()
-        
-        if (!id || !name) return
+if (editCredentialModal) {
+    const editCredForm = editCredentialModal.querySelector('form')
+    if (editCredForm) {
+        editCredForm.addEventListener('submit', async (e) => {
+            e.preventDefault()
+            const id = document.getElementById('editCredId').value
+            const name = document.getElementById('editCredName').value.trim()
+            const type = document.getElementById('editCredType').value
+            const username = document.getElementById('editCredUsername').value.trim()
+            const password = document.getElementById('editCredPassword').value.trim()
+            const description = document.getElementById('editCredDescription').value.trim()
+            
+            if (!id || !name) return
 
-        try {
-            const db = store.readSync()
-            const credential = db.credentials.find(x => x.id === id)
-            if (!credential) {
-                alert('Credential not found')
-                return
-            }
-            
-            const oldValues = {
-                name: credential.name,
-                type: credential.type,
-                username: credential.username,
-                description: credential.description
-            }
-            
-            // Update credential object
-            credential.name = name
-            credential.type = type
-            credential.username = username
-            if (password) credential.password = password // Only update if not empty
-            credential.description = description
-            
-            // Save to database
-            const response = await fetch(`${API_BASE_URL}/api/sync-data`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    credentials: [credential]
-                })
-            })
-            
-            const result = await response.json()
-
-            if (result.success) {
-
-                store.write(db, true) // Skip sync - we already updated DB
+            try {
+                const db = store.readSync()
+                const credential = db.credentials.find(x => x.id === id)
+                if (!credential) {
+                    alert('Credential not found')
+                    return
+                }
                 
-                // Credential updated in database
+                const oldValues = {
+                    name: credential.name,
+                    type: credential.type,
+                    username: credential.username,
+                    description: credential.description
+                }
                 
-                // Audit log with old and new values
-                await logAudit('update', 'credential', name, { 
-                    old: oldValues,
-                    new: { name, type, username, description }
+                // Update credential object
+                credential.name = name
+                credential.type = type
+                credential.username = username
+                if (password) credential.password = password // Only update if not empty
+                credential.description = description
+                
+                // Save to database
+                const response = await fetch(`${API_BASE_URL}/api/sync-data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        credentials: [credential]
+                    })
                 })
                 
-                // Re-render from database
-                await renderCredentials()
-                closeEditCredentialModal()
-            } else {
-                alert('Failed to update credential: ' + (result.error || 'Unknown error'))
+                const result = await response.json()
+
+                if (result.success) {
+
+                    store.write(db, true) // Skip sync - we already updated DB
+                    
+                    // Credential updated in database
+                    
+                    // Audit log with old and new values
+                    await logAudit('update', 'credential', name, { 
+                        old: oldValues,
+                        new: { name, type, username, description }
+                    })
+                    
+                    // Re-render from database
+                    await renderCredentials()
+                    closeEditCredentialModal()
+                } else {
+                    alert('Failed to update credential: ' + (result.error || 'Unknown error'))
+                }
+            } catch (error) {
+                console.error('❌ Failed to update credential:', error)
+                alert('Failed to update credential: ' + error.message)
             }
-        } catch (error) {
-            console.error('❌ Failed to update credential:', error)
-            alert('Failed to update credential: ' + error.message)
-        }
-    })
+        })
+    }
 }
 
 // Delete credential modal

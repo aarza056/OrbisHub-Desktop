@@ -2579,13 +2579,7 @@
 
 <!-- Modals -->
 <dialog id="envModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
+<form class="card">
 <h2>Add Environment</h2>
 <label class="label">Display name
 <input id="envName" class="input" placeholder="e.g., Prod EU" required />
@@ -2605,17 +2599,17 @@
 <menu class="row end">
 <button id="saveEnvBtn" type="submit" value="default" class="btn">Save</button>
 </menu>
-</form>
-</dialog>
-
-<dialog id="editEnvModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 </button>
+</form>
+</dialog>
+
+<dialog id="editEnvModal" class="modal">
+<form class="card">
 <h2>Edit Environment</h2>
 <input type="hidden" id="editEnvId" />
 <label class="label">Display name
@@ -2636,6 +2630,12 @@
 <menu class="row end">
 <button id="saveEditEnvBtn" type="submit" value="default" class="btn">Save Changes</button>
 </menu>
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
 </form>
 </dialog>
 
@@ -2723,13 +2723,7 @@
 </html>
 
 <dialog id="editUserModal" class="modal">
-<form method="dialog" class="card">
-<button type="button" value="cancel" class="modal-close-btn" title="Close">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
+<form class="card">
 <h2>Edit User</h2>
 <input type="hidden" id="editUserId" />
 <label class="label">Full name
@@ -2778,17 +2772,17 @@
 <menu class="row end">
 <button id="saveEditUserBtn" type="submit" value="default" class="btn">Save Changes</button>
 </menu>
-</form>
-</dialog>
-
-<dialog id="createUserModal" class="modal">
-<form method="dialog" class="card">
-<button type="button" value="cancel" class="modal-close-btn" title="Close">
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 </button>
+</form>
+</dialog>
+
+<dialog id="createUserModal" class="modal">
+<form class="card">
 <h2>Create User</h2>
 <label class="label">Full name
 <input id="userName" class="input" placeholder="Full name" required />
@@ -2836,18 +2830,18 @@
 <menu class="row end">
 <button id="createUserBtn" type="submit" value="default" class="btn">Create User</button>
 </menu>
-</form>
-</dialog>
-
-<!-- Credential Modals -->
-<dialog id="credentialModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 </button>
+</form>
+</dialog>
+
+<!-- Credential Modals -->
+<dialog id="credentialModal" class="modal">
+<form class="card">
 <h2>Add Credential</h2>
 <label class="label">Credential Name
 <input id="credName" class="input" placeholder="e.g., Admin Account, API Key" required />
@@ -2875,17 +2869,17 @@
 <menu class="row end">
 <button id="saveCredBtn" type="submit" value="default" class="btn">Save</button>
 </menu>
-</form>
-</dialog>
-
-<dialog id="editCredentialModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 </button>
+</form>
+</dialog>
+
+<dialog id="editCredentialModal" class="modal">
+<form class="card">
 <h2>Edit Credential</h2>
 <input type="hidden" id="editCredId" />
 <label class="label">Credential Name
@@ -2914,6 +2908,12 @@
 <menu class="row end">
 <button id="saveEditCredBtn" type="submit" value="default" class="btn">Save Changes</button>
 </menu>
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
 </form>
 </dialog>
 
@@ -3092,13 +3092,7 @@ Channels
 </dialog>
 
 <dialog id="serverModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
+<form class="card">
 <h2>Add Server</h2>
 <label class="label">Display Name
 <input id="serverDisplayName" class="input" placeholder="e.g., Web Server 01" required />
@@ -3136,17 +3130,17 @@ Channels
 <menu class="row end">
 <button id="saveServerBtn" type="submit" value="default" class="btn">Add Server</button>
 </menu>
-</form>
-</dialog>
-
-<dialog id="editServerModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 </button>
+</form>
+</dialog>
+
+<dialog id="editServerModal" class="modal">
+<form class="card">
 <h2>Edit Server</h2>
 <input type="hidden" id="editServerId" />
 <label class="label">Display Name
@@ -3191,6 +3185,12 @@ Channels
 <menu class="row end">
 <button id="saveEditServerBtn" type="submit" value="default" class="btn">Save Changes</button>
 </menu>
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
 </form>
 </dialog>
 
