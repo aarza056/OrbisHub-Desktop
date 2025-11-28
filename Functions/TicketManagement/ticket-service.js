@@ -658,6 +658,4 @@
     // Statistics
     getStatistics
   };
-
-  console.log('✓ Ticket Service initialized');
 })();

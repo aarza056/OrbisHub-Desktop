@@ -62,7 +62,6 @@
       // Setup event listeners
       setupEventListeners();
       
-      console.log('✓ Ticket Management UI initialized');
     } catch (error) {
       console.error('Error initializing ticket management:', error);
       const listContainer = document.getElementById('ticketListContainer');
@@ -605,7 +604,14 @@
             <div class="ticket-detail-field">
               <div class="ticket-detail-field-label">Assignee</div>
               <div class="ticket-detail-field-value">
-                ${ticket.assignee_fullname || '<em style="color: var(--muted);">Unassigned</em>'}
+                <select class="ticket-form-select" id="ticketAssigneeChange${ticket.id}" onchange="TicketUI.changeAssignee(${ticket.id}, this.value)" style="width: 100%; padding: 6px 8px;">
+                  <option value="">Unassigned</option>
+                  ${metadata.users.map(u => `
+                    <option value="${u.id}" ${ticket.assignee_id === u.id ? 'selected' : ''}>
+                      ${u.fullname || u.username}
+                    </option>
+                  `).join('')}
+                </select>
               </div>
             </div>
 
@@ -1065,6 +1071,35 @@
     }
   }
 
+  async function changeAssignee(ticketId, assigneeId) {
+    const session = getSession();
+    if (!session) {
+      showToast('Session expired', 'error');
+      return;
+    }
+
+    const result = await service.updateTicket(ticketId, { assigneeId: assigneeId || null }, session.id);
+    
+    if (result.success) {
+      showToast('Assignee updated', 'success');
+      await loadActivityForTicket(ticketId);
+      await loadTickets(currentFilters);
+      await loadStatistics(currentFilters);
+      
+      // Update currentTicket if it's the same one
+      if (currentTicket && currentTicket.id === ticketId) {
+        currentTicket.assignee_id = assigneeId || null;
+      }
+    } else {
+      showToast(result.error || 'Failed to update assignee', 'error');
+      // Revert the dropdown
+      const dropdown = document.getElementById(`ticketAssigneeChange${ticketId}`);
+      if (dropdown && currentTicket) {
+        dropdown.value = currentTicket.assignee_id || '';
+      }
+    }
+  }
+
   // Export to window
   window.TicketUI = {
     init: initTicketManagement,
@@ -1074,12 +1109,11 @@
     deleteTicket,
     editTicket,
     changeStatus,
+    changeAssignee,
     filterByStatus,
     refresh: () => {
       loadTickets(currentFilters);
       loadStatistics(currentFilters);
     }
   };
-
-  console.log('✓ Ticket UI initialized');
 })();
