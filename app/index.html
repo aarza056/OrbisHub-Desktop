@@ -3176,12 +3176,6 @@ Channels
 <option value="Dev">Dev</option>
 </select>
 </label>
-<label class="label">Credential
-<select id="editServerCredential" class="input">
-<option value="">-- Select Credential --</option>
-</select>
-<span style="font-size:12px; color:var(--muted); margin-top:4px; display:block;">Select saved credential for connection</span>
-</label>
 <menu class="row end">
 <button id="saveEditServerBtn" type="submit" value="default" class="btn">Save Changes</button>
 </menu>
@@ -3216,13 +3210,31 @@ Channels
 </form>
 </dialog>
 
+<dialog id="selectCredentialModal" class="modal">
+<form method="dialog" class="card" style="max-width:500px;">
+<h2>Select Credential</h2>
+<p class="muted" style="margin-bottom:16px;">Choose a credential to connect to <strong id="selectedServerName"></strong></p>
 
+<label class="label">Credential
+<select id="connectionCredentialSelect" class="input" required>
+<option value="">-- Select Credential --</option>
+</select>
+<span style="font-size:12px; color:var(--muted); margin-top:4px; display:block;">Select credentials for this connection</span>
+</label>
 
+<menu class="row end">
+<button value="cancel" class="btn btn-ghost">Cancel</button>
+<button id="confirmConnectionBtn" type="submit" value="default" class="btn">Connect</button>
+</menu>
 
-
-
-
-
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+</form>
+</dialog>
 
 <!-- Database Setup Modals -->
 <dialog id="dbInitProgressModal" class="modal">

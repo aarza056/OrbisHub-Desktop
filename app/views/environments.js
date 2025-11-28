@@ -469,6 +469,11 @@ function formatUptime(seconds) {
 async function fetchServerUptime(server) {
   try {
     if (!window.electronAPI || !window.electronAPI.getServerUptime) return null
+    // Note: Uptime check requires credentials but servers no longer have assigned credentials
+    // This feature is now disabled - credentials are selected at connection time only
+    return null
+    
+    /* Legacy code - disabled
     const db = store.readSync()
     let username = ''
     let password = ''
@@ -484,6 +489,7 @@ async function fetchServerUptime(server) {
       port: server.os === 'Linux' ? (server.port || 22) : (server.port || 5985)
     })
     if (res && res.success) return res.seconds
+    */
     // Attach error tooltip to help diagnose N/A state
     if (res && res.error) {
       try {

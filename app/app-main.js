@@ -805,7 +805,6 @@ function renderServers(filters = {}) {
 				<th style="padding:12px 16px; text-align:left; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Host</th>
                 <th style="padding:12px 16px; text-align:left; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Type</th>
                 <th style="padding:12px 16px; text-align:left; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">OS</th>
-				<th style="padding:12px 16px; text-align:left; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Credential</th>
 				<th style="padding:12px 16px; text-align:right; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; width:200px;">Actions</th>
 			</tr>
 		`
@@ -816,9 +815,6 @@ function renderServers(filters = {}) {
 		
 		grouped[groupName].forEach((server, index) => {
 			const health = server.health || 'ok'
-			const credentialName = server.credentialId ? 
-				(db.credentials || []).find(c => c.id === server.credentialId)?.name || 'Not found' : 
-				'Not assigned'
 			
 			const locked = isCardLocked('server', server.id)
 			
@@ -844,9 +840,6 @@ function renderServers(filters = {}) {
                 <td style="padding:12px 16px;">
                     <span style="font-size:13px; color:var(--muted);">${server.os || 'Windows'}</span>
                 </td>
-				<td style="padding:12px 16px;">
-					<span style="font-size:12px; color:${server.credentialId ? '#10b981' : 'var(--muted)'};">${credentialName}</span>
-				</td>
 				<td style="padding:12px 16px; text-align:right;">
 					<div style="display:inline-flex; gap:6px;">
 						${locked ? `<button class="btn btn-sm" data-action="unlock" data-id="${server.id}" style="padding:4px 10px; font-size:12px;">
@@ -997,22 +990,59 @@ async function testServerConnectionForHealthCheck(ipAddress, serverName, port = 
     }
 }
 
+// Store the server to connect to
+let serverToConnect = null
+
 async function connectToServer(server) {
 	const db = store.readSync()
 	
-	// Check if credential is assigned
-	if (!server.credentialId) {
-		alert('No credential assigned to this server. Please edit the server and assign a credential first.')
+	// Check if credentials exist
+	if (!db.credentials || db.credentials.length === 0) {
+		alert('No credentials available. Please create a credential first in the Credentials section.')
 		return
 	}
 	
-	// Find the credential
-	const credential = (db.credentials || []).find(c => c.id === server.credentialId)
+	// Show credential selection modal
+	serverToConnect = server
+	const modal = document.getElementById('selectCredentialModal')
+	const serverNameEl = document.getElementById('selectedServerName')
+	const credentialSelect = document.getElementById('connectionCredentialSelect')
 	
-	if (!credential) {
-		alert('Assigned credential not found. Please edit the server and assign a valid credential.')
-		return
+	if (serverNameEl) {
+		serverNameEl.textContent = server.displayName || server.hostname
 	}
+	
+	// Populate credential dropdown
+	if (credentialSelect) {
+		credentialSelect.innerHTML = '<option value="">-- Select Credential --</option>'
+		db.credentials.forEach(cred => {
+			const option = document.createElement('option')
+			option.value = cred.id
+			option.textContent = `${cred.name} (${cred.username})`
+			credentialSelect.appendChild(option)
+		})
+	}
+	
+	if (modal) {
+		try {
+			modal.showModal()
+		} catch (e) {
+			modal.setAttribute('open', '')
+		}
+	}
+}
+
+// Perform actual connection with selected credential
+async function performServerConnection(server, credential) {
+    if (!server) {
+        alert('Error: No server selected')
+        return
+    }
+    
+    if (!credential) {
+        alert('Error: No credential selected')
+        return
+    }
 
     const os = server.os || 'Windows'
     if (os === 'Linux') {
@@ -1116,22 +1146,6 @@ kdcproxyname:s:`
 }
 
 function openEditServer(server) {
-	const db = store.readSync()
-	const currentUser = null  || 'admin'
-	
-	// Populate credential dropdown
-	const credentialSelect = document.getElementById('editServerCredential')
-	if (credentialSelect) {
-		credentialSelect.innerHTML = '<option value="">-- Select Credential --</option>'
-		const credentials = db.credentials || []
-		credentials.forEach(cred => {
-			const option = document.createElement('option')
-			option.value = cred.id
-			option.textContent = `${cred.name} (${cred.username})`
-			credentialSelect.appendChild(option)
-		})
-	}
-	
 	// Set form values
 	document.getElementById('editServerId').value = server.id
 	document.getElementById('editServerDisplayName').value = server.displayName
@@ -1140,7 +1154,6 @@ function openEditServer(server) {
 	document.getElementById('editServerType').value = server.type || ''
     document.getElementById('editServerOS').value = server.os || 'Windows'
 	document.getElementById('editServerGroup').value = server.serverGroup || ''
-	document.getElementById('editServerCredential').value = server.credentialId || ''
 	
 	const modal = document.getElementById('editServerModal')
 	if (modal) {
@@ -1425,23 +1438,10 @@ function onCredentialAction(credential, action) {
         openEditCredential(credential)
     } else if (action === 'delete') {
         credentialToDelete = credential
-        const db = store.readSync()
-        const serversUsing = (db.servers || []).filter(s => s.credentialId === credential.id)
 
         const nameEl = document.getElementById('deleteCredName')
-        const sCount = document.getElementById('deleteCredUsageServers')
-        const details = document.getElementById('deleteCredUsageDetails')
 
         if (nameEl) nameEl.textContent = credential.name || '(unnamed)'
-        if (sCount) sCount.textContent = String(serversUsing.length)
-        if (details) {
-            if (serversUsing.length === 0) {
-                details.innerHTML = '<em>No current assignments.</em>'
-            } else {
-                const serverItems = serversUsing.map(s => `<li>Server: ${s.displayName || s.name || s.hostname || s.ipAddress}</li>`).join('')
-                details.innerHTML = `<ul style="margin:0 0 8px 16px;">${serverItems}</ul>`
-            }
-        }
 
         try {
             deleteCredentialModal.showModal()
@@ -2718,44 +2718,7 @@ if (confirmDeleteCredBtn) {
                 const credName = db.credentials[idx].name
                 const credId = db.credentials[idx].id
 
-                // 1) Unassign credential from servers and environments first (to satisfy FK constraints)
-                const updatedServers = []
-                if (Array.isArray(db.servers)) {
-                    db.servers.forEach(s => {
-                        if (s.credentialId === credId) {
-                            s.credentialId = null
-                            updatedServers.push({ ...s })
-                        }
-                    })
-                }
-
-                // If in use, persist the reference clear before deleting the row
-                if (updatedServers.length > 0) {
-                    try {
-
-                        const syncRes = await fetch(`${API_BASE_URL}/api/sync-data`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                servers: updatedServers
-                            })
-                        })
-                        const syncJson = await syncRes.json()
-                        if (!syncJson.success) {
-                            console.error('❌ Could not clear references before delete:', syncJson.error)
-                            alert('Failed to clear references before delete. Please try again.')
-                            closeDeleteCredentialModal()
-                            return
-                        }
-                    } catch (syncErr) {
-                        console.error('❌ Failed to clear references before delete:', syncErr)
-                        alert('Failed to clear references before delete: ' + (syncErr?.message || syncErr))
-                        closeDeleteCredentialModal()
-                        return
-                    }
-                }
-
-                // 2) Now delete the credential row
+                // Delete the credential (no server assignments to clear since credentials are selected at connection time)
 
                 try {
                     const result = await store.deleteFromDatabase('credential', credId)
@@ -2974,7 +2937,6 @@ if (saveEditServerBtn) {
         const type = document.getElementById('editServerType').value
         const os = (document.getElementById('editServerOS')?.value) || 'Windows'
         const group = document.getElementById('editServerGroup').value.trim()
-        const credentialId = document.getElementById('editServerCredential').value
         
         if (!id || !displayName || !hostname || !ip || !type) return
         
@@ -2992,7 +2954,6 @@ if (saveEditServerBtn) {
                     ipAddress: server.ipAddress,
                     type: server.type,
                     serverGroup: server.serverGroup,
-                    credentialId: server.credentialId,
                     health: server.health
                 }
                 
@@ -3008,7 +2969,6 @@ if (saveEditServerBtn) {
                 server.type = type
                 server.os = os
                 server.serverGroup = group || 'Ungrouped'
-                server.credentialId = credentialId || null
                 server.port = testPort
                 
                 // Sync to database FIRST
@@ -3037,7 +2997,7 @@ if (saveEditServerBtn) {
                 // Audit log with old and new values
                 await logAudit('update', 'server', displayName, { 
                     old: oldValues,
-                    new: { displayName, hostname, ipAddress: ip, type, os, serverGroup: group || 'Ungrouped', credentialId, health: server.health }
+                    new: { displayName, hostname, ipAddress: ip, type, os, serverGroup: group || 'Ungrouped', health: server.health }
                 })
                 
                 // Show appropriate toast based on connection test
@@ -3126,6 +3086,60 @@ if (confirmDeleteServerBtn) {
             }
         }
         closeDeleteServerModal()
+    })
+}
+
+// ========== CREDENTIAL SELECTION FOR CONNECTION ==========
+const selectCredentialModal = document.getElementById('selectCredentialModal')
+
+function closeSelectCredentialModal() {
+    try { selectCredentialModal.close() } catch (e) {}
+    try { selectCredentialModal.removeAttribute('open') } catch (e) {}
+    serverToConnect = null
+    const credSelect = document.getElementById('connectionCredentialSelect')
+    if (credSelect) credSelect.value = ''
+}
+
+if (selectCredentialModal) {
+    const cancelBtn = selectCredentialModal.querySelector('button[value="cancel"]')
+    if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeSelectCredentialModal() })
+    
+    selectCredentialModal.addEventListener('click', (e) => { if (e.target === selectCredentialModal) closeSelectCredentialModal() })
+}
+
+// Confirm connection with selected credential
+const confirmConnectionBtn = document.getElementById('confirmConnectionBtn')
+if (confirmConnectionBtn) {
+    confirmConnectionBtn.addEventListener('click', async (e) => {
+        e.preventDefault()
+        
+        const credentialId = document.getElementById('connectionCredentialSelect').value
+        if (!credentialId) {
+            alert('Please select a credential to connect.')
+            return
+        }
+        
+        if (serverToConnect) {
+            const db = store.readSync()
+            const credential = (db.credentials || []).find(c => c.id === credentialId)
+            
+            if (!credential) {
+                alert('Selected credential not found.')
+                closeSelectCredentialModal()
+                return
+            }
+            
+            // Store server reference before closing modal
+            const server = serverToConnect
+            
+            // Close modal (which sets serverToConnect to null)
+            closeSelectCredentialModal()
+            
+            // Perform the connection with the stored server reference
+            await performServerConnection(server, credential)
+        } else {
+            closeSelectCredentialModal()
+        }
     })
 }
 
