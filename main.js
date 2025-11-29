@@ -800,7 +800,6 @@ ipcMain.handle('db-get-size', async (event) => {
             SELECT 
                 SUM(CAST(FILEPROPERTY(name, 'SpaceUsed') AS bigint) * 8.0 / 1024.0) AS SizeInMB
             FROM sys.database_files
-            WHERE type_desc = 'ROWS'
         `;
         
         const request = dbPool.request();
