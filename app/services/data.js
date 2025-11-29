@@ -74,6 +74,7 @@
           url: extra.url || extra.envUrl || '',
           type: extra.type || extra.envType || '',
           mappedServers: Array.isArray(extra.mappedServers) ? extra.mappedServers : [],
+          mappedAgentIds: Array.isArray(extra.mappedAgentIds) ? extra.mappedAgentIds : [],
           description: (typeof e.description === 'string' && !e.description.trim().startsWith('{')) ? (e.description || '') : (extra.note || ''),
           color: e.color || '#3b82f6'
         };
@@ -200,6 +201,7 @@
           url: env.url || '',
           type: env.type || '',
           mappedServers: Array.isArray(env.mappedServers) ? env.mappedServers : [],
+          mappedAgentIds: Array.isArray(env.mappedAgentIds) ? env.mappedAgentIds : [],
           note: env.description || ''
         };
         const packedDescription = JSON.stringify(extra);

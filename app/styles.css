@@ -915,10 +915,6 @@ body.compact-mode .card { padding: 10px; border-radius: 12px; }
   }
 }
 
-.env.env--entering {
-  animation: slideInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
 .env.env--exiting {
   animation: slideOutDown 0.3s cubic-bezier(0.4, 0, 1, 1) forwards;
 }

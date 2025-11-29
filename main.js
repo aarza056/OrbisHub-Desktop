@@ -800,7 +800,6 @@ ipcMain.handle('db-get-size', async (event) => {
             SELECT 
                 SUM(CAST(FILEPROPERTY(name, 'SpaceUsed') AS bigint) * 8.0 / 1024.0) AS SizeInMB
             FROM sys.database_files
-            WHERE type_desc = 'ROWS'
         `;
         
         const request = dbPool.request();
@@ -1065,6 +1064,280 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
             END
         `);
         migrations.push('Messages table updated with attachment columns');
+        
+        // ============ TICKET MANAGEMENT SYSTEM ============
+        
+        // Ticket Priorities Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TicketPriorities')
+            BEGIN
+                CREATE TABLE TicketPriorities (
+                    id INT PRIMARY KEY IDENTITY(1,1),
+                    name NVARCHAR(50) NOT NULL UNIQUE,
+                    color NVARCHAR(7) NOT NULL,
+                    level INT NOT NULL,
+                    created_at DATETIME DEFAULT GETDATE()
+                )
+                
+                INSERT INTO TicketPriorities (name, color, level) VALUES
+                ('Critical', '#dc2626', 5),
+                ('High', '#ea580c', 4),
+                ('Medium', '#f59e0b', 3),
+                ('Low', '#3b82f6', 2),
+                ('Trivial', '#6b7280', 1)
+            END
+        `);
+        migrations.push('TicketPriorities table created');
+        
+        // Ticket Statuses Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TicketStatuses')
+            BEGIN
+                CREATE TABLE TicketStatuses (
+                    id INT PRIMARY KEY IDENTITY(1,1),
+                    name NVARCHAR(50) NOT NULL UNIQUE,
+                    color NVARCHAR(7) NOT NULL,
+                    category NVARCHAR(20) NOT NULL,
+                    display_order INT NOT NULL,
+                    created_at DATETIME DEFAULT GETDATE()
+                )
+                
+                INSERT INTO TicketStatuses (name, color, category, display_order) VALUES
+                ('Open', '#3b82f6', 'open', 1),
+                ('In Progress', '#f59e0b', 'in_progress', 2),
+                ('Blocked', '#dc2626', 'in_progress', 3),
+                ('In Review', '#8b5cf6', 'in_progress', 4),
+                ('Resolved', '#10b981', 'resolved', 5),
+                ('Closed', '#6b7280', 'closed', 6),
+                ('Reopened', '#f97316', 'open', 7)
+            END
+        `);
+        migrations.push('TicketStatuses table created');
+        
+        // Ticket Types Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TicketTypes')
+            BEGIN
+                CREATE TABLE TicketTypes (
+                    id INT PRIMARY KEY IDENTITY(1,1),
+                    name NVARCHAR(50) NOT NULL UNIQUE,
+                    icon NVARCHAR(50) NOT NULL,
+                    color NVARCHAR(7) NOT NULL,
+                    created_at DATETIME DEFAULT GETDATE()
+                )
+                
+                INSERT INTO TicketTypes (name, icon, color) VALUES
+                ('Bug', 'bug', '#dc2626'),
+                ('Feature', 'star', '#8b5cf6'),
+                ('Task', 'checklist', '#3b82f6'),
+                ('Improvement', 'trending-up', '#10b981'),
+                ('Question', 'help-circle', '#f59e0b'),
+                ('Epic', 'layers', '#ec4899')
+            END
+        `);
+        migrations.push('TicketTypes table created');
+        
+        // Ticket Labels Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TicketLabels')
+            BEGIN
+                CREATE TABLE TicketLabels (
+                    id INT PRIMARY KEY IDENTITY(1,1),
+                    name NVARCHAR(50) NOT NULL UNIQUE,
+                    color NVARCHAR(7) NOT NULL,
+                    created_at DATETIME DEFAULT GETDATE()
+                )
+                
+                INSERT INTO TicketLabels (name, color) VALUES
+                ('urgent', '#dc2626'),
+                ('security', '#ea580c'),
+                ('performance', '#f59e0b'),
+                ('ui-ux', '#8b5cf6'),
+                ('backend', '#3b82f6'),
+                ('database', '#10b981'),
+                ('documentation', '#6b7280')
+            END
+        `);
+        migrations.push('TicketLabels table created');
+        
+        // Ticket Projects Table - Need to handle Users FK properly
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TicketProjects')
+            BEGIN
+                CREATE TABLE TicketProjects (
+                    id INT PRIMARY KEY IDENTITY(1,1),
+                    name NVARCHAR(100) NOT NULL,
+                    [key] NVARCHAR(10) NOT NULL UNIQUE,
+                    description NVARCHAR(MAX),
+                    color NVARCHAR(7) NOT NULL DEFAULT '#3b82f6',
+                    is_active BIT DEFAULT 1,
+                    created_by NVARCHAR(50) NOT NULL,
+                    created_at DATETIME DEFAULT GETDATE(),
+                    updated_at DATETIME DEFAULT GETDATE(),
+                    CONSTRAINT FK_TicketProjects_CreatedBy FOREIGN KEY (created_by) REFERENCES Users(id)
+                )
+            END
+            
+            -- Insert default project if it doesn't exist
+            IF NOT EXISTS (SELECT 1 FROM TicketProjects WHERE [key] = 'ORB')
+            BEGIN
+                DECLARE @defaultUser NVARCHAR(50)
+                SELECT TOP 1 @defaultUser = id FROM Users WHERE role = 'admin' ORDER BY created_at
+                
+                IF @defaultUser IS NOT NULL
+                BEGIN
+                    INSERT INTO TicketProjects (name, [key], description, color, created_by) 
+                    VALUES ('OrbisHub', 'ORB', 'Default OrbisHub project for system administration tasks', '#8aa2ff', @defaultUser)
+                END
+            END
+        `);
+        migrations.push('TicketProjects table created');
+        
+        // Main Tickets Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Tickets')
+            BEGIN
+                CREATE TABLE Tickets (
+                    id INT PRIMARY KEY IDENTITY(1,1),
+                    ticket_number NVARCHAR(20) NOT NULL,
+                    project_id INT NOT NULL,
+                    type_id INT NOT NULL,
+                    title NVARCHAR(200) NOT NULL,
+                    description NVARCHAR(MAX),
+                    status_id INT NOT NULL,
+                    priority_id INT NOT NULL,
+                    assignee_id NVARCHAR(50),
+                    reporter_id NVARCHAR(50) NOT NULL,
+                    environment_id NVARCHAR(50),
+                    server_id NVARCHAR(50),
+                    story_points INT,
+                    estimated_hours DECIMAL(10,2),
+                    actual_hours DECIMAL(10,2),
+                    due_date DATETIME,
+                    parent_ticket_id INT,
+                    created_at DATETIME DEFAULT GETDATE(),
+                    updated_at DATETIME DEFAULT GETDATE(),
+                    resolved_at DATETIME,
+                    closed_at DATETIME,
+                    CONSTRAINT FK_Tickets_Project FOREIGN KEY (project_id) REFERENCES TicketProjects(id),
+                    CONSTRAINT FK_Tickets_Type FOREIGN KEY (type_id) REFERENCES TicketTypes(id),
+                    CONSTRAINT FK_Tickets_Status FOREIGN KEY (status_id) REFERENCES TicketStatuses(id),
+                    CONSTRAINT FK_Tickets_Priority FOREIGN KEY (priority_id) REFERENCES TicketPriorities(id),
+                    CONSTRAINT FK_Tickets_Parent FOREIGN KEY (parent_ticket_id) REFERENCES Tickets(id)
+                )
+                
+                CREATE INDEX IX_Tickets_Project ON Tickets(project_id)
+                CREATE INDEX IX_Tickets_Status ON Tickets(status_id)
+                CREATE INDEX IX_Tickets_Assignee ON Tickets(assignee_id)
+                CREATE INDEX IX_Tickets_Reporter ON Tickets(reporter_id)
+                CREATE INDEX IX_Tickets_DueDate ON Tickets(due_date)
+                CREATE INDEX IX_Tickets_CreatedAt ON Tickets(created_at)
+            END
+        `);
+        migrations.push('Tickets table created');
+        
+        // Ticket Comments Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TicketComments')
+            BEGIN
+                CREATE TABLE TicketComments (
+                    id INT PRIMARY KEY IDENTITY(1,1),
+                    ticket_id INT NOT NULL,
+                    user_id NVARCHAR(50) NOT NULL,
+                    comment NVARCHAR(MAX) NOT NULL,
+                    is_internal BIT DEFAULT 0,
+                    created_at DATETIME DEFAULT GETDATE(),
+                    updated_at DATETIME DEFAULT GETDATE(),
+                    CONSTRAINT FK_TicketComments_Ticket FOREIGN KEY (ticket_id) REFERENCES Tickets(id) ON DELETE CASCADE
+                )
+                
+                CREATE INDEX IX_TicketComments_Ticket ON TicketComments(ticket_id)
+                CREATE INDEX IX_TicketComments_CreatedAt ON TicketComments(created_at)
+            END
+        `);
+        migrations.push('TicketComments table created');
+        
+        // Ticket Attachments Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TicketAttachments')
+            BEGIN
+                CREATE TABLE TicketAttachments (
+                    id INT PRIMARY KEY IDENTITY(1,1),
+                    ticket_id INT NOT NULL,
+                    filename NVARCHAR(255) NOT NULL,
+                    filepath NVARCHAR(500) NOT NULL,
+                    filesize BIGINT NOT NULL,
+                    mimetype NVARCHAR(100),
+                    uploaded_by NVARCHAR(50) NOT NULL,
+                    uploaded_at DATETIME DEFAULT GETDATE(),
+                    CONSTRAINT FK_TicketAttachments_Ticket FOREIGN KEY (ticket_id) REFERENCES Tickets(id) ON DELETE CASCADE
+                )
+                
+                CREATE INDEX IX_TicketAttachments_Ticket ON TicketAttachments(ticket_id)
+            END
+        `);
+        migrations.push('TicketAttachments table created');
+        
+        // Ticket Watchers Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TicketWatchers')
+            BEGIN
+                CREATE TABLE TicketWatchers (
+                    id INT PRIMARY KEY IDENTITY(1,1),
+                    ticket_id INT NOT NULL,
+                    user_id NVARCHAR(50) NOT NULL,
+                    created_at DATETIME DEFAULT GETDATE(),
+                    CONSTRAINT FK_TicketWatchers_Ticket FOREIGN KEY (ticket_id) REFERENCES Tickets(id) ON DELETE CASCADE,
+                    CONSTRAINT UQ_TicketWatchers UNIQUE (ticket_id, user_id)
+                )
+                
+                CREATE INDEX IX_TicketWatchers_Ticket ON TicketWatchers(ticket_id)
+                CREATE INDEX IX_TicketWatchers_User ON TicketWatchers(user_id)
+            END
+        `);
+        migrations.push('TicketWatchers table created');
+        
+        // Ticket Activity Log Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TicketActivityLog')
+            BEGIN
+                CREATE TABLE TicketActivityLog (
+                    id INT PRIMARY KEY IDENTITY(1,1),
+                    ticket_id INT NOT NULL,
+                    user_id NVARCHAR(50) NOT NULL,
+                    action NVARCHAR(50) NOT NULL,
+                    field_name NVARCHAR(100),
+                    old_value NVARCHAR(MAX),
+                    new_value NVARCHAR(MAX),
+                    created_at DATETIME DEFAULT GETDATE(),
+                    CONSTRAINT FK_TicketActivityLog_Ticket FOREIGN KEY (ticket_id) REFERENCES Tickets(id) ON DELETE CASCADE
+                )
+                
+                CREATE INDEX IX_TicketActivityLog_Ticket ON TicketActivityLog(ticket_id)
+                CREATE INDEX IX_TicketActivityLog_CreatedAt ON TicketActivityLog(created_at)
+            END
+        `);
+        migrations.push('TicketActivityLog table created');
+        
+        // Ticket-Label Mapping Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TicketLabelMap')
+            BEGIN
+                CREATE TABLE TicketLabelMap (
+                    id INT PRIMARY KEY IDENTITY(1,1),
+                    ticket_id INT NOT NULL,
+                    label_id INT NOT NULL,
+                    created_at DATETIME DEFAULT GETDATE(),
+                    CONSTRAINT FK_TicketLabelMap_Ticket FOREIGN KEY (ticket_id) REFERENCES Tickets(id) ON DELETE CASCADE,
+                    CONSTRAINT FK_TicketLabelMap_Label FOREIGN KEY (label_id) REFERENCES TicketLabels(id),
+                    CONSTRAINT UQ_TicketLabelMap UNIQUE (ticket_id, label_id)
+                )
+            END
+        `);
+        migrations.push('TicketLabelMap table created');
+        
+        // Note: Ticket numbers are generated in the application code during insert
+        // to avoid conflicts with OUTPUT clause
         
         await pool.close();
         

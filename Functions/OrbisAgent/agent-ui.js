@@ -78,6 +78,9 @@ const AgentUI = {
                 const agentCard = this.createAgentCard(agent)
                 agentsList.appendChild(agentCard)
             })
+            
+            // Dispatch custom event to notify other components that agents were updated
+            window.dispatchEvent(new CustomEvent('agentsUpdated', { detail: { agents } }))
 
         } catch (error) {
             console.error('Failed to render agents:', error)

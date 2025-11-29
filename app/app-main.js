@@ -681,11 +681,26 @@ function closeEditUserModal() {
 
 if (editUserModal) {
     const cancelEdit = editUserModal.querySelector('button[value="cancel"]')
-    if (cancelEdit) cancelEdit.addEventListener('click', (e) => { e.preventDefault(); closeEditUserModal() })
+    if (cancelEdit) {
+        cancelEdit.addEventListener('click', (e) => { e.preventDefault(); closeEditUserModal() })
+        cancelEdit.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault() })
+    }
     
     editUserModal.addEventListener('click', (e) => { if (e.target === editUserModal) closeEditUserModal() })
     
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && editUserModal.hasAttribute('open')) closeEditUserModal() })
+    
+    // Add Enter key handler to all inputs
+    const editUserInputs = editUserModal.querySelectorAll('input, select, textarea')
+    editUserInputs.forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                const submitBtn = document.getElementById('saveEditUserBtn')
+                if (submitBtn) submitBtn.click()
+            }
+        })
+    })
 }
 
 // moved: environment delete modal handling is in views/environments.js
@@ -790,7 +805,6 @@ function renderServers(filters = {}) {
 				<th style="padding:12px 16px; text-align:left; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Host</th>
                 <th style="padding:12px 16px; text-align:left; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Type</th>
                 <th style="padding:12px 16px; text-align:left; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">OS</th>
-				<th style="padding:12px 16px; text-align:left; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Credential</th>
 				<th style="padding:12px 16px; text-align:right; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; width:200px;">Actions</th>
 			</tr>
 		`
@@ -801,9 +815,6 @@ function renderServers(filters = {}) {
 		
 		grouped[groupName].forEach((server, index) => {
 			const health = server.health || 'ok'
-			const credentialName = server.credentialId ? 
-				(db.credentials || []).find(c => c.id === server.credentialId)?.name || 'Not found' : 
-				'Not assigned'
 			
 			const locked = isCardLocked('server', server.id)
 			
@@ -829,9 +840,6 @@ function renderServers(filters = {}) {
                 <td style="padding:12px 16px;">
                     <span style="font-size:13px; color:var(--muted);">${server.os || 'Windows'}</span>
                 </td>
-				<td style="padding:12px 16px;">
-					<span style="font-size:12px; color:${server.credentialId ? '#10b981' : 'var(--muted)'};">${credentialName}</span>
-				</td>
 				<td style="padding:12px 16px; text-align:right;">
 					<div style="display:inline-flex; gap:6px;">
 						${locked ? `<button class="btn btn-sm" data-action="unlock" data-id="${server.id}" style="padding:4px 10px; font-size:12px;">
@@ -982,25 +990,69 @@ async function testServerConnectionForHealthCheck(ipAddress, serverName, port = 
     }
 }
 
+// Store the server to connect to
+let serverToConnect = null
+
 async function connectToServer(server) {
 	const db = store.readSync()
 	
-	// Check if credential is assigned
-	if (!server.credentialId) {
-		alert('No credential assigned to this server. Please edit the server and assign a credential first.')
+	// Check if credentials exist
+	if (!db.credentials || db.credentials.length === 0) {
+		alert('No credentials available. Please create a credential first in the Credentials section.')
 		return
 	}
 	
-	// Find the credential
-	const credential = (db.credentials || []).find(c => c.id === server.credentialId)
+	// Show credential selection modal
+	serverToConnect = server
+	const modal = document.getElementById('selectCredentialModal')
+	const serverNameEl = document.getElementById('selectedServerName')
+	const credentialSelect = document.getElementById('connectionCredentialSelect')
+	const connectionTypeSelect = document.getElementById('connectionTypeSelect')
 	
-	if (!credential) {
-		alert('Assigned credential not found. Please edit the server and assign a valid credential.')
-		return
+	if (serverNameEl) {
+		serverNameEl.textContent = server.displayName || server.hostname
 	}
+	
+	// Set default connection type based on server OS
+	if (connectionTypeSelect) {
+		const os = server.os || 'Windows'
+		connectionTypeSelect.value = os === 'Linux' ? 'ssh' : 'rdp'
+	}
+	
+	// Populate credential dropdown
+	if (credentialSelect) {
+		credentialSelect.innerHTML = '<option value="">-- Select Credential --</option>'
+		db.credentials.forEach(cred => {
+			const option = document.createElement('option')
+			option.value = cred.id
+			option.textContent = `${cred.name} (${cred.username})`
+			credentialSelect.appendChild(option)
+		})
+	}
+	
+	if (modal) {
+		try {
+			modal.showModal()
+		} catch (e) {
+			modal.setAttribute('open', '')
+		}
+	}
+}
 
-    const os = server.os || 'Windows'
-    if (os === 'Linux') {
+// Perform actual connection with selected credential
+async function performServerConnection(server, credential, connectionType) {
+    if (!server) {
+        alert('Error: No server selected')
+        return
+    }
+    
+    if (!credential) {
+        alert('Error: No credential selected')
+        return
+    }
+
+    // Use the explicitly selected connection type, not the server OS
+    if (connectionType === 'ssh') {
         // SSH/PuTTY
         try {
             if (window.electronAPI && window.electronAPI.connectSSH) {
@@ -1101,22 +1153,6 @@ kdcproxyname:s:`
 }
 
 function openEditServer(server) {
-	const db = store.readSync()
-	const currentUser = null  || 'admin'
-	
-	// Populate credential dropdown
-	const credentialSelect = document.getElementById('editServerCredential')
-	if (credentialSelect) {
-		credentialSelect.innerHTML = '<option value="">-- Select Credential --</option>'
-		const credentials = db.credentials || []
-		credentials.forEach(cred => {
-			const option = document.createElement('option')
-			option.value = cred.id
-			option.textContent = `${cred.name} (${cred.username})`
-			credentialSelect.appendChild(option)
-		})
-	}
-	
 	// Set form values
 	document.getElementById('editServerId').value = server.id
 	document.getElementById('editServerDisplayName').value = server.displayName
@@ -1125,7 +1161,6 @@ function openEditServer(server) {
 	document.getElementById('editServerType').value = server.type || ''
     document.getElementById('editServerOS').value = server.os || 'Windows'
 	document.getElementById('editServerGroup').value = server.serverGroup || ''
-	document.getElementById('editServerCredential').value = server.credentialId || ''
 	
 	const modal = document.getElementById('editServerModal')
 	if (modal) {
@@ -1410,23 +1445,10 @@ function onCredentialAction(credential, action) {
         openEditCredential(credential)
     } else if (action === 'delete') {
         credentialToDelete = credential
-        const db = store.readSync()
-        const serversUsing = (db.servers || []).filter(s => s.credentialId === credential.id)
 
         const nameEl = document.getElementById('deleteCredName')
-        const sCount = document.getElementById('deleteCredUsageServers')
-        const details = document.getElementById('deleteCredUsageDetails')
 
         if (nameEl) nameEl.textContent = credential.name || '(unnamed)'
-        if (sCount) sCount.textContent = String(serversUsing.length)
-        if (details) {
-            if (serversUsing.length === 0) {
-                details.innerHTML = '<em>No current assignments.</em>'
-            } else {
-                const serverItems = serversUsing.map(s => `<li>Server: ${s.displayName || s.name || s.hostname || s.ipAddress}</li>`).join('')
-                details.innerHTML = `<ul style="margin:0 0 8px 16px;">${serverItems}</ul>`
-            }
-        }
 
         try {
             deleteCredentialModal.showModal()
@@ -1844,109 +1866,130 @@ if (addUserBtn && createUserModal) {
     
     // Cancel button
     const cancelBtn = createUserModal.querySelector('button[value="cancel"]')
-    if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeCreateUserModal() })
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeCreateUserModal() })
+        cancelBtn.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault() })
+    }
     
     // Backdrop click
     createUserModal.addEventListener('click', (e) => { if (e.target === createUserModal) closeCreateUserModal() })
     
     // Escape key
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && createUserModal.hasAttribute('open')) closeCreateUserModal() })
-}
-
-if (createUserBtn) {
-    createUserBtn.addEventListener('click', async (e) => {
-        e.preventDefault()
-        const name = document.getElementById('userName').value.trim()
-        const username = document.getElementById('userUsername').value.trim()
-        const password = document.getElementById('userPassword').value.trim()
-        const changePassword = document.getElementById('userChangePassword').checked
-        const email = document.getElementById('userEmail').value.trim()
-        const position = document.getElementById('userPosition').value.trim()
-        const squad = document.getElementById('userSquad').value.trim()
-        const role = document.getElementById('userRole').value
-        if (!name || !email || !username || !password) return
-        
-        // Validate password
-        const validation = validatePassword(password)
-        if (!validation.isValid) {
-            const errorDiv = document.getElementById('createUserPasswordError')
-            const errorList = document.getElementById('createUserPasswordErrorList')
-            if (errorDiv && errorList) {
-                errorList.innerHTML = validation.errors.map(err => `<li>${err}</li>`).join('')
-                errorDiv.style.display = 'block'
+    
+    // Add Enter key handler to all inputs
+    const createUserInputs = createUserModal.querySelectorAll('input, select, textarea')
+    createUserInputs.forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                const submitBtn = document.getElementById('createUserBtn')
+                if (submitBtn) submitBtn.click()
             }
-            return
-        }
-        
-        // Hide error if validation passes
-        const errorDiv = document.getElementById('createUserPasswordError')
-        if (errorDiv) errorDiv.style.display = 'none'
-        
-        // Hash password before storing
-        const hashResult = await window.electronAPI.hashPassword(password)
-        if (!hashResult || !hashResult.success) {
-            alert('Failed to secure password')
-            return
-        }
-        
-        const newUser = { 
-            id: uid(), 
-            name,
-            username,
-            password: hashResult.hash,
-            changePasswordOnLogin: changePassword,
-            email,
-            position: position || '—',
-            squad: squad || '—',
-            role,
-            lastLogin: '—',
-            lastActivity: Date.now(),
-            ip: '—',
-            isActive: true
-        }
-        
-        const db = store.readSync()
-        db.users = db.users || []
-        db.users.unshift(newUser)
-        store.write(db)
-        
-        // Sync to database
-        try {
-            await window.Data.syncAll({ users: db.users })
-        } catch (error) {
-            console.error('Failed to sync user to database:', error)
-        }
-        
-        // Audit log for user creation
-        logAudit('create', 'user', name, { username, email, role })
-        
-        // Audit log for password set
-        await window.Audit.log({
-            id: uid(),
-            action: 'password_set',
-            entityType: 'user',
-            entityName: name,
-            user: window.sessionUser ? window.sessionUser.name : 'System',
-            username: window.sessionUser ? window.sessionUser.username : 'system',
-            timestamp: new Date().toISOString(),
-            ip: getLocalIP(),
-            details: { targetUser: username, reason: 'User creation' }
         })
-        
-        // clear inputs
-        document.getElementById('userName').value = ''
-        document.getElementById('userUsername').value = ''
-        document.getElementById('userPassword').value = ''
-        document.getElementById('userChangePassword').checked = false
-        document.getElementById('userEmail').value = ''
-        document.getElementById('userPosition').value = ''
-        document.getElementById('userSquad').value = ''
-        document.getElementById('userRole').value = 'Admin'
-        
-        // Refresh user list and close modal
-        await renderUsers()
-        closeCreateUserModal()
     })
+    
+    // Handle form submission (works with Enter key and button click)
+    const createUserForm = createUserModal.querySelector('form')
+    if (createUserForm) {
+        createUserForm.addEventListener('submit', async (e) => {
+            e.preventDefault()
+            
+            const name = document.getElementById('userName').value.trim()
+            const username = document.getElementById('userUsername').value.trim()
+            const password = document.getElementById('userPassword').value.trim()
+            const changePassword = document.getElementById('userChangePassword').checked
+            const email = document.getElementById('userEmail').value.trim()
+            const position = document.getElementById('userPosition').value.trim()
+            const squad = document.getElementById('userSquad').value.trim()
+            const role = document.getElementById('userRole').value
+            if (!name || !email || !username || !password) return
+            
+            // Validate password
+            const validation = validatePassword(password)
+            if (!validation.isValid) {
+                const errorDiv = document.getElementById('createUserPasswordError')
+                const errorList = document.getElementById('createUserPasswordErrorList')
+                if (errorDiv && errorList) {
+                    errorList.innerHTML = validation.errors.map(err => `<li>${err}</li>`).join('')
+                    errorDiv.style.display = 'block'
+                }
+                return
+            }
+            
+            // Hide error if validation passes
+            const errorDiv = document.getElementById('createUserPasswordError')
+            if (errorDiv) errorDiv.style.display = 'none'
+            
+            // Hash password before storing
+            const hashResult = await window.electronAPI.hashPassword(password)
+            if (!hashResult || !hashResult.success) {
+                alert('Failed to secure password')
+                return
+            }
+            
+            const newUser = { 
+                id: uid(), 
+                name,
+                username,
+                password: hashResult.hash,
+                changePasswordOnLogin: changePassword,
+                email,
+                position: position || '—',
+                squad: squad || '—',
+                role,
+                lastLogin: '—',
+                lastActivity: Date.now(),
+                ip: '—',
+                isActive: true
+            }
+            
+            const db = store.readSync()
+            db.users = db.users || []
+            db.users.unshift(newUser)
+            store.write(db)
+            
+            // Sync to database
+            try {
+                await window.Data.syncAll({ users: db.users })
+            } catch (error) {
+                console.error('Failed to sync user to database:', error)
+            }
+            
+            // Audit log for user creation
+            logAudit('create', 'user', name, { username, email, role })
+            
+            // Audit log for password set
+            await window.Audit.log({
+                id: uid(),
+                action: 'password_set',
+                entityType: 'user',
+                entityName: name,
+                user: window.sessionUser ? window.sessionUser.name : 'System',
+                username: window.sessionUser ? window.sessionUser.username : 'system',
+                timestamp: new Date().toISOString(),
+                ip: getLocalIP(),
+                details: { targetUser: username, reason: 'User creation' }
+            })
+            
+            // clear inputs
+            document.getElementById('userName').value = ''
+            document.getElementById('userUsername').value = ''
+            document.getElementById('userPassword').value = ''
+            document.getElementById('userChangePassword').checked = false
+            document.getElementById('userEmail').value = ''
+            document.getElementById('userPosition').value = ''
+            document.getElementById('userSquad').value = ''
+            document.getElementById('userRole').value = 'Admin'
+            
+            // Show success notification
+            ToastManager.success('User Created', `${name} has been created successfully`, 3000)
+            
+            // Refresh user list and close modal
+            await renderUsers()
+            closeCreateUserModal()
+        })
+    }
 }
 
 // Wire up edit user form submission
@@ -1956,6 +1999,7 @@ if (saveEditUserBtn) {
     if (editUserForm) {
         editUserForm.addEventListener('submit', async (e) => {
             e.preventDefault()
+            
             const id = document.getElementById('editUserId').value
             const name = document.getElementById('editUserName').value.trim()
             const username = document.getElementById('editUserUsername').value.trim()
@@ -2127,6 +2171,10 @@ if (confirmDeleteUserBtn) {
                 
                 // Audit log for deletion
                 await logAudit('delete', 'user', deleted.name, { username: deleted.username, email: deleted.email, role: deleted.role })
+                
+                // Show success notification
+                ToastManager.success('User Deleted', `${deleted.name} has been deleted successfully`, 3000)
+                
                 renderUsers()
             }
         }
@@ -2296,147 +2344,7 @@ if (databaseSearchInput) {
     databaseSearchInput.addEventListener('input', (e) => renderDatabases(e.target.value))
 }
 
-// Test Database Connection from list
-const testDbConnectionFromListBtn = document.getElementById('testDbConnectionFromListBtn')
-const buildDbBtn = document.getElementById('buildDbBtn')
-
-if (testDbConnectionFromListBtn) {
-    testDbConnectionFromListBtn.addEventListener('click', async () => {
-        const db = store.readSync()
-        const databases = db.databases || []
-        
-        if (databases.length === 0) {
-            alert('No databases found. Please add a database connection first.')
-            return
-        }
-        
-        // Use the first database or selected one
-        const database = databases[0]
-        
-        // Disable button and show loading
-        testDbConnectionFromListBtn.disabled = true
-        testDbConnectionFromListBtn.innerHTML = `
-            <div class="spinner-ring" style="width:16px; height:16px; border-width:2px; margin-right:8px;"></div>
-            Testing...
-        `
-        
-        // Simulate connection test (replace with actual API call)
-        setTimeout(() => {
-            // Success
-            testDbConnectionFromListBtn.innerHTML = `
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-                Connection Successful!
-            `
-            testDbConnectionFromListBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-            
-            // Enable Build DB button
-            buildDbBtn.disabled = false
-            buildDbBtn.style.opacity = '1'
-            
-            // Reset after 3 seconds
-            setTimeout(() => {
-                testDbConnectionFromListBtn.disabled = false
-                testDbConnectionFromListBtn.innerHTML = `
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                    Test Connection
-                `
-                testDbConnectionFromListBtn.style.background = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
-            }, 3000)
-        }, 2000)
-    })
-}
-
-// Build Database
-if (buildDbBtn) {
-    buildDbBtn.addEventListener('click', () => {
-        // Open the database initialization modal
-        const modal = document.getElementById('dbInitProgressModal')
-        const progressList = document.getElementById('dbInitProgressList')
-        const progressBar = document.getElementById('dbInitProgressBar')
-        const progressPercent = document.getElementById('dbInitProgressPercent')
-        const closeBtn = document.getElementById('closeDbInitProgressBtn')
-        
-        if (!modal) {
-            alert('Database initialization modal not found.')
-            return
-        }
-        
-        // Reset modal
-        progressList.innerHTML = ''
-        progressBar.style.width = '0%'
-        progressPercent.textContent = '0%'
-        closeBtn.disabled = true
-        
-        modal.showModal()
-        
-        // Tables to create
-        const tables = [
-            { name: 'Users', description: 'User accounts and authentication' },
-            { name: 'Environments', description: 'Environment configurations' },
-            { name: 'Servers', description: 'Server inventory and status' },
-            { name: 'Credentials', description: 'Encrypted credentials vault' },
-            { name: 'DatabaseConnections', description: 'Database connection strings' },
-            { name: 'AuditLogs', description: 'System activity tracking' },
-            { name: 'Sessions', description: 'User session management' }
-        ]
-        
-        let completed = 0
-        const total = tables.length
-        
-        // Simulate table creation (replace with actual API calls)
-        tables.forEach((table, index) => {
-            setTimeout(() => {
-                const item = document.createElement('div')
-                item.style.cssText = 'display:flex; align-items:center; gap:12px; padding:12px; background:var(--bg-secondary); border-radius:8px;'
-                item.innerHTML = `
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                    <div style="flex:1;">
-                        <div style="font-weight:600; margin-bottom:2px;">${table.name}</div>
-                        <div style="font-size:12px; color:var(--muted);">${table.description}</div>
-                    </div>
-                `
-                progressList.appendChild(item)
-                
-                completed++
-                const percent = Math.round((completed / total) * 100)
-                progressBar.style.width = percent + '%'
-                progressPercent.textContent = percent + '%'
-                
-                if (completed === total) {
-                    closeBtn.disabled = false
-                    
-                    // Add final success message
-                    setTimeout(() => {
-                        const successItem = document.createElement('div')
-                        successItem.style.cssText = 'padding:16px; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:8px; margin-top:8px;'
-                        successItem.innerHTML = `
-                            <div style="display:flex; align-items:center; gap:12px;">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                                </svg>
-                                <div>
-                                    <div style="font-weight:700; font-size:16px; color:#10b981; margin-bottom:4px;">Database Built Successfully!</div>
-                                    <div style="font-size:13px; color:var(--muted);">All tables created and ready to use.</div>
-                                </div>
-                            </div>
-                        `
-                        progressList.appendChild(successItem)
-                        
-                        // Log audit
-                        logAudit('create', 'database', 'OrbisHub Schema', 'Initialized database schema with all tables')
-                    }, 300)
-                }
-            }, (index + 1) * 800)
-        })
-    })
-}
+// Old database build code removed - no longer in use
 
 
 // ========== CREDENTIALS MODAL HANDLERS ==========
@@ -2479,23 +2387,37 @@ if (addCredentialBtn && credentialModal) {
     })
     
     const cancelBtn = credentialModal.querySelector('button[value="cancel"]')
-    if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeCredentialModal() })
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeCredentialModal() })
+        cancelBtn.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault() })
+    }
     
     credentialModal.addEventListener('click', (e) => { if (e.target === credentialModal) closeCredentialModal() })
-}
-
-// Save new credential
-const saveCredBtn = document.getElementById('saveCredBtn')
-if (saveCredBtn) {
-    saveCredBtn.addEventListener('click', async (e) => {
-        e.preventDefault()
-        const name = document.getElementById('credName').value.trim()
-        const type = document.getElementById('credType').value
-        const username = document.getElementById('credUsername').value.trim()
-        const password = document.getElementById('credPassword').value.trim()
-        const description = document.getElementById('credDescription').value.trim()
-        
-        if (!name) return
+    
+    // Add Enter key handler to all inputs
+    const inputs = credentialModal.querySelectorAll('input, select, textarea')
+    inputs.forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                const submitBtn = document.getElementById('saveCredBtn')
+                if (submitBtn) submitBtn.click()
+            }
+        })
+    })
+    
+    // Handle form submission
+    const credForm = credentialModal.querySelector('form')
+    if (credForm) {
+        credForm.addEventListener('submit', async (e) => {
+            e.preventDefault()
+            const name = document.getElementById('credName').value.trim()
+            const type = document.getElementById('credType').value
+            const username = document.getElementById('credUsername').value.trim()
+            const password = document.getElementById('credPassword').value.trim()
+            const description = document.getElementById('credDescription').value.trim()
+            
+            if (!name) return
         
         const newCred = {
             id: uid(),
@@ -2540,87 +2462,107 @@ if (saveCredBtn) {
             console.error('❌ Failed to save credential:', error)
             alert('Failed to save credential: ' + error.message)
         }
-    })
+        })
+    }
 }
 
 // Edit credential modal
 if (editCredentialModal) {
     const cancelBtn = editCredentialModal.querySelector('button[value="cancel"]')
-    if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeEditCredentialModal() })
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeEditCredentialModal() })
+        // Prevent Enter from triggering close button
+        cancelBtn.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault() })
+    }
     
     editCredentialModal.addEventListener('click', (e) => { if (e.target === editCredentialModal) closeEditCredentialModal() })
+    
+    // Add Enter key handler to all inputs to explicitly submit form
+    const inputs = editCredentialModal.querySelectorAll('input, select, textarea')
+    inputs.forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                const submitBtn = document.getElementById('saveEditCredBtn')
+                if (submitBtn) submitBtn.click()
+            }
+        })
+    })
 }
 
 // Save edited credential
 const saveEditCredBtn = document.getElementById('saveEditCredBtn')
-if (saveEditCredBtn) {
-    saveEditCredBtn.addEventListener('click', async (e) => {
-        e.preventDefault()
-        const id = document.getElementById('editCredId').value
-        const name = document.getElementById('editCredName').value.trim()
-        const type = document.getElementById('editCredType').value
-        const username = document.getElementById('editCredUsername').value.trim()
-        const password = document.getElementById('editCredPassword').value.trim()
-        const description = document.getElementById('editCredDescription').value.trim()
-        
-        if (!id || !name) return
+if (editCredentialModal) {
+    const editCredForm = editCredentialModal.querySelector('form')
+    if (editCredForm) {
+        editCredForm.addEventListener('submit', async (e) => {
+            e.preventDefault()
+            const id = document.getElementById('editCredId').value
+            const name = document.getElementById('editCredName').value.trim()
+            const type = document.getElementById('editCredType').value
+            const username = document.getElementById('editCredUsername').value.trim()
+            const password = document.getElementById('editCredPassword').value.trim()
+            const description = document.getElementById('editCredDescription').value.trim()
+            
+            if (!id || !name) return
 
-        try {
-            const db = store.readSync()
-            const credential = db.credentials.find(x => x.id === id)
-            if (!credential) {
-                alert('Credential not found')
-                return
-            }
-            
-            const oldValues = {
-                name: credential.name,
-                type: credential.type,
-                username: credential.username,
-                description: credential.description
-            }
-            
-            // Update credential object
-            credential.name = name
-            credential.type = type
-            credential.username = username
-            if (password) credential.password = password // Only update if not empty
-            credential.description = description
-            
-            // Save to database
-            const response = await fetch(`${API_BASE_URL}/api/sync-data`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    credentials: [credential]
-                })
-            })
-            
-            const result = await response.json()
-
-            if (result.success) {
-
-                store.write(db, true) // Skip sync - we already updated DB
+            try {
+                const db = store.readSync()
+                const credential = db.credentials.find(x => x.id === id)
+                if (!credential) {
+                    alert('Credential not found')
+                    return
+                }
                 
-                // Credential updated in database
+                const oldValues = {
+                    name: credential.name,
+                    type: credential.type,
+                    username: credential.username,
+                    description: credential.description
+                }
                 
-                // Audit log with old and new values
-                await logAudit('update', 'credential', name, { 
-                    old: oldValues,
-                    new: { name, type, username, description }
+                // Update credential object
+                credential.name = name
+                credential.type = type
+                credential.username = username
+                if (password) credential.password = password // Only update if not empty
+                credential.description = description
+                
+                // Save to database
+                const response = await fetch(`${API_BASE_URL}/api/sync-data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        credentials: [credential]
+                    })
                 })
                 
-                // Re-render from database
-                await renderCredentials()
-                closeEditCredentialModal()
-            } else {
-                alert('Failed to update credential: ' + (result.error || 'Unknown error'))
+                const result = await response.json()
+
+                if (result.success) {
+
+                    store.write(db, true) // Skip sync - we already updated DB
+                    
+                    // Credential updated in database
+                    
+                    // Audit log with old and new values
+                    await logAudit('update', 'credential', name, { 
+                        old: oldValues,
+                        new: { name, type, username, description }
+                    })
+                    
+                    // Re-render from database
+                    await renderCredentials()
+                    closeEditCredentialModal()
+                } else {
+                    alert('Failed to update credential: ' + (result.error || 'Unknown error'))
+                }
+            } catch (error) {
+                console.error('❌ Failed to update credential:', error)
+                alert('Failed to update credential: ' + error.message)
             }
-        } catch (error) {
-            console.error('❌ Failed to update credential:', error)
-            alert('Failed to update credential: ' + error.message)
-        }
-    })
+        })
+    }
 }
 
 // Delete credential modal
@@ -2643,44 +2585,7 @@ if (confirmDeleteCredBtn) {
                 const credName = db.credentials[idx].name
                 const credId = db.credentials[idx].id
 
-                // 1) Unassign credential from servers and environments first (to satisfy FK constraints)
-                const updatedServers = []
-                if (Array.isArray(db.servers)) {
-                    db.servers.forEach(s => {
-                        if (s.credentialId === credId) {
-                            s.credentialId = null
-                            updatedServers.push({ ...s })
-                        }
-                    })
-                }
-
-                // If in use, persist the reference clear before deleting the row
-                if (updatedServers.length > 0) {
-                    try {
-
-                        const syncRes = await fetch(`${API_BASE_URL}/api/sync-data`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                servers: updatedServers
-                            })
-                        })
-                        const syncJson = await syncRes.json()
-                        if (!syncJson.success) {
-                            console.error('❌ Could not clear references before delete:', syncJson.error)
-                            alert('Failed to clear references before delete. Please try again.')
-                            closeDeleteCredentialModal()
-                            return
-                        }
-                    } catch (syncErr) {
-                        console.error('❌ Failed to clear references before delete:', syncErr)
-                        alert('Failed to clear references before delete: ' + (syncErr?.message || syncErr))
-                        closeDeleteCredentialModal()
-                        return
-                    }
-                }
-
-                // 2) Now delete the credential row
+                // Delete the credential (no server assignments to clear since credentials are selected at connection time)
 
                 try {
                     const result = await store.deleteFromDatabase('credential', credId)
@@ -2899,7 +2804,6 @@ if (saveEditServerBtn) {
         const type = document.getElementById('editServerType').value
         const os = (document.getElementById('editServerOS')?.value) || 'Windows'
         const group = document.getElementById('editServerGroup').value.trim()
-        const credentialId = document.getElementById('editServerCredential').value
         
         if (!id || !displayName || !hostname || !ip || !type) return
         
@@ -2917,7 +2821,6 @@ if (saveEditServerBtn) {
                     ipAddress: server.ipAddress,
                     type: server.type,
                     serverGroup: server.serverGroup,
-                    credentialId: server.credentialId,
                     health: server.health
                 }
                 
@@ -2933,7 +2836,6 @@ if (saveEditServerBtn) {
                 server.type = type
                 server.os = os
                 server.serverGroup = group || 'Ungrouped'
-                server.credentialId = credentialId || null
                 server.port = testPort
                 
                 // Sync to database FIRST
@@ -2962,7 +2864,7 @@ if (saveEditServerBtn) {
                 // Audit log with old and new values
                 await logAudit('update', 'server', displayName, { 
                     old: oldValues,
-                    new: { displayName, hostname, ipAddress: ip, type, os, serverGroup: group || 'Ungrouped', credentialId, health: server.health }
+                    new: { displayName, hostname, ipAddress: ip, type, os, serverGroup: group || 'Ungrouped', health: server.health }
                 })
                 
                 // Show appropriate toast based on connection test
@@ -3051,6 +2953,70 @@ if (confirmDeleteServerBtn) {
             }
         }
         closeDeleteServerModal()
+    })
+}
+
+// ========== CREDENTIAL SELECTION FOR CONNECTION ==========
+const selectCredentialModal = document.getElementById('selectCredentialModal')
+
+function closeSelectCredentialModal() {
+    try { selectCredentialModal.close() } catch (e) {}
+    try { selectCredentialModal.removeAttribute('open') } catch (e) {}
+    serverToConnect = null
+    const credSelect = document.getElementById('connectionCredentialSelect')
+    if (credSelect) credSelect.value = ''
+    const typeSelect = document.getElementById('connectionTypeSelect')
+    if (typeSelect) typeSelect.value = 'rdp'
+}
+
+if (selectCredentialModal) {
+    const cancelBtn = selectCredentialModal.querySelector('button[value="cancel"]')
+    if (cancelBtn) cancelBtn.addEventListener('click', (e) => { e.preventDefault(); closeSelectCredentialModal() })
+    
+    selectCredentialModal.addEventListener('click', (e) => { if (e.target === selectCredentialModal) closeSelectCredentialModal() })
+}
+
+// Confirm connection with selected credential
+const confirmConnectionBtn = document.getElementById('confirmConnectionBtn')
+if (confirmConnectionBtn) {
+    confirmConnectionBtn.addEventListener('click', async (e) => {
+        e.preventDefault()
+        
+        const credentialId = document.getElementById('connectionCredentialSelect').value
+        const connectionType = document.getElementById('connectionTypeSelect').value
+        
+        if (!credentialId) {
+            alert('Please select a credential to connect.')
+            return
+        }
+        
+        if (!connectionType) {
+            alert('Please select a connection type.')
+            return
+        }
+        
+        if (serverToConnect) {
+            const db = store.readSync()
+            const credential = (db.credentials || []).find(c => c.id === credentialId)
+            
+            if (!credential) {
+                alert('Selected credential not found.')
+                closeSelectCredentialModal()
+                return
+            }
+            
+            // Store server reference and connection type before closing modal
+            const server = serverToConnect
+            const selectedType = connectionType
+            
+            // Close modal (which sets serverToConnect to null)
+            closeSelectCredentialModal()
+            
+            // Perform the connection with the stored server reference and selected type
+            await performServerConnection(server, credential, selectedType)
+        } else {
+            closeSelectCredentialModal()
+        }
     })
 }
 
@@ -3219,205 +3185,13 @@ async function renderAllViews() {
 /* Removed: obsolete code */
 
 // ============================================
-// DATABASE SETUP MANAGEMENT
-// ============================================
-
-// Navigate to Database Setup view
-const dbSetupCard = document.querySelector('.admin-card[data-admin-section="dbsetup"]')
-if (dbSetupCard) {
-    dbSetupCard.addEventListener('click', () => {
-        switchView('admin-dbsetup')
-        populateDbSetupConnections()
-    })
-}
-
-// Back to Admin button
-const backToAdminFromDbSetupBtn = document.getElementById('backToAdminFromDbSetupBtn')
-if (backToAdminFromDbSetupBtn) {
-    backToAdminFromDbSetupBtn.addEventListener('click', () => {
-        switchView('admin')
-    })
-}
-
-// Populate database connections dropdown
-function populateDbSetupConnections() {
-    const select = document.getElementById('dbSetupConnectionSelect')
-    if (!select) return
-    
-    const db = store.readSync()
-    const databases = db.databases || []
-    
-    select.innerHTML = '<option value="">-- Select Database --</option>'
-    
-    databases.forEach(database => {
-        const option = document.createElement('option')
-        option.value = database.id
-        option.textContent = `${database.name} (${database.type})`
-        option.dataset.type = database.type
-        option.dataset.connectionString = database.connectionString
-        select.appendChild(option)
-    })
-}
-
-// Handle database selection
-const dbSetupConnectionSelect = document.getElementById('dbSetupConnectionSelect')
-if (dbSetupConnectionSelect) {
-    dbSetupConnectionSelect.addEventListener('change', (e) => {
-        const selectedOption = e.target.selectedOptions[0]
-        const infoDiv = document.getElementById('dbSetupConnectionInfo')
-        const testBtn = document.getElementById('testDbConnectionBtn')
-        const initBtn = document.getElementById('initializeDbSchemaBtn')
-        const migrateBtn = document.getElementById('migrateDataBtn')
-        
-        if (selectedOption.value) {
-            // Show connection info
-            document.getElementById('dbSetupType').textContent = selectedOption.dataset.type
-            document.getElementById('dbSetupConnString').textContent = selectedOption.dataset.connectionString
-            infoDiv.style.display = 'block'
-            
-            // Enable buttons
-            testBtn.disabled = false
-            initBtn.disabled = false
-            migrateBtn.disabled = false
-        } else {
-            infoDiv.style.display = 'none'
-            testBtn.disabled = true
-            initBtn.disabled = true
-            migrateBtn.disabled = true
-        }
-    })
-}
-
-// Initialize Database Schema
-const initializeDbSchemaBtn = document.getElementById('initializeDbSchemaBtn')
-if (initializeDbSchemaBtn) {
-    initializeDbSchemaBtn.addEventListener('click', () => {
-        // Get selected database connection
-        const selectElement = document.getElementById('dbSetupConnectionSelect')
-        const selectedDbId = selectElement.value
-        
-        if (!selectedDbId) {
-            alert('Please select a database connection first.')
-            return
-        }
-        
-        // Find the selected database from storage
-        const db = store.readSync()
-        const selectedDatabase = db.databases.find(database => database.id === selectedDbId)
-        
-        if (!selectedDatabase) {
-            alert('Selected database connection not found.')
-            return
-        }
-        
-        // Call the buildDatabase function with the selected database
-        buildDatabase(selectedDatabase)
-    })
-}
-
-// Close progress modal
-const closeDbInitProgressBtn = document.getElementById('closeDbInitProgressBtn')
-if (closeDbInitProgressBtn) {
-    closeDbInitProgressBtn.addEventListener('click', () => {
-        document.getElementById('dbInitProgressModal').close()
-    })
-}
-
-// [Migration function removed - database-only]
-const migrateDataBtn = document.getElementById('migrateDataBtn')
-if (migrateDataBtn) {
-    migrateDataBtn.addEventListener('click', () => {
-        const modal = document.getElementById('dbMigrateModal')
-        const db = store.readSync()
-        
-        // Count records
-        document.getElementById('migrateCountUsers').textContent = (db.users || []).length
-        document.getElementById('migrateCountEnvs').textContent = (db.environments || []).length
-        document.getElementById('migrateCountServers').textContent = (db.servers || []).length
-        const total = (db.users || []).length + (db.environments || []).length + (db.servers || []).length
-        document.getElementById('migrateCountTotal').textContent = total
-        
-        modal.showModal()
-    })
-}
-
-// Confirm Migration
-const confirmMigrateBtn = document.getElementById('confirmMigrateBtn')
-if (confirmMigrateBtn) {
-    confirmMigrateBtn.addEventListener('click', async () => {
-        const modal = document.getElementById('dbMigrateModal')
-        const btn = confirmMigrateBtn
-        
-        // Disable button and show progress
-        btn.disabled = true
-        btn.innerHTML = `
-            <div class="spinner-ring" style="width:16px; height:16px; border-width:2px; margin-right:8px;"></div>
-            Migrating...
-        `
-        
-        // Simulate migration (you'll need to implement actual API calls)
-        setTimeout(() => {
-            btn.disabled = false
-            btn.innerHTML = `
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-                Migration Complete!
-            `
-            btn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-            
-            setTimeout(() => {
-                modal.close()
-                
-                // Show success message
-                const statusDiv = document.getElementById('dbSetupStatus')
-                statusDiv.style.display = 'block'
-                statusDiv.style.background = 'rgba(16,185,129,0.1)'
-                statusDiv.style.border = '1px solid rgba(16,185,129,0.3)'
-                statusDiv.innerHTML = `
-                    <div style="display:flex; align-items:center; gap:12px;">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                        </svg>
-                        <div style="flex:1;">
-                            <div style="font-weight:700; font-size:16px; color:#10b981; margin-bottom:4px;">Data Migration Complete!</div>
-                            <div style="font-size:13px; color:var(--muted);">All data successfully transferred to SQL Server database</div>
-                        </div>
-                    </div>
-                `
-                
-                // Reset button
-                btn.innerHTML = `
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <polyline points="19 12 12 19 5 12"></polyline>
-                    </svg>
-                    Start Migration
-                `
-                btn.style.background = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
-            }, 1500)
-        }, 3000)
-    })
-}
-
-// ============================================
-// END DATABASE SETUP MANAGEMENT
-// ============================================
+// Database Setup Management removed - no longer in use
 
 // ============================================
 // NOTIFICATIONS CONFIGURATION
 // ============================================
 
-// Navigate to Notifications view
-const notificationsCard = document.querySelector('.admin-card[data-admin-section="notifications"]')
-if (notificationsCard) {
-    notificationsCard.addEventListener('click', () => {
-        switchView('admin-notifications')
-        loadNotificationSettings()
-        populateNotificationChannels()
-    })
-}
+// Notifications view navigation removed - admin panel no longer in use
 
 // Populate integration channels for all notification dropdowns
 function populateNotificationChannels() {
@@ -3655,6 +3429,49 @@ function updateSummaryNotificationBadge(systemHealth, hasErrors) {
     }
 }
 
+async function checkCoreServiceStatus(elCoreStatus) {
+    try {
+        const coreUrl = window.AgentAPI ? window.AgentAPI.coreServiceUrl : null;
+        
+        if (!coreUrl) {
+            elCoreStatus.textContent = '⚠ Not Configured';
+            elCoreStatus.style.color = '#f59e0b';
+            return;
+        }
+        
+        if (window.electronAPI && window.electronAPI.httpRequest) {
+            const response = await Promise.race([
+                window.electronAPI.httpRequest(coreUrl + '/health', {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                }),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Timeout')), 3000)
+                )
+            ]);
+            
+            if (response && response.ok) {
+                elCoreStatus.textContent = '✓ Running';
+                elCoreStatus.style.color = '#10b981';
+            } else {
+                elCoreStatus.textContent = '⚠ Error';
+                elCoreStatus.style.color = '#f59e0b';
+            }
+        } else {
+            elCoreStatus.textContent = '⚠ Unknown';
+            elCoreStatus.style.color = '#f59e0b';
+        }
+    } catch (e) {
+        console.error('Core Service check failed:', e);
+        if (e.message === 'Timeout') {
+            elCoreStatus.textContent = '✗ Timeout';
+        } else {
+            elCoreStatus.textContent = '✗ Offline';
+        }
+        elCoreStatus.style.color = '#ef4444';
+    }
+}
+
 async function updateSummaryDashboard() {
     // Ensure the summary view DOM is loaded
     const healthPercentageEl = document.getElementById('summaryHealthPercentage')
@@ -3671,7 +3488,14 @@ async function updateSummaryDashboard() {
     
     // Refresh servers from API
     try {
-        const serversResponse = await fetch(`${API_BASE_URL}/api/load-data`)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 2000) // 2 second timeout
+        
+        const serversResponse = await fetch(`${API_BASE_URL}/api/load-data`, {
+            signal: controller.signal
+        })
+        clearTimeout(timeoutId)
+        
         const serversResult = await serversResponse.json()
         if (serversResult.success && serversResult.data) {
             const db = store.readSync()
@@ -3682,7 +3506,10 @@ async function updateSummaryDashboard() {
             store.write(db, true) // Skip sync back to DB
         }
     } catch (error) {
-        console.error('Failed to refresh servers for summary:', error)
+        if (error.name !== 'AbortError') {
+            console.error('Failed to refresh servers for summary:', error)
+        }
+        // Continue rendering with cached data
     }
     
     const db = store.readSync()
@@ -3821,45 +3648,13 @@ async function updateSummaryDashboard() {
         }
     }
     
-    // OrbisHub.Core Service status
-    const elCoreStatus = document.getElementById('summaryCoreStatus')
+    // OrbisHub.Core Service status - check immediately
+    const elCoreStatus = document.getElementById('summaryCoreStatus');
     if (elCoreStatus) {
-        try {
-            const coreUrl = window.AgentAPI ? window.AgentAPI.coreServiceUrl : 'http://192.168.11.56:5000'
-            
-            // Use Electron's HTTP request to avoid CORS issues
-            if (window.electronAPI && window.electronAPI.httpRequest) {
-                const response = await window.electronAPI.httpRequest(`${coreUrl}/api/agents`, {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                })
-                
-                if (response.ok) {
-                    elCoreStatus.textContent = '✓ Running'
-                    elCoreStatus.style.color = '#10b981'
-                } else {
-                    elCoreStatus.textContent = '⚠ Error'
-                    elCoreStatus.style.color = '#f59e0b'
-                }
-            } else {
-                // Fallback to regular fetch
-                const response = await fetch(`${coreUrl}/api/agents`, { 
-                    method: 'GET',
-                    signal: AbortSignal.timeout(3000)
-                })
-                if (response.ok) {
-                    elCoreStatus.textContent = '✓ Running'
-                    elCoreStatus.style.color = '#10b981'
-                } else {
-                    elCoreStatus.textContent = '⚠ Error'
-                    elCoreStatus.style.color = '#f59e0b'
-                }
-            }
-        } catch (e) {
-            console.error('Core Service check failed:', e)
-            elCoreStatus.textContent = '✗ Offline'
-            elCoreStatus.style.color = '#ef4444'
-        }
+        elCoreStatus.textContent = 'Checking...';
+        elCoreStatus.style.color = '#94a3b8';
+        
+        checkCoreServiceStatus(elCoreStatus);
     }
     
     // Database size
@@ -4439,6 +4234,20 @@ async function showView(name, updateUrl = true) {
                     startConversationPolling(window.currentChatUserId)
                 }
                 break
+                
+            case 'tickets':
+                // Initialize ticket management system
+                if (window.TicketUI) {
+                    await window.TicketUI.init();
+                }
+                break
+                
+            case 'passwords':
+                // Initialize password manager
+                if (window.PasswordUI) {
+                    await window.PasswordUI.init();
+                }
+                break
         }
     } catch (error) {
 
@@ -4539,38 +4348,9 @@ document.querySelectorAll('.config-status-btn[data-view]').forEach(btn => {
 // Restore last active view on page load - moved to after app initialization
 // This will be called from showApp() or initializeApp()
 
-// Admin dashboard navigation
-document.querySelectorAll('.admin-card').forEach(card => {
-    card.addEventListener('click', () => {
-        const section = card.dataset.adminSection
-        if (section === 'users') {
-            showView('admin-users')
-        } else if (section === 'databases') {
-            showView('admin-databases')
-        } else if (section === 'credentials') {
-            showView('admin-credentials')
-        } else if (section === 'audit') {
-            showView('admin-audit')
-        } else if (section === 'documentation') {
-            showView('admin-documentation')
-        } else if (section === 'dbsetup') {
-            showView('admin-dbsetup')
-        } else if (section === 'notifications') {
-            showView('admin-notifications')
-        } else {
-            // Placeholder for other sections
-            alert(`${section.charAt(0).toUpperCase() + section.slice(1)} management coming soon`)
-        }
-    })
-})
+// Admin dashboard navigation removed - admin panel no longer in use
 
-// Back to admin button
-const backToAdminBtn = document.getElementById('backToAdminBtn')
-if (backToAdminBtn) {
-    backToAdminBtn.addEventListener('click', () => {
-        showView('admin')
-    })
-}
+// Back to admin button removed - admin panel no longer in use
 
 // User menu dropdown
 const userMenuBtn = document.getElementById('userMenuBtn')
@@ -4726,10 +4506,14 @@ async function showApp() {
     if (appMain) appMain.style.display = 'block'
     // Update user menu with current user info
     updateUserMenu()
-    // Reload and apply settings after login
-    const settings = readSettings()
+    // Load CoreService configuration after login
+    await initCoreServiceConfig()
+    
+    // Load settings directly from database on app launch
+    const settings = await loadSettingsFromDatabase()
     applySettings(settings)
     populateSettingsForm(settings)
+    
     // Initialize app content after showing
     await renderAllViews()
     // Initialize from URL parameters
@@ -6406,8 +6190,6 @@ const CommandPalette = {
             // Navigation
             { id: 'nav-environments', title: 'Environments', description: 'View and manage environments', icon: '🌍', action: () => showView('environments'), section: 'Navigation' },
             { id: 'nav-servers', title: 'Servers', description: 'Manage server infrastructure', icon: '🖥️', action: () => showView('servers'), section: 'Navigation' },
-            // Navigation simplified
-            { id: 'nav-admin', title: 'Admin Panel', description: 'System administration', icon: '⚙️', action: () => showView('admin'), section: 'Navigation' },
             
             // Actions
             { id: 'add-environment', title: 'Add Environment', description: 'Create new environment', icon: '➕', action: () => openAddEnvModal(), section: 'Actions', shortcut: 'Ctrl+E' },
@@ -6715,9 +6497,28 @@ function getDefaultSettings() {
 
 function readSettings() {
     const db = store.readSync()
-    db.settings = { ...getDefaultSettings(), ...(db.settings || {}) }
-    store.write(db, true)
-    return db.settings
+    // Merge defaults with existing settings, but preserve saved values
+    const merged = { ...getDefaultSettings(), ...(db.settings || {}) }
+    db.settings = merged
+    // Note: Don't write here - just read. Writing happens in saveSettings()
+    return merged
+}
+
+async function loadSettingsFromDatabase() {
+    try {
+        const dbData = await store.loadFromDatabase()
+        if (dbData && dbData.settings) {
+            // Update memory cache with loaded data
+            const db = store.readSync()
+            db.settings = { ...getDefaultSettings(), ...dbData.settings }
+            memoryCache = db
+            return db.settings
+        }
+        return getDefaultSettings()
+    } catch (error) {
+        console.error('❌ Failed to load settings from database:', error)
+        return getDefaultSettings()
+    }
 }
 
 async function saveSettings(patch) {
@@ -6729,7 +6530,6 @@ async function saveSettings(patch) {
 
 function applySettings(settings) {
     try {
-
         const body = document.body
         if (!body) {
             console.error('❌ document.body not found!')
@@ -6753,20 +6553,28 @@ function applySettings(settings) {
         body.classList.toggle('no-animations', settings.animations === false)
 
         // Auto-refresh handling
-        if (__autoRefreshTimer) { clearInterval(__autoRefreshTimer); __autoRefreshTimer = null }
+        if (__autoRefreshTimer) { 
+            clearInterval(__autoRefreshTimer); 
+            __autoRefreshTimer = null 
+        }
         if (settings.autoRefresh) {
             const intervalMs = Math.max(5, Number(settings.refreshInterval || 60)) * 1000
             const tick = async () => {
-                // Refresh the currently visible view in a lightweight way
-                const visible = document.querySelector('.view.is-visible')
-                if (!visible) return
                 try {
-                    if (visible.id === 'view-summary') await updateSummaryDashboard()
-                    else if (visible.id === 'view-environments') window.renderEnvs && window.renderEnvs(document.getElementById('search')?.value || '')
-                    else if (visible.id === 'view-servers') renderServers && renderServers()
-                    else if (visible.id === 'view-admin-audit') renderAuditLogs && renderAuditLogs()
+                    // Always refresh summary dashboard data in the background
+                    await updateSummaryDashboard()
+                    
+                    // Also refresh the currently visible view if it's not the summary
+                    const visible = document.querySelector('.view.is-visible')
+                    if (visible && visible.id !== 'view-summary') {
+                        if (visible.id === 'view-environments') window.renderEnvs && window.renderEnvs(document.getElementById('search')?.value || '')
+                        else if (visible.id === 'view-servers') renderServers && renderServers()
+                        else if (visible.id === 'view-admin-audit') renderAuditLogs && renderAuditLogs()
+                    }
                 } catch {}
             }
+            // Call tick immediately to provide instant feedback, then set up interval
+            tick()
             __autoRefreshTimer = setInterval(tick, intervalMs)
         }
     } catch {}
@@ -9459,6 +9267,219 @@ if (window.electronAPI) {
     initializeAutoUpdater()
 }
 
+// ========== SYSTEM CONFIGURATION - CORESERVICE ==========
+// Test CoreService connection
+document.getElementById('testCoreServiceBtn')?.addEventListener('click', async () => {
+    const addressInput = document.getElementById('coreServiceAddress')
+    const statusBadge = document.getElementById('coreServiceStatusBadge')
+    const testBtn = document.getElementById('testCoreServiceBtn')
+    
+    const address = addressInput.value.trim()
+    if (!address) {
+        showToast('Please enter a CoreService address', 'warning')
+        return
+    }
+    
+    testBtn.disabled = true
+    testBtn.textContent = 'Testing...'
+    statusBadge.textContent = 'Testing...'
+    statusBadge.className = 'status-badge status-warning'
+    
+    try {
+        // Test /health endpoint
+        const response = await fetch(`${address}/health`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(5000) // 5 second timeout
+        })
+        
+        if (response.ok) {
+            const data = await response.json()
+            statusBadge.textContent = `Connected (v${data.version || '1.0.0'})`
+            statusBadge.className = 'status-badge status-success'
+            showToast('CoreService connection successful!', 'success')
+        } else {
+            throw new Error(`HTTP ${response.status}`)
+        }
+    } catch (error) {
+        console.error('CoreService connection test failed:', error)
+        statusBadge.textContent = 'Connection Failed'
+        statusBadge.className = 'status-badge status-error'
+        showToast(`Connection failed: ${error.message}`, 'error')
+    } finally {
+        testBtn.disabled = false
+        testBtn.textContent = 'Test Connection'
+    }
+})
+
+// Save CoreService configuration
+document.getElementById('saveCoreServiceBtn')?.addEventListener('click', async () => {
+    const addressInput = document.getElementById('coreServiceAddress')
+    const statusBadge = document.getElementById('coreServiceStatusBadge')
+    const saveBtn = document.getElementById('saveCoreServiceBtn')
+    
+    const address = addressInput.value.trim()
+    if (!address) {
+        showToast('Please enter a CoreService address', 'warning')
+        return
+    }
+    
+    // Validate URL format
+    try {
+        new URL(address)
+    } catch (error) {
+        showToast('Invalid URL format. Use http://hostname:port', 'error')
+        return
+    }
+    
+    saveBtn.disabled = true
+    saveBtn.textContent = 'Saving...'
+    
+    try {
+        // Ensure SystemSettings table exists first
+        const createResult = await window.DB.execute(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SystemSettings')
+            BEGIN
+                CREATE TABLE SystemSettings (
+                    SettingKey NVARCHAR(100) PRIMARY KEY,
+                    SettingValue NVARCHAR(MAX),
+                    UpdatedAt DATETIME2 DEFAULT GETDATE()
+                )
+            END
+        `)
+        
+        // Check if setting already exists
+        const existing = await window.DB.query(
+            `SELECT SettingKey FROM SystemSettings WHERE SettingKey = @param0`,
+            [{ value: 'CoreServiceAddress' }]
+        )
+        
+        let saveResult
+        // Update or insert
+        if (existing && existing.success && existing.data && existing.data.length > 0) {
+            saveResult = await window.DB.execute(
+                `UPDATE SystemSettings SET SettingValue = @param0, UpdatedAt = GETDATE() WHERE SettingKey = @param1`,
+                [{ value: address }, { value: 'CoreServiceAddress' }]
+            )
+        } else {
+            saveResult = await window.DB.execute(
+                `INSERT INTO SystemSettings (SettingKey, SettingValue, UpdatedAt) VALUES (@param0, @param1, GETDATE())`,
+                [{ value: 'CoreServiceAddress' }, { value: address }]
+            )
+        }
+        
+        // Verify the save by reading it back
+        const verification = await window.DB.query(
+            `SELECT * FROM SystemSettings WHERE SettingKey = @param0`,
+            [{ value: 'CoreServiceAddress' }]
+        )
+        
+        if (!verification || !verification.success || !verification.data || verification.data.length === 0) {
+            throw new Error('Data was not saved to database')
+        }
+        statusBadge.textContent = 'Configured'
+        statusBadge.className = 'status-badge status-info'
+        showToast('CoreService configuration saved!', 'success')
+        
+        // Update global config if AgentAPI exists
+        if (window.AgentAPI) {
+            window.AgentAPI.coreServiceUrl = address
+        }
+    } catch (error) {
+        console.error('Failed to save CoreService config:', error)
+        showToast(`Failed to save: ${error.message}`, 'error')
+    } finally {
+        saveBtn.disabled = false
+        saveBtn.textContent = 'Save'
+    }
+})
+
+// Load CoreService configuration when System Configuration view is shown
+async function loadCoreServiceConfig() {
+    const addressInput = document.getElementById('coreServiceAddress')
+    const statusBadge = document.getElementById('coreServiceStatusBadge')
+    
+    // Check if elements exist before trying to set values
+    if (!addressInput || !statusBadge) {
+        console.warn('CoreService config elements not found in DOM')
+        return
+    }
+    
+    try {
+        // Ensure SystemSettings table exists
+        await window.DB.execute(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SystemSettings')
+            BEGIN
+                CREATE TABLE SystemSettings (
+                    SettingKey NVARCHAR(100) PRIMARY KEY,
+                    SettingValue NVARCHAR(MAX),
+                    UpdatedAt DATETIME2 DEFAULT GETDATE()
+                )
+            END
+        `)
+        
+        const results = await window.DB.query(
+            `SELECT SettingValue FROM SystemSettings WHERE SettingKey = @param0`,
+            [{ value: 'CoreServiceAddress' }]
+        )
+        
+        if (results && results.success && results.data && results.data.length > 0 && results.data[0].SettingValue) {
+            const savedAddress = results.data[0].SettingValue
+            addressInput.value = savedAddress
+            statusBadge.textContent = 'Configured'
+            statusBadge.className = 'status-badge status-info'
+            
+            // Update global config if AgentAPI exists
+            if (window.AgentAPI) {
+                window.AgentAPI.coreServiceUrl = savedAddress
+            }
+        } else {
+            // No saved configuration - keep placeholder visible
+            addressInput.value = ''
+            statusBadge.textContent = 'Not Configured'
+            statusBadge.className = 'status-badge status-error'
+        }
+    } catch (error) {
+        console.error('Failed to load CoreService config:', error)
+        // Table might not exist yet, that's okay
+        addressInput.value = ''
+        statusBadge.textContent = 'Not Configured'
+        statusBadge.className = 'status-badge status-error'
+    }
+}
+
+// Load CoreService configuration globally on app startup
+async function initCoreServiceConfig() {
+    try {
+        const results = await window.DB.query(
+            `SELECT SettingValue FROM SystemSettings WHERE SettingKey = @param0`,
+            [{ value: 'CoreServiceAddress' }]
+        )
+        
+        if (results && results.success && results.data && results.data.length > 0 && results.data[0].SettingValue) {
+            const savedAddress = results.data[0].SettingValue
+            
+            // Update global config if AgentAPI exists
+            if (window.AgentAPI) {
+                window.AgentAPI.coreServiceUrl = savedAddress
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load CoreService config on startup:', error)
+    }
+}
+
+// Call loadCoreServiceConfig when system-configuration view is shown
+const originalShowView = showView
+showView = async function(name, updateUrl = true) {
+    await originalShowView.call(this, name, updateUrl)
+    
+    if (name === 'system-configuration') {
+        // Small delay to ensure DOM elements are rendered
+        setTimeout(() => loadCoreServiceConfig(), 100)
+    }
+}
+
 // ========== ORBISAGENT MODULE INITIALIZATION ==========
 // Initialize OrbisAgent UI when view is shown
 document.addEventListener('DOMContentLoaded', () => {
@@ -9466,6 +9487,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.AgentUI) {
         window.AgentUI.init()
     }
+    
+    // Load CoreService configuration on app startup
+    initCoreServiceConfig()
     
     // Note: Agent view rendering is handled by the showView() function
     // No need for duplicate event listeners here

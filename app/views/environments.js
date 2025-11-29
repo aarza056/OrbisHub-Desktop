@@ -28,23 +28,25 @@
     environments
       .filter(e => !q || e.name.toLowerCase().includes(q) || e.url.toLowerCase().includes(q))
       .forEach(env => {
+        // Migrate old mappedAgentId to mappedAgentIds array
+        if (env.mappedAgentId && !env.mappedAgentIds) {
+          env.mappedAgentIds = [env.mappedAgentId]
+          delete env.mappedAgentId
+          store.write(db)
+        }
+        
         const mappedServerIds = env.mappedServers || []
         const mappedServers = mappedServerIds.map(id => db.servers?.find(s => s.id === id)).filter(Boolean)
 
         let uptimeSectionHTML = ''
-        if (mappedServers.length > 0) {
-          const serversByType = { 'Front End': [], 'Back End': [], 'Win Server': [], 'Web Server': [] }
-          mappedServers.forEach(srv => { if (serversByType[srv.type]) serversByType[srv.type].push(srv) })
-          let uptimeRowsHTML = ''
-          Object.keys(serversByType).forEach(type => {
-            const servers = serversByType[type]
-            if (servers.length > 0) {
-              servers.forEach(server => {
-                uptimeRowsHTML += `<div class="uptime-row" data-server-id="${server.id}"><span>${server.displayName}</span><span class="uptime-value">—</span></div>`
-              })
-            }
+        // Show agent uptime if agents are mapped
+        if (env.mappedAgentIds && env.mappedAgentIds.length > 0) {
+          let agentRows = ''
+          env.mappedAgentIds.forEach(agentId => {
+            const agentName = `agent_${agentId}`
+            agentRows += `<div class="uptime-row" data-agent-id="${agentId}"><span class="agent-hostname" data-agent-id="${agentId}">🖥️ Loading...</span><span class="uptime-value">—</span></div>`
           })
-          uptimeSectionHTML = `<div class="env__uptime">${uptimeRowsHTML}</div>`
+          uptimeSectionHTML = `<div class="env__uptime">${agentRows}</div>`
         }
 
         const el = document.createElement('div')
@@ -128,13 +130,13 @@
           if (env) onEnvAction(env, action)
         }))
 
-        const existingCard = envList.querySelector(`[data-env-id="${env.id}"]`)
-        if (!existingCard) el.classList.add('env--entering')
         envList.appendChild(el)
 
-        // After DOM insert, resolve uptimes for mapped servers
-        if (mappedServers.length > 0) {
-          updateEnvUptimes(el, mappedServers)
+        // After DOM insert, resolve agent uptimes and hostnames if agents are mapped
+        if (env.mappedAgentIds && env.mappedAgentIds.length > 0) {
+          env.mappedAgentIds.forEach(agentId => {
+            updateEnvAgentUptime(el, agentId)
+          })
         }
       })
   }
@@ -236,32 +238,80 @@
     try { mapServersModal.showModal() } catch (e) { mapServersModal.setAttribute('open', '') }
   }
 
-  function populateAllServerTypes(env) {
+  async function populateAllServerTypes(env) {
     const allTypesContainer = document.getElementById('mapServersAllTypes')
     if (!allTypesContainer || !env) return
+    
+    allTypesContainer.innerHTML = '<div style="color: var(--muted); font-size: 14px; padding: 8px;">Loading agents...</div>'
+    
+    // Re-read from store to get latest data
     const db = store.readSync()
-    const servers = db.servers || []
-    const existingMappedServers = env.mappedServers || []
-    const compatibleServers = servers.filter(server => server.serverGroup === env.type)
-    if (compatibleServers.length === 0) {
-      allTypesContainer.innerHTML = '<div style="color: var(--muted); font-size: 14px; padding: 8px;">No compatible servers found for this environment type.</div>'
+    const currentEnv = db.environments.find(e => e.id === env.id) || env
+    
+    // Migrate old mappedAgentId to mappedAgentIds if needed
+    if (currentEnv.mappedAgentId && !currentEnv.mappedAgentIds) {
+      currentEnv.mappedAgentIds = [currentEnv.mappedAgentId]
+      delete currentEnv.mappedAgentId
+      store.write(db)
+    }
+    
+    // Fetch agents from AgentAPI
+    let agents = []
+    try {
+      if (window.AgentAPI) {
+        agents = await window.AgentAPI.getAllAgents()
+      }
+    } catch (error) {
+      console.error('Failed to fetch agents:', error)
+      allTypesContainer.innerHTML = '<div style="color: var(--error); font-size: 14px; padding: 8px;">Failed to load agents. Make sure Core Service is running.</div>'
       return
     }
-    const serversByType = { 'Front End': [], 'Back End': [], 'Win Server': [], 'Web Server': [] }
-    compatibleServers.forEach(server => { if (serversByType[server.type]) serversByType[server.type].push(server) })
-    let html = ''
-    Object.keys(serversByType).forEach(type => {
-      const serversOfType = serversByType[type]
-      if (serversOfType.length > 0) {
-        html += `<div style="margin-bottom: 20px;"><h4 style="margin: 0 0 8px 0; color: var(--text); font-size: 14px; font-weight: 600;">${type}</h4><div style="padding-left: 8px; border-left: 2px solid var(--border);">`
-        serversOfType.forEach(server => {
-          const isChecked = existingMappedServers.includes(server.id)
-          html += `<label style="display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer;"><input type="checkbox" value="${server.id}" ${isChecked ? 'checked' : ''}><span style="flex: 1;">${server.displayName}</span><span style="color: var(--muted); font-size: 12px; font-family: monospace;">${server.ipAddress || 'N/A'}</span></label>`
-        })
-        html += '</div></div>'
+    
+    if (agents.length === 0) {
+      allTypesContainer.innerHTML = '<div style="color: var(--muted); font-size: 14px; padding: 8px;">No agents available. Deploy OrbisAgent to your servers first.</div>'
+      return
+    }
+    
+    const existingAgentIds = currentEnv.mappedAgentIds || []
+    let html = '<div style="padding-left: 8px; border-left: 2px solid var(--border);">'
+    
+    agents.forEach(agent => {
+      const now = new Date().getTime()
+      const lastHeartbeat = new Date(agent.lastHeartbeat + 'Z').getTime()
+      const secondsSinceHeartbeat = (now - lastHeartbeat) / 1000
+      
+      let statusBadge = ''
+      let statusColor = '#ef4444'
+      if (secondsSinceHeartbeat < 120) {
+        statusBadge = 'Online'
+        statusColor = '#10b981'
+      } else if (secondsSinceHeartbeat < 600) {
+        statusBadge = 'Idle'
+        statusColor = '#f59e0b'
+      } else {
+        statusBadge = 'Offline'
+        statusColor = '#ef4444'
       }
+      
+      const uptime = agent.metadata?.uptime || '—'
+      const isChecked = existingAgentIds.includes(agent.id)
+      
+      html += `
+        <label style="display: flex; align-items: center; gap: 12px; padding: 10px 8px; cursor: pointer; border-radius: 6px; transition: background 0.2s;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">
+          <input type="checkbox" name="agentSelection" value="${agent.id}" ${isChecked ? 'checked' : ''} style="flex-shrink: 0;">
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 600; font-size: 13px; margin-bottom: 2px;">${agent.machineName}</div>
+            <div style="font-size: 11px; color: var(--muted); font-family: monospace;">${agent.ipAddress || 'N/A'} • ${agent.os || 'Unknown OS'}</div>
+          </div>
+          <div style="text-align: right; flex-shrink: 0;">
+            <div style="font-size: 10px; font-weight: 600; color: ${statusColor}; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px;">${statusBadge}</div>
+            <div style="font-size: 11px; color: var(--muted); font-family: monospace;">⏱ ${uptime}</div>
+          </div>
+        </label>
+      `
     })
-    if (html === '') html = '<div style="color: var(--muted); font-size: 14px; padding: 8px;">No servers available for this environment type.</div>'
+    
+    html += '</div>'
     allTypesContainer.innerHTML = html
   }
 
@@ -279,19 +329,24 @@
 
   const saveMapServersBtn = document.getElementById('saveMapServersBtn')
   if (saveMapServersBtn) {
-    saveMapServersBtn.addEventListener('click', (e) => {
+    saveMapServersBtn.addEventListener('click', async (e) => {
       e.preventDefault()
       if (!currentMappingEnv) return
       const allTypesContainer = document.getElementById('mapServersAllTypes')
       const checkboxes = allTypesContainer.querySelectorAll('input[type="checkbox"]:checked')
-      const selectedServerIds = Array.from(checkboxes).map(cb => cb.value)
+      const selectedAgentIds = Array.from(checkboxes).map(cb => cb.value)
+      console.log('💾 Saving agent mapping:', selectedAgentIds)
       const db = store.readSync()
       const env = db.environments.find(e => e.id === currentMappingEnv.id)
       if (env) {
-        const oldServers = env.mappedServers || []
-        env.mappedServers = selectedServerIds
-        store.write(db)
-        logAudit('update', 'environment', env.name, { old: { mappedServers: oldServers }, new: { mappedServers: selectedServerIds } })
+        const oldAgentIds = env.mappedAgentIds || []
+        env.mappedAgentIds = selectedAgentIds
+        console.log('💾 Updated environment:', env.name, 'with agents:', selectedAgentIds)
+        await store.write(db)
+        console.log('✅ Agent mapping saved to database')
+        logAudit('update', 'environment', env.name, { old: { mappedAgentIds: oldAgentIds }, new: { mappedAgentIds: selectedAgentIds } })
+        // Reload from database to ensure we have fresh data
+        await store.read()
         renderEnvs(document.getElementById('search')?.value || '')
       }
       closeMapServersModal()
@@ -382,7 +437,58 @@
 
   // Add environment modal
   const addEnvBtn = document.getElementById('addEnvBtn')
+  const refreshEnvBtn = document.getElementById('refreshEnvBtn')
   const envModal = document.getElementById('envModal')
+
+  // Refresh button handler
+  if (refreshEnvBtn) {
+    refreshEnvBtn.addEventListener('click', async () => {
+      const icon = refreshEnvBtn.querySelector('svg')
+      const text = refreshEnvBtn.childNodes[refreshEnvBtn.childNodes.length - 1]
+      
+      // Add spinning animation
+      if (icon) icon.style.animation = 'spin 1s linear infinite'
+      if (text) text.textContent = ' Refreshing...'
+      refreshEnvBtn.disabled = true
+      
+      try {
+        // Reload data from database
+        await store.read()
+        
+        // Re-render environments
+        const searchInput = document.getElementById('search')
+        renderEnvs(searchInput ? searchInput.value : '')
+        
+        // Force refresh all agent uptimes
+        const db = store.readSync()
+        const environments = db.environments || []
+        
+        // Clear uptime cache to force fresh fetch
+        Object.keys(__uptimeCache).forEach(key => {
+          if (key.startsWith('agent_')) delete __uptimeCache[key]
+        })
+        
+        // Update all agent uptimes
+        environments.forEach(env => {
+          const card = document.querySelector(`.env[data-env-id="${env.id}"]`)
+          if (card && env.mappedAgentIds && env.mappedAgentIds.length > 0) {
+            env.mappedAgentIds.forEach(agentId => {
+              updateEnvAgentUptime(card, agentId)
+            })
+          }
+        })
+        
+        console.log('✅ Farm Systems refreshed')
+      } catch (error) {
+        console.error('❌ Failed to refresh:', error)
+      } finally {
+        // Remove spinning animation
+        if (icon) icon.style.animation = ''
+        if (text) text.textContent = ' Refresh'
+        refreshEnvBtn.disabled = false
+      }
+    })
+  }
 
   function closeEnvModal() {
     if (!envModal) return
@@ -469,6 +575,11 @@ function formatUptime(seconds) {
 async function fetchServerUptime(server) {
   try {
     if (!window.electronAPI || !window.electronAPI.getServerUptime) return null
+    // Note: Uptime check requires credentials but servers no longer have assigned credentials
+    // This feature is now disabled - credentials are selected at connection time only
+    return null
+    
+    /* Legacy code - disabled
     const db = store.readSync()
     let username = ''
     let password = ''
@@ -484,6 +595,7 @@ async function fetchServerUptime(server) {
       port: server.os === 'Linux' ? (server.port || 22) : (server.port || 5985)
     })
     if (res && res.success) return res.seconds
+    */
     // Attach error tooltip to help diagnose N/A state
     if (res && res.error) {
       try {
@@ -519,6 +631,48 @@ function updateEnvUptimes(envCardEl, servers) {
   })
 }
 
+// Update environment card with agent uptime and hostname
+async function updateEnvAgentUptime(envCardEl, agentId) {
+  const row = envCardEl.querySelector(`.uptime-row[data-agent-id="${agentId}"] .uptime-value`)
+  const hostnameEl = envCardEl.querySelector(`.agent-hostname[data-agent-id="${agentId}"]`)
+  if (!row) return
+  
+  const cacheKey = `agent_${agentId}`
+  const now = Date.now()
+  const cached = __uptimeCache[cacheKey]
+  
+  if (cached && now - cached.ts < 60_000) {
+    row.textContent = cached.uptime
+    if (hostnameEl && cached.hostname) hostnameEl.textContent = `🖥️ ${cached.hostname}`
+    return
+  }
+  
+  row.textContent = '…'
+  
+  try {
+    if (window.AgentAPI) {
+      const agent = await window.AgentAPI.getAgentById(agentId)
+      if (agent) {
+        const uptime = agent.metadata?.uptime || 'N/A'
+        const hostname = agent.machineName || 'Unknown'
+        __uptimeCache[cacheKey] = { uptime, hostname, ts: Date.now() }
+        row.textContent = uptime
+        if (hostnameEl) hostnameEl.textContent = `🖥️ ${hostname}`
+      } else {
+        row.textContent = 'N/A'
+        if (hostnameEl) hostnameEl.textContent = '🖥️ Unknown'
+      }
+    } else {
+      row.textContent = 'N/A'
+      if (hostnameEl) hostnameEl.textContent = '🖥️ N/A'
+    }
+  } catch (error) {
+    console.error('Failed to fetch agent uptime:', error)
+    row.textContent = 'N/A'
+    if (hostnameEl) hostnameEl.textContent = '🖥️ Error'
+  }
+}
+
 // Periodically refresh uptimes when Environments view is visible
 ;(function setupUptimeAutoRefresh() {
   try {
@@ -530,15 +684,22 @@ function updateEnvUptimes(envCardEl, servers) {
       environments.forEach(env => {
         const card = document.querySelector(`.env[data-env-id="${env.id}"]`)
         if (!card) return
-        const mappedServerIds = env.mappedServers || []
-        if (!mappedServerIds.length) return
-        const servers = (db.servers || []).filter(s => mappedServerIds.includes(s.id))
-        if (servers.length) updateEnvUptimes(card, servers)
+        // Refresh agent uptimes if agents are mapped
+        if (env.mappedAgentIds && env.mappedAgentIds.length > 0) {
+          env.mappedAgentIds.forEach(agentId => {
+            updateEnvAgentUptime(card, agentId)
+          })
+        }
       })
     }
     // Initial slight delay to allow first render, then every 60s
     setTimeout(refresh, 1500)
     setInterval(refresh, 60_000)
+    
+    // Also refresh when agents are updated from the Agents view
+    window.addEventListener('agentsUpdated', () => {
+      refresh()
+    })
   } catch (e) {
     // noop
   }

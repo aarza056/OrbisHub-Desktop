@@ -12,6 +12,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css" />
 <link rel="stylesheet" href="../Functions/OrbisAgent/agent-ui.css" />
+<link rel="stylesheet" href="../Functions/TicketManagement/ticket-ui.css" />
+<link rel="stylesheet" href="../Functions/PasswordManager/password-ui.css" />
 </head>
 <body>
 
@@ -292,7 +294,7 @@
 <menu class="row" style="margin: 16px 0 24px 0; gap: 8px; padding: 0;">
 <button type="button" id="envDetailsDeployBtn" class="btn" style="background: linear-gradient(135deg, #5a4fcf 0%, #5e2a84 100%); color: white; border: none;">Deploy</button>
 <button type="button" id="envDetailsSolutionsBtn" class="btn" style="background: linear-gradient(135deg, #d946a6 0%, #c21e56 100%); color: white; border: none;">Show Solutions</button>
-<button type="button" id="envDetailsMapServersBtn" class="btn" style="background: linear-gradient(135deg, #0ea770 0%, #0c8599 100%); color: white; border: none;">Map Servers</button>
+<button type="button" id="envDetailsMapServersBtn" class="btn" style="background: linear-gradient(135deg, #0ea770 0%, #0c8599 100%); color: white; border: none;">Map Agent</button>
 </menu>
 <div id="envDetailsContent" style="margin: 24px 0;">
   <!-- Details will be populated by JavaScript -->
@@ -346,7 +348,7 @@
       <line x1="2" y1="12" x2="22" y2="12"></line>
       <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
     </svg>
-    Environments
+    Farm Systems
   </button>
   <button class="nav__btn" data-view="servers">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
@@ -381,6 +383,24 @@
     </svg>
     Notifications
   </button>
+  <button class="nav__btn" data-view="tickets">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+      <polyline points="14 2 14 8 20 8"></polyline>
+      <line x1="16" y1="13" x2="8" y2="13"></line>
+      <line x1="16" y1="17" x2="8" y2="17"></line>
+      <line x1="12" y1="9" x2="8" y2="9"></line>
+    </svg>
+    Ticket Management
+  </button>
+  <button class="nav__btn" data-view="passwords">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      <circle cx="12" cy="16" r="1"></circle>
+    </svg>
+    Password Manager
+  </button>
 </div>
 
 <div class="nav__group">
@@ -407,6 +427,14 @@
 
 <div class="nav__group nav__group--bottom">
   <div class="nav__label">System</div>
+  <button class="nav__btn" id="configStatusNavBtn" data-view="system-configuration">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M12 1v6m0 6v6m-9-9h6m6 0h6"></path>
+    </svg>
+    System Configuration
+    <span class="nav-badge" id="configNavBadge" style="display:none; margin-left:auto;">1</span>
+  </button>
   <button class="nav__btn" data-view="settings">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
       <circle cx="12" cy="12" r="3"></circle>
@@ -446,15 +474,6 @@
   </svg>
   <span>Messages</span>
   <span class="nav-badge" id="navUnreadBadge" style="display:none;">0</span>
-</button>
-<!-- Configuration Status Button -->
-<button class="config-status-btn" id="configStatusBtn" title="System Configuration">
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="3"></circle>
-    <path d="M12 1v6m0 6v6m-9-9h6m6 0h6"></path>
-  </svg>
-  <span id="configStatusText">Configure System</span>
-  <span class="config-status-badge" id="configStatusBadge">1</span>
 </button>
 <div class="user-menu">
   <button class="user-menu__btn" id="userMenuBtn">
@@ -548,7 +567,7 @@
         </div>
       </div>
       <div class="summary-metric-card__value" id="summaryEnvCount">0</div>
-      <div class="summary-metric-card__label">Environments</div>
+      <div class="summary-metric-card__label">Farm Systems</div>
       <div class="summary-metric-card__details">
         <div class="summary-metric-detail">
           <span class="summary-metric-detail__label">Healthy</span>
@@ -672,7 +691,7 @@
         <h3 style="margin:0;">Recent Activity</h3>
         <div style="display:flex; gap:8px;">
           <button class="btn btn-ghost btn-sm" onclick="filterSummaryActivity('all')" id="activityFilterAll">All</button>
-          <button class="btn btn-ghost btn-sm" onclick="filterSummaryActivity('environments')" id="activityFilterEnv">Environments</button>
+          <button class="btn btn-ghost btn-sm" onclick="filterSummaryActivity('environments')" id="activityFilterEnv">Farm Systems</button>
           <button class="btn btn-ghost btn-sm" onclick="filterSummaryActivity('servers')" id="activityFilterSrv">Servers</button>
         </div>
       </div>
@@ -693,7 +712,7 @@
               <line x1="12" y1="8" x2="12" y2="16"></line>
               <line x1="8" y1="12" x2="16" y2="12"></line>
             </svg>
-            Add Environment
+            Add Farm System
           </button>
           <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="showView('servers'); document.getElementById('addServerBtn').click();">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -708,13 +727,7 @@
             </svg>
             View Agents
           </button>
-          <button class="btn btn-ghost" style="justify-content:flex-start;" onclick="showView('admin')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M12 1v6m0 6v6m-9-9h6m6 0h6"></path>
-            </svg>
-            Admin Panel
-          </button>
+          <!-- Admin Panel button removed - no longer in use -->
         </div>
       </div>
 
@@ -771,13 +784,21 @@
 
 <section id="view-environments" class="view">
 <div class="view__header">
-  <h1>Environments</h1>
+  <h1>Farm Systems</h1>
   <div style="flex:1"></div>
-  <button id="addEnvBtn" class="btn">+ Add Environment</button>
+  <button id="refreshEnvBtn" class="btn btn-ghost" title="Refresh health and agent uptimes">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="23 4 23 10 17 10"></polyline>
+      <polyline points="1 20 1 14 7 14"></polyline>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+    </svg>
+    Refresh
+  </button>
+  <button id="addEnvBtn" class="btn">+ Add Farm System</button>
   
 </div>
 <div class="view__toolbar">
-  <input id="search" class="input" placeholder="Search environments by name or URL..." style="flex:1; max-width: 600px;" />
+  <input id="search" class="input" placeholder="Search farm systems by name or URL..." style="flex:1; max-width: 600px;" />
 </div>
 <div class="stack">
   <div id="envList" class="grid"></div>
@@ -797,56 +818,7 @@
 </section>
 
 
-<!-- Admin Panel -->
-<section id="view-admin" class="view">
-  <div class="view__header">
-    <h1>Admin Panel</h1>
-  </div>
-  <div class="admin-dashboard">
-    <div class="admin-card" data-admin-section="users">
-      <div class="admin-card__bg"></div>
-      <div class="admin-card__content">
-        <h2>Users</h2>
-        <p class="muted">Manage user accounts and permissions</p>
-      </div>
-    </div>
-    <div class="admin-card" data-admin-section="credentials">
-      <div class="admin-card__bg"></div>
-      <div class="admin-card__content">
-        <h2>Credentials</h2>
-        <p class="muted">Store and manage authentication credentials</p>
-      </div>
-    </div>
-    <div class="admin-card" data-admin-section="audit">
-      <div class="admin-card__bg"></div>
-      <div class="admin-card__content">
-        <h2>Audit Logs</h2>
-        <p class="muted">View system activity and changes</p>
-      </div>
-    </div>
-    <div class="admin-card" data-admin-section="dbsetup">
-      <div class="admin-card__bg"></div>
-      <div class="admin-card__content">
-        <h2>Database Setup</h2>
-        <p class="muted">Initialize database schema and migrate data</p>
-      </div>
-    </div>
-    <div class="admin-card" data-admin-section="notifications">
-      <div class="admin-card__bg"></div>
-      <div class="admin-card__content">
-        <h2>Notifications</h2>
-        <p class="muted">Configure when and how to send notifications</p>
-      </div>
-    </div>
-    <div class="admin-card" data-admin-section="documentation">
-      <div class="admin-card__bg"></div>
-      <div class="admin-card__content">
-        <h2>📚 Documentation</h2>
-        <p class="muted">Complete guide to OrbisHub features</p>
-      </div>
-    </div>
-  </div>
-</section>
+<!-- Admin Panel view removed - no longer in use -->
 
 <!-- Agents Management -->
 <section id="view-agents" class="view">
@@ -940,7 +912,7 @@
             </label>
             <label class="permission-item">
               <input type="checkbox" checked disabled>
-              <span>Manage Environments</span>
+              <span>Manage Farm Systems</span>
             </label>
             <label class="permission-item">
               <input type="checkbox" checked disabled>
@@ -982,7 +954,7 @@
             </label>
             <label class="permission-item">
               <input type="checkbox" id="opManageEnvs" checked>
-              <span>Manage Environments</span>
+              <span>Manage Farm Systems</span>
             </label>
             <label class="permission-item">
               <input type="checkbox" id="opManageServers" checked>
@@ -1027,7 +999,7 @@
             </label>
             <label class="permission-item">
               <input type="checkbox" id="viewManageEnvs">
-              <span>Manage Environments</span>
+              <span>Manage Farm Systems</span>
             </label>
             <label class="permission-item">
               <input type="checkbox" id="viewManageServers">
@@ -1211,7 +1183,7 @@
     </select>
     <select id="auditEntityFilter" class="input" style="width:150px;">
       <option value="">All Types</option>
-      <option value="environment">Environments</option>
+      <option value="environment">Farm Systems</option>
       <option value="user">Users</option>
       <option value="database">Databases</option>
       <option value="credential">Credentials</option>
@@ -1460,95 +1432,172 @@
   </div>
 </section>
 
-<!-- Admin Database Setup -->
-<section id="view-admin-dbsetup" class="view">
-  <div class="view__header">
-    <h1>Database Setup</h1>
-    <div style="flex:1"></div>
-    <!-- <button id="backToAdminFromDbSetupBtn" class="btn btn-ghost">← Back to Admin</button> -->
-  </div>
-  <div class="stack">
-    <div class="card">
-      <h3>Database Initialization</h3>
-      <p class="muted" style="margin-bottom:20px;">Initialize your SQL Server database with OrbisHub schema. This will create all required tables, indexes, and seed initial data.</p>
-      
-      <label class="label">Select Database Connection
-        <select id="dbSetupConnectionSelect" class="input" style="margin-top:8px;">
-          <option value="">-- Select Database --</option>
-        </select>
-      </label>
-      
-      <div id="dbSetupConnectionInfo" style="display:none; margin-top:16px; padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
-        <div style="display:flex; gap:20px;">
-          <div style="flex:1;">
-            <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Database Type</div>
-            <div id="dbSetupType" style="font-size:14px; font-weight:500;">-</div>
-          </div>
-          <div style="flex:2;">
-            <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Connection String</div>
-            <div id="dbSetupConnString" style="font-size:12px; font-family:monospace; word-break:break-all;">-</div>
-          </div>
+<!-- Database Setup view removed - no longer in use -->
+
+<!-- Ticket Management System -->
+<section id="view-tickets" class="view">
+  <div class="ticket-container">
+    <!-- Header with search and filters -->
+    <div class="ticket-header">
+      <div class="ticket-header-left">
+        <div class="ticket-search-box">
+          <svg class="ticket-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+          <input type="text" id="ticketSearch" placeholder="Search tickets...">
         </div>
       </div>
-      
-      <div style="display:flex; gap:12px; margin-top:20px;">
-        <button id="testOldDbConnectionBtn" class="btn btn-ghost" disabled>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
-            <polyline points="20 6 9 17 4 12"></polyline>
+      <div class="ticket-filter-group">
+        <button class="ticket-filter-btn" id="refreshTicketsBtn" title="Refresh">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
           </svg>
-          Test Connection
         </button>
-        <button id="initializeDbSchemaBtn" class="btn" disabled style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-            <line x1="12" y1="22.08" x2="12" y2="12"></line>
-          </svg>
-          Initialize Database Schema
-        </button>
-        <button id="migrateDataBtn" class="btn btn-ghost" disabled>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+        <button class="btn" id="createTicketBtn" style="background: var(--primary); color: white; border: none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
             <line x1="12" y1="5" x2="12" y2="19"></line>
-            <polyline points="19 12 12 19 5 12"></polyline>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
-          Import data
+          Create Ticket
         </button>
-      </div>
-      
-      <div id="dbSetupStatus" style="display:none; margin-top:20px; padding:16px; border-radius:8px;">
-        <!-- Status messages will appear here -->
       </div>
     </div>
-    
-    <div class="card">
-      <h3>Schema Information</h3>
-      <p class="muted" style="margin-bottom:16px;">The following tables will be created in your database:</p>
-      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:12px;">
-        <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
-          <div style="font-weight:600; margin-bottom:4px;">Users</div>
-          <div style="font-size:12px; color:var(--muted);">User accounts & auth</div>
+
+    <!-- Statistics -->
+    <div class="ticket-stats" id="ticketStatsContainer">
+      <div class="ticket-stat-card">
+        <div class="ticket-stat-label">Loading...</div>
+        <div class="ticket-stat-value">0</div>
+      </div>
+    </div>
+
+    <!-- Ticket List -->
+    <div class="ticket-list-container" id="ticketListContainer">
+      <div style="padding:40px; text-align:center; color:var(--muted);">
+        Loading tickets...
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Password Manager -->
+<section id="view-passwords" class="view">
+  <div class="password-container">
+    <!-- Sidebar -->
+    <aside class="password-sidebar">
+      <div class="password-sidebar-header">
+        <div class="password-sidebar-title">
+          🔐 Password Manager
         </div>
-        <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
-          <div style="font-weight:600; margin-bottom:4px;">Environments</div>
-          <div style="font-size:12px; color:var(--muted);">Environment configs</div>
+        <div class="password-search">
+          <svg class="password-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+          <input type="text" id="passwordSearchInput" placeholder="Search passwords...">
         </div>
-        <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
-          <div style="font-weight:600; margin-bottom:4px;">Servers</div>
-          <div style="font-size:12px; color:var(--muted);">Server inventory</div>
+      </div>
+
+      <div class="password-filters">
+        <div class="password-filter-header">
+          <div class="password-filter-label">Categories</div>
+          <button class="btn-icon btn-icon-sm" id="manageCategoriesBtn" title="Manage Categories">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"></path>
+            </svg>
+          </button>
         </div>
-        
-        <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
-          <div style="font-weight:600; margin-bottom:4px;">Credentials</div>
-          <div style="font-size:12px; color:var(--muted);">Encrypted credentials</div>
+        <div class="password-category-list" id="passwordCategoryList">
+          <!-- Categories will be rendered here -->
         </div>
-        <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
-          <div style="font-weight:600; margin-bottom:4px;">AuditLogs</div>
-          <div style="font-size:12px; color:var(--muted);">Activity tracking</div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="password-main">
+      <div class="password-header">
+        <div class="password-header-title">Passwords</div>
+        <div class="password-header-actions">
+          <button class="btn btn-secondary" id="passwordFavoritesFilter">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+            </svg>
+            Favorites
+          </button>
+          <button class="btn btn-primary" id="addPasswordBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Add Password
+          </button>
         </div>
-        <div style="padding:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px;">
-          <div style="font-weight:600; margin-bottom:4px;">Sessions</div>
-          <div style="font-size:12px; color:var(--muted);">User sessions</div>
+      </div>
+
+      <div class="password-content">
+        <div class="password-list-container" id="passwordListContainer">
+          <!-- Password table will be rendered here -->
         </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Manage Categories Modal -->
+  <div id="manageCategoriesModal" class="password-modal" style="display: none;">
+    <div class="password-modal-overlay"></div>
+    <div class="password-modal-content" style="max-width: 700px;">
+      <div class="password-modal-header">
+        <h2>Manage Categories</h2>
+        <button class="password-modal-close" onclick="window.PasswordUI.closeCategoryModal()">×</button>
+      </div>
+      <div class="password-modal-body">
+        <div style="margin-bottom: 20px;">
+          <button class="btn btn-primary" onclick="window.PasswordUI.addNewCategory()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Add Category
+          </button>
+        </div>
+        <div id="categoryListEdit">
+          <!-- Category list will be rendered here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category Edit Modal -->
+  <div id="categoryEditModal" class="password-modal" style="display: none;">
+    <div class="password-modal-overlay"></div>
+    <div class="password-modal-content" style="max-width: 500px;">
+      <div class="password-modal-header">
+        <h2 id="categoryModalTitle">Add Category</h2>
+        <button class="password-modal-close" onclick="window.PasswordUI.closeCategoryEditModal()">×</button>
+      </div>
+      <div class="password-modal-body">
+        <input type="hidden" id="categoryEditId">
+        <div class="form-group">
+          <label>Category Name</label>
+          <input type="text" id="categoryEditName" class="input" placeholder="e.g., Banking" required>
+        </div>
+        <div class="form-group">
+          <label>Icon (Emoji)</label>
+          <input type="text" id="categoryEditIcon" class="input" placeholder="🏦" maxlength="2" required>
+          <div class="input-hint">Enter an emoji character</div>
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <input type="color" id="categoryEditColor" class="input" value="#3b82f6">
+        </div>
+      </div>
+      <div class="password-modal-footer">
+        <button class="btn btn-secondary" onclick="window.PasswordUI.closeCategoryEditModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="window.PasswordUI.saveCategoryEdit()">Save</button>
       </div>
     </div>
   </div>
@@ -1656,6 +1705,171 @@
 </section>
 
 <!-- Documentation -->
+<!-- System Configuration -->
+<section id="view-system-configuration" class="view">
+  <div class="view__header">
+    <h1>🔧 System Configuration</h1>
+    <div style="flex:1"></div>
+  </div>
+  
+  <div class="documentation-container">
+    <!-- OrbisHub CoreService Section -->
+    <div class="doc-section">
+      <h2 class="doc-section-title">🔧 OrbisHub CoreService</h2>
+      
+      <!-- CoreService Status Card -->
+      <div class="doc-card">
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>CoreService Connection</h3>
+            <p>Connect to your OrbisHub CoreService API for agent management and job orchestration</p>
+          </div>
+          <div class="settings-row-control">
+            <span class="status-badge" id="coreServiceStatusBadge">Not Configured</span>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <h3>Server Address</h3>
+            <p>IP address or hostname where CoreService is running (e.g., http://192.168.1.100:5000)</p>
+          </div>
+          <div class="settings-row-control" style="flex-direction: column; align-items: flex-end; gap: 8px;">
+            <input 
+              type="text" 
+              class="input" 
+              id="coreServiceAddress" 
+              placeholder="http://localhost:5000"
+              value=""
+              style="width: 300px;"
+            />
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-ghost" id="testCoreServiceBtn">Test Connection</button>
+              <button class="btn btn-primary" id="saveCoreServiceBtn">Save</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Installation Guide -->
+      <div class="doc-card">
+        <h3>📦 Installation Guide</h3>
+        <p style="margin-bottom: 16px;">Follow these steps to install OrbisHub CoreService on your server.</p>
+        
+        <div class="doc-tip" style="margin-bottom: 20px;">
+          <strong>📍 Pre-Built Location:</strong> If you have OrbisHub Desktop installed, the compiled CoreService is located at:<br>
+          <code style="background: var(--bg-secondary); padding: 4px 8px; border-radius: 4px; margin-top: 8px; display: inline-block;">C:\Program Files\OrbisHub Desktop\resources\CoreService</code>
+        </div>
+
+        <!-- Step 1: Copy Files -->
+        <details class="doc-faq-item" open>
+          <summary><strong>Step 1: Copy CoreService Files to Server</strong></summary>
+          <div style="padding: 12px 0;">
+            <p>Copy the entire CoreService folder to your target server:</p>
+            <pre class="doc-code" style="font-size: 12px;">
+# On the source machine (where OrbisHub Desktop is installed)
+Copy-Item "C:\Program Files\OrbisHub Desktop\resources\CoreService" `
+  -Destination "\\\\ServerName\\C$\\OrbisHub\\CoreService" -Recurse
+
+# Or copy to a local path on the server
+Copy-Item "C:\Program Files\OrbisHub Desktop\resources\CoreService" `
+  -Destination "C:\\OrbisHub\\CoreService" -Recurse</pre>
+          </div>
+        </details>
+
+        <!-- Step 2: Configure -->
+        <details class="doc-faq-item">
+          <summary><strong>Step 2: Configure the Service</strong></summary>
+          <div style="padding: 12px 0;">
+            <p>Edit <code>appsettings.json</code> in the copied CoreService folder:</p>
+            <pre class="doc-code" style="font-size: 12px;">
+{
+  "OrbisHub": {
+    "ServiceName": "OrbisHub Core Service",
+    "ServiceUrl": "http://0.0.0.0:5000",
+    "ConnectionString": "Server=localhost;Database=OrbisHub;Integrated Security=true;TrustServerCertificate=True;",
+    "HeartbeatTimeoutMinutes": 5,
+    "JobTimeoutMinutes": 30
+  }
+}</pre>
+            <p style="margin-top: 12px;"><strong>Important Settings:</strong></p>
+            <ul style="margin-left: 20px; font-size: 13px;">
+              <li><strong>ServiceUrl:</strong> Use <code>0.0.0.0</code> to listen on all network interfaces</li>
+              <li><strong>ConnectionString:</strong> Your SQL Server connection details</li>
+              <li><strong>HeartbeatTimeoutMinutes:</strong> How long before an agent is considered offline</li>
+            </ul>
+          </div>
+        </details>
+
+                <!-- Step 3: Install Service -->
+        <details class="doc-faq-item">
+          <summary><strong>Step 3: Install as Windows Service</strong></summary>
+          <div style="padding: 12px 0;">
+            <p>Open PowerShell or Command Prompt <strong>as Administrator</strong> on the server:</p>
+            <pre class="doc-code" style="font-size: 12px;">
+# Create the service (adjust path to match your installation location)
+sc.exe create OrbisHubCoreService `
+  binPath= "C:\\OrbisHub\\CoreService\\OrbisHub.CoreService.exe" `
+  start= auto
+
+# Set service description
+sc.exe description OrbisHubCoreService `
+  "Central controller for OrbisHub agents and clients"
+
+# Start the service
+sc.exe start OrbisHubCoreService</pre>
+            <div class="doc-warning" style="margin-top: 12px;">
+              <strong>⚠️ Important:</strong> Ensure there is a space after <code>binPath=</code> and <code>start=</code> when using <code>sc.exe</code>.
+            </div>
+          </div>
+        </details>
+
+        <!-- Step 4: Verify -->
+        <details class="doc-faq-item">
+          <summary><strong>Step 4: Verify Installation</strong></summary>
+          <div style="padding: 12px 0;">
+            <p>Check service status:</p>
+            <pre class="doc-code" style="font-size: 12px;">
+Get-Service OrbisHubCoreService</pre>
+            <p style="margin-top: 12px;">Test the API:</p>
+            <pre class="doc-code" style="font-size: 12px;">
+Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
+            <p style="margin-top: 12px;">Expected response:</p>
+            <pre class="doc-code" style="font-size: 12px;">
+{
+  "status": "healthy",
+  "timestamp": "2025-11-29T10:30:00Z",
+  "version": "1.0.0"
+}</pre>
+          </div>
+        </details>
+
+        <!-- Troubleshooting -->
+        <details class="doc-faq-item">
+          <summary><strong>🔍 Troubleshooting</strong></summary>
+          <div style="padding: 12px 0;">
+            <ul style="margin-left: 20px; font-size: 13px;">
+              <li><strong>Service won't start:</strong> Check Windows Event Viewer for errors</li>
+              <li><strong>Port already in use:</strong> Change the port in <code>appsettings.json</code></li>
+              <li><strong>Database connection fails:</strong> Verify SQL Server is running and connection string is correct</li>
+              <li><strong>Access denied:</strong> Ensure the service runs with appropriate permissions</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+
+      <!-- API Documentation Link -->
+      <div class="doc-card">
+        <h3>📚 API Documentation</h3>
+        <p>Once CoreService is running, you can access the Swagger API documentation at:</p>
+        <code style="background: var(--bg-secondary); padding: 8px 12px; border-radius: 4px; display: inline-block; margin-top: 8px;">
+          http://your-server:5000/swagger
+        </code>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="view-admin-documentation" class="view">
   <div class="view__header">
     <h1>📚 OrbisHub Documentation</h1>
@@ -1680,7 +1894,7 @@
           <li><strong>View Summary Dashboard:</strong> Start at the Summary page to see an overview of your entire system—environments, servers, and recent activity.</li>
           <li><strong>Add Credentials:</strong> Navigate to Credentials in System Administrators to securely store login credentials for your servers.</li>
           <li><strong>Register Servers:</strong> Go to Remote Desktop Manager and add your infrastructure with IP addresses and assigned credentials for one-click RDP access.</li>
-          <li><strong>Create Environments:</strong> Define your deployment targets (Production, Staging, Dev) to organize your infrastructure logically.</li>
+          <li><strong>Create Farm Systems:</strong> Define your deployment targets (Production, Staging, Dev) to organize your infrastructure logically.</li>
         </ol>
         <div class="doc-tip">
           <strong>💡 Pro Tip:</strong> Press <kbd>Ctrl+`</kbd> to open the Command Palette for quick navigation!
@@ -1938,7 +2152,7 @@
         </div>
         <div class="doc-shortcut-item">
           <kbd>Ctrl</kbd> + <kbd>E</kbd>
-          <span>Add Environment</span>
+          <span>Add Farm System</span>
         </div>
         <div class="doc-shortcut-item">
           <kbd>Ctrl</kbd> + <kbd>S</kbd>
@@ -2554,7 +2768,7 @@
         </div>
         <div class="doc-shortcut-item">
           <kbd>Ctrl</kbd> + <kbd>E</kbd>
-          <span>Add Environment</span>
+          <span>Add Farm System</span>
         </div>
         <div class="doc-shortcut-item">
           <kbd>Ctrl</kbd> + <kbd>S</kbd>
@@ -2579,14 +2793,8 @@
 
 <!-- Modals -->
 <dialog id="envModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
-<h2>Add Environment</h2>
+<form class="card">
+<h2>Add Farm System</h2>
 <label class="label">Display name
 <input id="envName" class="input" placeholder="e.g., Prod EU" required />
 </label>
@@ -2605,17 +2813,17 @@
 <menu class="row end">
 <button id="saveEnvBtn" type="submit" value="default" class="btn">Save</button>
 </menu>
-</form>
-</dialog>
-
-<dialog id="editEnvModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 </button>
+</form>
+</dialog>
+
+<dialog id="editEnvModal" class="modal">
+<form class="card">
 <h2>Edit Environment</h2>
 <input type="hidden" id="editEnvId" />
 <label class="label">Display name
@@ -2636,6 +2844,12 @@
 <menu class="row end">
 <button id="saveEditEnvBtn" type="submit" value="default" class="btn">Save Changes</button>
 </menu>
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
 </form>
 </dialog>
 
@@ -2658,12 +2872,12 @@
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 </button>
-<h2>Map Servers to <span id="mapServersEnvName"></span></h2>
-<p style="color:var(--muted); font-size:14px; margin-bottom:20px;">Select servers from any type, then click Save to map them all at once.</p>
+<h2>Map Agent to <span id="mapServersEnvName"></span></h2>
+<p style="color:var(--muted); font-size:14px; margin-bottom:20px;">Select an OrbisAgent to monitor uptime for this Farm System.</p>
 
-<label class="label">Available Servers (by Type)
+<label class="label">Available Agents
 <div id="mapServersAllTypes" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
-<div style="color: var(--muted); font-size: 14px; padding: 8px;">Loading servers...</div>
+<div style="color: var(--muted); font-size: 14px; padding: 8px;">Loading agents...</div>
 </div>
 </label>
 <menu class="row end">
@@ -2723,13 +2937,7 @@
 </html>
 
 <dialog id="editUserModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
+<form class="card">
 <h2>Edit User</h2>
 <input type="hidden" id="editUserId" />
 <label class="label">Full name
@@ -2778,17 +2986,17 @@
 <menu class="row end">
 <button id="saveEditUserBtn" type="submit" value="default" class="btn">Save Changes</button>
 </menu>
-</form>
-</dialog>
-
-<dialog id="createUserModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 </button>
+</form>
+</dialog>
+
+<dialog id="createUserModal" class="modal">
+<form class="card">
 <h2>Create User</h2>
 <label class="label">Full name
 <input id="userName" class="input" placeholder="Full name" required />
@@ -2836,18 +3044,18 @@
 <menu class="row end">
 <button id="createUserBtn" type="submit" value="default" class="btn">Create User</button>
 </menu>
-</form>
-</dialog>
-
-<!-- Credential Modals -->
-<dialog id="credentialModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 </button>
+</form>
+</dialog>
+
+<!-- Credential Modals -->
+<dialog id="credentialModal" class="modal">
+<form class="card">
 <h2>Add Credential</h2>
 <label class="label">Credential Name
 <input id="credName" class="input" placeholder="e.g., Admin Account, API Key" required />
@@ -2875,17 +3083,17 @@
 <menu class="row end">
 <button id="saveCredBtn" type="submit" value="default" class="btn">Save</button>
 </menu>
-</form>
-</dialog>
-
-<dialog id="editCredentialModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 </button>
+</form>
+</dialog>
+
+<dialog id="editCredentialModal" class="modal">
+<form class="card">
 <h2>Edit Credential</h2>
 <input type="hidden" id="editCredId" />
 <label class="label">Credential Name
@@ -2914,6 +3122,12 @@
 <menu class="row end">
 <button id="saveEditCredBtn" type="submit" value="default" class="btn">Save Changes</button>
 </menu>
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
 </form>
 </dialog>
 
@@ -3092,13 +3306,7 @@ Channels
 </dialog>
 
 <dialog id="serverModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-</button>
+<form class="card">
 <h2>Add Server</h2>
 <label class="label">Display Name
 <input id="serverDisplayName" class="input" placeholder="e.g., Web Server 01" required />
@@ -3136,17 +3344,17 @@ Channels
 <menu class="row end">
 <button id="saveServerBtn" type="submit" value="default" class="btn">Add Server</button>
 </menu>
-</form>
-</dialog>
-
-<dialog id="editServerModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close">
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 </button>
+</form>
+</dialog>
+
+<dialog id="editServerModal" class="modal">
+<form class="card">
 <h2>Edit Server</h2>
 <input type="hidden" id="editServerId" />
 <label class="label">Display Name
@@ -3182,15 +3390,15 @@ Channels
 <option value="Dev">Dev</option>
 </select>
 </label>
-<label class="label">Credential
-<select id="editServerCredential" class="input">
-<option value="">-- Select Credential --</option>
-</select>
-<span style="font-size:12px; color:var(--muted); margin-top:4px; display:block;">Select saved credential for connection</span>
-</label>
 <menu class="row end">
 <button id="saveEditServerBtn" type="submit" value="default" class="btn">Save Changes</button>
 </menu>
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
 </form>
 </dialog>
 
@@ -3216,93 +3424,41 @@ Channels
 </form>
 </dialog>
 
+<dialog id="selectCredentialModal" class="modal">
+<form method="dialog" class="card" style="max-width:500px;">
+<h2>Select Credential</h2>
+<p class="muted" style="margin-bottom:16px;">Choose a credential to connect to <strong id="selectedServerName"></strong></p>
 
+<label class="label">Connection Type
+<select id="connectionTypeSelect" class="input" required>
+<option value="rdp">RDP (Remote Desktop)</option>
+<option value="ssh">SSH (Secure Shell)</option>
+</select>
+<span style="font-size:12px; color:var(--muted); margin-top:4px; display:block;">Select the connection protocol</span>
+</label>
 
-
-
-
-
-
-
-<!-- Database Setup Modals -->
-<dialog id="dbInitProgressModal" class="modal">
-<form method="dialog" class="card" style="max-width:700px;">
-<h2>Initializing Database Schema</h2>
-<p class="muted" style="margin-bottom:16px;">Please wait while we create the database schema...</p>
-
-<div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
-  <div style="flex:1; height:8px; background:var(--bg-secondary); border-radius:4px; overflow:hidden;">
-    <div id="dbInitProgressBar" style="width:0%; height:100%; background:linear-gradient(135deg, #10b981 0%, #059669 100%); transition:width 0.3s ease;"></div>
-  </div>
-  <div id="dbInitProgressPercent" style="font-size:14px; font-weight:600; color:var(--muted); min-width:45px; text-align:right;">0%</div>
-</div>
-
-<div id="dbInitProgressList" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; max-height:200px; overflow-y:auto;">
-  <!-- Progress items will be added here -->
-</div>
+<label class="label">Credential
+<select id="connectionCredentialSelect" class="input" required>
+<option value="">-- Select Credential --</option>
+</select>
+<span style="font-size:12px; color:var(--muted); margin-top:4px; display:block;">Select credentials for this connection</span>
+</label>
 
 <menu class="row end">
-  <button id="closeDbInitProgressBtn" type="submit" value="default" class="btn" disabled>Close</button>
+<button value="cancel" class="btn btn-ghost">Cancel</button>
+<button id="confirmConnectionBtn" type="submit" value="default" class="btn">Connect</button>
 </menu>
+
+<button type="button" value="cancel" class="modal-close-btn" title="Close" tabindex="-1">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
 </form>
 </dialog>
 
-<dialog id="dbMigrateModal" class="modal">
-<form method="dialog" class="card" style="max-width:600px;">
-<div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
-  <div style="width:56px; height:56px; border-radius:16px; background:linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19"></line>
-      <polyline points="19 12 12 19 5 12"></polyline>
-    </svg>
-  </div>
-  <div style="flex:1;">
-    <h2 style="margin:0 0 8px 0;">Migrate Data to Database</h2>
-    <p style="margin:0; color:var(--muted); font-size:14px;">Transfer existing data into the SQL Server database.</p>
-  </div>
-</div>
-
-<div style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.2); border-radius:8px; padding:16px; margin-bottom:20px;">
-  <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:16px;">
-    <div>
-      <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Users</div>
-      <div id="migrateCountUsers" style="font-size:24px; font-weight:700; color:#3b82f6;">0</div>
-    </div>
-    <div>
-      <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Environments</div>
-      <div id="migrateCountEnvs" style="font-size:24px; font-weight:700; color:#3b82f6;">0</div>
-    </div>
-    <div>
-      <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Servers</div>
-      <div id="migrateCountServers" style="font-size:24px; font-weight:700; color:#3b82f6;">0</div>
-    </div>
-    <div>
-      <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Total Records</div>
-      <div id="migrateCountTotal" style="font-size:24px; font-weight:700; color:#10b981;">0</div>
-    </div>
-  </div>
-</div>
-
-<div style="background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:8px; padding:12px; margin-bottom:20px;">
-  <div style="display:flex; align-items:start; gap:8px;">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:2px;">
-      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-      <line x1="12" y1="9" x2="12" y2="13"></line>
-      <line x1="12" y1="17" x2="12.01" y2="17"></line>
-    </svg>
-    <div style="flex:1;">
-      <div style="font-weight:600; margin-bottom:4px; color:#f59e0b;">Warning</div>
-      <div style="font-size:13px; color:var(--muted);">This operation will insert selected data into the database. Make sure the database schema is initialized first.</div>
-    </div>
-  </div>
-</div>
-
-<menu class="row end">
-  <button value="cancel" class="btn btn-ghost">Cancel</button>
-  <button id="confirmMigrateBtn" type="button" class="btn" style="background:linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color:white; border:none;">Start Migration</button>
-</menu>
-</form>
-</dialog>
+<!-- Database Setup Modals removed - no longer in use -->
 
 <!-- System Configuration Modal -->
 <dialog id="systemConfigModal" class="modal">
@@ -3717,6 +3873,12 @@ Channels
 <!-- OrbisAgent Module -->
 <script src="../Functions/OrbisAgent/agent-api.js"></script>
 <script src="../Functions/OrbisAgent/agent-ui.js"></script>
+<!-- Ticket Management Module -->
+<script src="../Functions/TicketManagement/ticket-service.js"></script>
+<script src="../Functions/TicketManagement/ticket-ui.js"></script>
+<!-- Password Manager Module -->
+<script src="../Functions/PasswordManager/password-service.js"></script>
+<script src="../Functions/PasswordManager/password-ui.js"></script>
 <!-- Core -->
 <script src="app-main.js"></script>
 </body>

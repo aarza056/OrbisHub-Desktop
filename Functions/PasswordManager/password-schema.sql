@@ -1,54 +1,6 @@
--- OrbisHub Core Service Database Schema
--- Run this script to create the required tables
-
-USE [OrbisHub]
-GO
-
--- Create Agents table
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Agents]') AND type in (N'U'))
-BEGIN
-    CREATE TABLE [dbo].[Agents] (
-        [AgentId] UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-        [MachineName] NVARCHAR(255) NOT NULL,
-        [IPAddress] NVARCHAR(500) NULL,
-        [OSVersion] NVARCHAR(255) NULL,
-        [AgentVersion] NVARCHAR(50) NULL,
-        [LastSeenUtc] DATETIME NOT NULL DEFAULT GETUTCDATE(),
-        [CreatedUtc] DATETIME NOT NULL DEFAULT GETUTCDATE()
-    );
-
-    CREATE INDEX IX_Agents_MachineName ON [dbo].[Agents]([MachineName]);
-    CREATE INDEX IX_Agents_LastSeenUtc ON [dbo].[Agents]([LastSeenUtc]);
-END
-GO
-
--- Create AgentJobs table
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[AgentJobs]') AND type in (N'U'))
-BEGIN
-    CREATE TABLE [dbo].[AgentJobs] (
-        [JobId] UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-        [AgentId] UNIQUEIDENTIFIER NOT NULL,
-        [Type] NVARCHAR(100) NOT NULL,
-        [PayloadJson] NVARCHAR(MAX) NULL,
-        [Status] NVARCHAR(50) NOT NULL DEFAULT 'Pending',
-        [CreatedUtc] DATETIME NOT NULL DEFAULT GETUTCDATE(),
-        [StartedUtc] DATETIME NULL,
-        [CompletedUtc] DATETIME NULL,
-        [ResultJson] NVARCHAR(MAX) NULL,
-        [ErrorMessage] NVARCHAR(MAX) NULL,
-        CONSTRAINT FK_AgentJobs_Agents FOREIGN KEY ([AgentId]) 
-            REFERENCES [dbo].[Agents]([AgentId]) ON DELETE CASCADE
-    );
-
-    CREATE INDEX IX_AgentJobs_AgentId ON [dbo].[AgentJobs]([AgentId]);
-    CREATE INDEX IX_AgentJobs_Status ON [dbo].[AgentJobs]([Status]);
-    CREATE INDEX IX_AgentJobs_CreatedUtc ON [dbo].[AgentJobs]([CreatedUtc]);
-    CREATE INDEX IX_AgentJobs_AgentId_Status_CreatedUtc ON [dbo].[AgentJobs]([AgentId], [Status], [CreatedUtc]);
-END
-GO
-
 -- =====================================================
--- Password Manager Tables
+-- OrbisHub Password Manager - Database Schema
+-- Secure password storage with encryption
 -- =====================================================
 
 -- Password Entries Table
@@ -71,13 +23,14 @@ BEGIN
         CONSTRAINT FK_PasswordEntry_User FOREIGN KEY (created_by) REFERENCES Users(id) ON DELETE NO ACTION
     );
 
+    -- Index for faster searches
     CREATE INDEX IX_PasswordEntries_Name ON PasswordEntries(name);
     CREATE INDEX IX_PasswordEntries_Category ON PasswordEntries(category);
     CREATE INDEX IX_PasswordEntries_CreatedBy ON PasswordEntries(created_by);
 END
 GO
 
--- Password Categories Table
+-- Password Categories Table (Optional - for categorization)
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PasswordCategories')
 BEGIN
     CREATE TABLE PasswordCategories (
@@ -89,6 +42,7 @@ BEGIN
         CONSTRAINT CK_PasswordCategory_Color CHECK (color LIKE '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')
     );
 
+    -- Insert default categories with Unicode icon support
     INSERT INTO PasswordCategories (name, color, icon) VALUES
     (N'Personal', '#3b82f6', N'👤'),
     (N'Work', '#8b5cf6', N'💼'),
@@ -102,7 +56,7 @@ BEGIN
 END
 GO
 
--- Password Access Log Table
+-- Audit log for password access
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PasswordAccessLog')
 BEGIN
     CREATE TABLE PasswordAccessLog (
@@ -116,11 +70,9 @@ BEGIN
         CONSTRAINT CK_PasswordAccessLog_Action CHECK (action IN ('view', 'copy', 'edit', 'delete', 'create'))
     );
 
+    -- Index for faster queries
     CREATE INDEX IX_PasswordAccessLog_Entry ON PasswordAccessLog(password_entry_id);
     CREATE INDEX IX_PasswordAccessLog_User ON PasswordAccessLog(user_id);
     CREATE INDEX IX_PasswordAccessLog_AccessedAt ON PasswordAccessLog(accessed_at);
 END
-GO
-
-PRINT 'OrbisHub Core Service database schema created successfully.'
 GO

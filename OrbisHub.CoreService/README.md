@@ -38,14 +38,112 @@ The **OrbisHub Core Service** is a Windows Service that acts as the central cont
 
 ## Installation
 
-### Step 1: Publish the Application
+### Quick Installation (Using Pre-Built Files)
+
+If you have the OrbisHub Desktop application installed, the compiled CoreService is already available and ready to deploy.
+
+#### Step 1: Copy CoreService Files to Server
+
+The compiled service is located at:
+```
+C:\Program Files\OrbisHub Desktop\resources\CoreService
+```
+
+Copy this entire folder to your target server location, for example:
+```powershell
+# On the source machine (where OrbisHub Desktop is installed)
+Copy-Item "C:\Program Files\OrbisHub Desktop\resources\CoreService" -Destination "\\ServerName\C$\OrbisHub\CoreService" -Recurse
+
+# Or copy to a local path on the server
+Copy-Item "C:\Program Files\OrbisHub Desktop\resources\CoreService" -Destination "C:\OrbisHub\CoreService" -Recurse
+```
+
+#### Step 2: Configure the Service
+
+Edit `appsettings.json` in the copied CoreService folder:
+
+```json
+{
+  "OrbisHub": {
+    "ServiceName": "OrbisHub Core Service",
+    "ServiceUrl": "http://0.0.0.0:5000",
+    "ConnectionString": "Server=localhost;Database=OrbisHub;Integrated Security=true;TrustServerCertificate=True;",
+    "HeartbeatTimeoutMinutes": 5,
+    "JobTimeoutMinutes": 30
+  }
+}
+```
+
+**Important Settings:**
+- `ServiceUrl`: The URL/port where the API will listen (use `0.0.0.0` to listen on all interfaces)
+- `ConnectionString`: SQL Server connection string
+- `HeartbeatTimeoutMinutes`: How long before an agent is considered offline
+- `JobTimeoutMinutes`: Maximum time a job can run before timing out
+
+#### Step 3: Initialize the Database
+
+Run the SQL script to create the database schema:
+
+```powershell
+sqlcmd -S localhost -d OrbisHub -i Database\InitializeSchema.sql
+```
+
+Or execute the script in SQL Server Management Studio.
+
+#### Step 4: Install as Windows Service
+
+Open PowerShell or Command Prompt **as Administrator** on the server:
+
+```powershell
+# Create the service (adjust path to match your installation location)
+sc.exe create OrbisHubCoreService binPath= "C:\OrbisHub\CoreService\OrbisHub.CoreService.exe" start= auto
+
+# Set service description
+sc.exe description OrbisHubCoreService "Central controller for OrbisHub agents and clients"
+
+# Start the service
+sc.exe start OrbisHubCoreService
+```
+
+**Important:** Ensure there is a space after `binPath=` and `start=` when using `sc.exe`.
+
+#### Step 5: Verify Installation
+
+Check service status:
+
+```powershell
+Get-Service OrbisHubCoreService
+```
+
+Test the API:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:5000/health"
+```
+
+Expected response:
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-11-25T10:30:00Z",
+  "version": "1.0.0"
+}
+```
+
+---
+
+### Manual Build Installation (For Development)
+
+If you need to build from source instead of using the pre-built files:
+
+#### Step 1: Publish the Application
 
 ```powershell
 cd OrbisHub.CoreService
 dotnet publish -c Release -o .\publish
 ```
 
-### Step 2: Configure the Service
+#### Step 2: Configure the Service
 
 Edit `publish\appsettings.json`:
 
@@ -67,7 +165,7 @@ Edit `publish\appsettings.json`:
 - `HeartbeatTimeoutMinutes`: How long before an agent is considered offline
 - `JobTimeoutMinutes`: Maximum time a job can run before timing out
 
-### Step 3: Initialize the Database
+#### Step 3: Initialize the Database
 
 Run the SQL script to create the database schema:
 
@@ -77,35 +175,20 @@ sqlcmd -S localhost -d OrbisHub -i Database\InitializeSchema.sql
 
 Or execute the script in SQL Server Management Studio.
 
-### Step 4: Install as Windows Service
-
-**Using sc.exe (built-in):**
+#### Step 4: Install as Windows Service
 
 ```powershell
-# Navigate to publish directory
-cd publish
-
-# Create the service
+# Create the service (adjust path to match your installation location)
 sc.exe create OrbisHubCoreService binPath= "C:\Path\To\publish\OrbisHub.CoreService.exe" start= auto
 
-# Set service description (optional)
+# Set service description
 sc.exe description OrbisHubCoreService "Central controller for OrbisHub agents and clients"
 
 # Start the service
 sc.exe start OrbisHubCoreService
 ```
 
-**Using PowerShell:**
-
-```powershell
-$serviceName = "OrbisHubCoreService"
-$binaryPath = "C:\Path\To\publish\OrbisHub.CoreService.exe"
-
-New-Service -Name $serviceName -BinaryPathName $binaryPath -DisplayName "OrbisHub Core Service" -StartupType Automatic -Description "Central controller for OrbisHub agents and clients"
-Start-Service -Name $serviceName
-```
-
-### Step 5: Verify Installation
+#### Step 5: Verify Installation
 
 Check service status:
 
