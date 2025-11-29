@@ -222,8 +222,8 @@
 
 <!-- Password Change Modal -->
 <dialog id="changePasswordModal" class="modal">
-<form method="dialog" class="card">
-<button type="submit" value="cancel" class="modal-close-btn" title="Close" style="display:none;">
+<div class="card">
+<button type="button" class="modal-close-btn" title="Close" style="display:none;">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -240,9 +240,9 @@
 <input id="confirmPassword" type="password" class="input" placeholder="Confirm new password" required />
 </label>
 <menu class="row end">
-<button id="changePasswordBtn" type="submit" value="default" class="btn">Change Password</button>
+<button id="changePasswordBtn" type="button" class="btn">Change Password</button>
 </menu>
-</form>
+</div>
 </dialog>
 
 <!-- Sign Out Confirmation Modal -->
@@ -1587,7 +1587,7 @@
         </div>
         <div class="form-group">
           <label>Icon (Emoji)</label>
-          <input type="text" id="categoryEditIcon" class="input" placeholder="🏦" maxlength="2" required>
+          <input type="text" id="categoryEditIcon" class="input" placeholder="🏦" maxlength="10" required>
           <div class="input-hint">Enter an emoji character</div>
         </div>
         <div class="form-group">

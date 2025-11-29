@@ -4784,131 +4784,165 @@ if (loginForm) {
 }
 
 // Change password modal handler
+async function handlePasswordChange() {
+    const userId = document.getElementById('changePasswordUserId').value
+    const newPassword = document.getElementById('newPassword').value
+    const confirmPassword = document.getElementById('confirmPassword').value
+    const changePasswordModal = document.getElementById('changePasswordModal')
+    const errorEl = document.getElementById('changePasswordError')
+    
+    // Helper to show error in modal
+    const showError = (msg) => {
+        if (errorEl) {
+            errorEl.textContent = msg
+            errorEl.classList.add('is-visible')
+            errorEl.style.display = 'block'
+        }
+    }
+    
+    // Clear previous errors
+    if (errorEl) {
+        errorEl.textContent = ''
+        errorEl.classList.remove('is-visible')
+        errorEl.style.display = 'none'
+    }
+    
+    // Validate
+    if (!newPassword || !confirmPassword) {
+        showError('Please fill in both password fields')
+        return
+    }
+    
+    if (newPassword !== confirmPassword) {
+        showError('Passwords do not match')
+        return
+    }
+    
+    // Validate password complexity
+    const validation = validatePassword(newPassword)
+    if (!validation.isValid) {
+        showError('Password requirements:\n' + validation.errors.join('\n'))
+        return
+    }
+    
+    // Update user password in database
+    try {
+        // Hash the new password before storing
+        const hashResult = await window.electronAPI.hashPassword(newPassword)
+        if (!hashResult || !hashResult.success) {
+            showError('Failed to secure password')
+            return
+        }
+        
+        const updateResult = await window.electronAPI.dbExecute(
+            'UPDATE Users SET password = @param0, changePasswordOnLogin = 0 WHERE id = @param1',
+            [
+                { name: 'param0', type: 'NVarChar', value: hashResult.hash },
+                { name: 'param1', type: 'NVarChar', value: userId }
+            ]
+        )
+        
+        if (!updateResult || !updateResult.success) {
+            showError('Failed to update password in database')
+            return
+        }
+        
+        // Fetch updated user from database
+        const userResult = await window.electronAPI.dbQuery(
+            'SELECT * FROM Users WHERE id = @param0',
+            [{ name: 'param0', type: 'NVarChar', value: userId }]
+        )
+        
+        if (!userResult || !userResult.success || !userResult.data || userResult.data.length === 0) {
+            showError('Failed to retrieve updated user')
+            return
+        }
+        
+        const user = userResult.data[0]
+        
+        
+        const db = store.readSync()
+        const cachedUser = db.users.find(u => u.id === userId)
+        if (cachedUser) {
+            cachedUser.password = hashResult.hash
+            cachedUser.changePasswordOnLogin = false
+            store.write(db)
+        }
+        
+        // Audit log for password change
+        await window.Audit.log({
+            id: uid(),
+            action: 'password_changed',
+            entityType: 'user',
+            entityName: user.name,
+            user: user.username,
+            username: user.username,
+            timestamp: new Date().toISOString(),
+            ip: getLocalIP(),
+            details: { reason: 'User self-service password change' }
+        })
+        
+        // Close modal and log in
+        if (changePasswordModal) {
+            changePasswordModal.close()
+        }
+        
+        // Clear form
+        document.getElementById('newPassword').value = ''
+        document.getElementById('confirmPassword').value = ''
+        document.getElementById('changePasswordUserId').value = ''
+        
+        // Set session and show app
+        setSession(user)
+        showApp()
+        
+        // Clear login form
+        const loginForm = document.getElementById('loginForm')
+        if (loginForm) {
+            loginForm.reset()
+        }
+    } catch (error) {
+        console.error('Password change error:', error)
+        showError('Failed to update password: ' + error.message)
+    }
+}
+
 const changePasswordBtn = document.getElementById('changePasswordBtn')
+const changePasswordModal = document.getElementById('changePasswordModal')
+const newPasswordInput = document.getElementById('newPassword')
+const confirmPasswordInput = document.getElementById('confirmPassword')
+
+// Prevent dialog from closing on ESC key
+if (changePasswordModal) {
+    changePasswordModal.addEventListener('cancel', (e) => {
+        e.preventDefault()
+    })
+}
+
+// Handle Enter key in password inputs
+if (newPasswordInput) {
+    newPasswordInput.addEventListener('keypress', async (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault()
+            await handlePasswordChange()
+        }
+    })
+}
+
+if (confirmPasswordInput) {
+    confirmPasswordInput.addEventListener('keypress', async (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault()
+            await handlePasswordChange()
+        }
+    })
+}
+
+// Handle button click
 if (changePasswordBtn) {
     changePasswordBtn.addEventListener('click', async (e) => {
         e.preventDefault()
-        
-        const userId = document.getElementById('changePasswordUserId').value
-        const newPassword = document.getElementById('newPassword').value
-        const confirmPassword = document.getElementById('confirmPassword').value
-        const changePasswordModal = document.getElementById('changePasswordModal')
-        const errorEl = document.getElementById('changePasswordError')
-        
-        // Helper to show error in modal
-        const showError = (msg) => {
-            if (errorEl) {
-                errorEl.textContent = msg
-                errorEl.classList.add('is-visible')
-                errorEl.style.display = 'block'
-            }
-        }
-        
-        // Clear previous errors
-        if (errorEl) {
-            errorEl.textContent = ''
-            errorEl.classList.remove('is-visible')
-            errorEl.style.display = 'none'
-        }
-        
-        // Validate
-        if (!newPassword || !confirmPassword) {
-            showError('Please fill in both password fields')
-            return
-        }
-        
-        if (newPassword !== confirmPassword) {
-            showError('Passwords do not match')
-            return
-        }
-        
-        // Validate password complexity
-        const validation = validatePassword(newPassword)
-        if (!validation.isValid) {
-            showError('Password requirements:\n' + validation.errors.join('\n'))
-            return
-        }
-        
-        // Update user password in database
-        try {
-            // Hash the new password before storing
-            const hashResult = await window.electronAPI.hashPassword(newPassword)
-            if (!hashResult || !hashResult.success) {
-                showError('Failed to secure password')
-                return
-            }
-            
-            const updateResult = await window.electronAPI.dbExecute(
-                'UPDATE Users SET password = @param0, changePasswordOnLogin = 0 WHERE id = @param1',
-                [
-                    { name: 'param0', type: 'NVarChar', value: hashResult.hash },
-                    { name: 'param1', type: 'NVarChar', value: userId }
-                ]
-            )
-            
-            if (!updateResult || !updateResult.success) {
-                showError('Failed to update password in database')
-                return
-            }
-            
-            // Fetch updated user from database
-            const userResult = await window.electronAPI.dbQuery(
-                'SELECT * FROM Users WHERE id = @param0',
-                [{ name: 'param0', type: 'NVarChar', value: userId }]
-            )
-            
-            if (!userResult || !userResult.success || !userResult.data || userResult.data.length === 0) {
-                showError('Failed to retrieve updated user')
-                return
-            }
-            
-            const user = userResult.data[0]
-            
-            
-            const db = store.readSync()
-            const cachedUser = db.users.find(u => u.id === userId)
-            if (cachedUser) {
-                cachedUser.password = hashResult.hash
-                cachedUser.changePasswordOnLogin = false
-                store.write(db)
-            }
-            
-            // Audit log for password change
-            await window.Audit.log({
-                id: uid(),
-                action: 'password_changed',
-                entityType: 'user',
-                entityName: user.name,
-                user: user.username,
-                username: user.username,
-                timestamp: new Date().toISOString(),
-                ip: getLocalIP(),
-                details: { reason: 'User self-service password change' }
-            })
-            
-            // Close modal and log in
-            if (changePasswordModal) {
-                changePasswordModal.close()
-            }
-            
-            // Clear form
-            document.getElementById('newPassword').value = ''
-            document.getElementById('confirmPassword').value = ''
-            document.getElementById('changePasswordUserId').value = ''
-            
-            // Set session and show app
-            setSession(user)
-            showApp()
-            
-            // Clear login form
-            const loginForm = document.getElementById('loginForm')
-            if (loginForm) {
-                loginForm.reset()
-            }
-        } catch (error) {
-            console.error('Password change error:', error)
-            showError('Failed to update password: ' + error.message)
-        }
+        await handlePasswordChange()
     })
 }
 
@@ -5133,10 +5167,17 @@ const dbConfigAuthType = document.getElementById('dbConfigAuthType')
 const sqlAuthFields = document.getElementById('sqlAuthFields')
 if (dbConfigAuthType && sqlAuthFields) {
     dbConfigAuthType.addEventListener('change', (e) => {
+        const usernameInput = document.getElementById('dbConfigUser')
+        const passwordInput = document.getElementById('dbConfigPassword')
+        
         if (e.target.value === 'sql') {
             sqlAuthFields.style.display = 'block'
+            if (usernameInput) usernameInput.required = true
+            if (passwordInput) passwordInput.required = true
         } else {
             sqlAuthFields.style.display = 'none'
+            if (usernameInput) usernameInput.required = false
+            if (passwordInput) passwordInput.required = false
         }
     })
 }
@@ -8756,10 +8797,17 @@ function setupWizardListeners() {
     
     if (authTypeSelect) {
         authTypeSelect.addEventListener('change', (e) => {
+            const usernameInput = document.getElementById('setupUsername')
+            const passwordInput = document.getElementById('setupPassword')
+            
             if (e.target.value === 'sql') {
                 sqlAuthFields.style.display = 'block'
+                if (usernameInput) usernameInput.required = true
+                if (passwordInput) passwordInput.required = true
             } else {
                 sqlAuthFields.style.display = 'none'
+                if (usernameInput) usernameInput.required = false
+                if (passwordInput) passwordInput.required = false
             }
         })
     }
@@ -8820,6 +8868,11 @@ async function testSetupConnection() {
     
     if (!wizardConfig.server || !wizardConfig.database) {
         showSetupStatus('Please enter server name and database name', 'error')
+        return
+    }
+    
+    if (wizardConfig.authType === 'sql' && (!wizardConfig.user || !wizardConfig.password)) {
+        showSetupStatus('Username and Password are required for SQL Server Authentication', 'error')
         return
     }
     
@@ -9451,6 +9504,18 @@ async function loadCoreServiceConfig() {
 // Load CoreService configuration globally on app startup
 async function initCoreServiceConfig() {
     try {
+        // Ensure SystemSettings table exists
+        await window.DB.execute(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SystemSettings')
+            BEGIN
+                CREATE TABLE SystemSettings (
+                    SettingKey NVARCHAR(100) PRIMARY KEY,
+                    SettingValue NVARCHAR(MAX),
+                    UpdatedAt DATETIME2 DEFAULT GETDATE()
+                )
+            END
+        `)
+        
         const results = await window.DB.query(
             `SELECT SettingValue FROM SystemSettings WHERE SettingKey = @param0`,
             [{ value: 'CoreServiceAddress' }]

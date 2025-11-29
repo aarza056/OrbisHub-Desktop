@@ -562,13 +562,16 @@
     if (result.success) {
       showToast('Password deleted successfully', 'success');
       currentPassword = null;
-      document.getElementById('passwordDetailContainer').innerHTML = `
-        <div class="password-empty">
-          <div class="password-empty-icon">🔐</div>
-          <div class="password-empty-title">Select a password</div>
-          <div class="password-empty-description">Choose a password from the list to view its details</div>
-        </div>
-      `;
+      const container = document.getElementById('passwordDetailContainer');
+      if (container) {
+        container.innerHTML = `
+          <div class="password-empty">
+            <div class="password-empty-icon">🔐</div>
+            <div class="password-empty-title">Select a password</div>
+            <div class="password-empty-description">Choose a password from the list to view its details</div>
+          </div>
+        `;
+      }
       await loadPasswords();
     } else {
       showError('Failed to delete password');

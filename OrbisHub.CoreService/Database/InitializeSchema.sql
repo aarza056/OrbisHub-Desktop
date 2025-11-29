@@ -122,5 +122,20 @@ BEGIN
 END
 GO
 
+-- =====================================================
+-- System Settings Table
+-- =====================================================
+
+-- System Settings Table for Desktop App Configuration
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SystemSettings')
+BEGIN
+    CREATE TABLE SystemSettings (
+        SettingKey NVARCHAR(100) PRIMARY KEY,
+        SettingValue NVARCHAR(MAX),
+        UpdatedAt DATETIME2 DEFAULT GETDATE()
+    );
+END
+GO
+
 PRINT 'OrbisHub Core Service database schema created successfully.'
 GO
