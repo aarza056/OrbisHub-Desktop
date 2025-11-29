@@ -44,10 +44,7 @@
 
       // Set up event listeners
       setupEventListeners();
-
-      console.log('Password Manager initialized');
     } catch (error) {
-      console.error('Password Manager init error:', error);
       showError('Failed to initialize Password Manager');
     }
   }
@@ -697,7 +694,6 @@
         showError('Failed to load password');
       }
     } catch (error) {
-      console.error('Copy password error:', error);
       showError('Failed to copy password');
     }
   }
@@ -707,7 +703,6 @@
       await navigator.clipboard.writeText(username);
       showToast('Username copied to clipboard', 'success');
     } catch (error) {
-      console.error('Copy username error:', error);
       showError('Failed to copy username');
     }
   }
@@ -862,7 +857,6 @@
         showError(result.error || 'Failed to save category');
       }
     } catch (error) {
-      console.error('Save category error:', error);
       showError('Failed to save category');
     }
   }
@@ -894,7 +888,6 @@
         showError(result.error || 'Failed to delete category');
       }
     } catch (error) {
-      console.error('Delete category error:', error);
       showError('Failed to delete category');
     }
   }
@@ -921,6 +914,4 @@
     copyToClipboard,
     generatePassword
   };
-
-  console.log('Password UI loaded');
 })();

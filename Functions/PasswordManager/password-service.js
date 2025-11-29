@@ -34,7 +34,6 @@
       const encrypted = textBytes.map((byte, i) => byte ^ keyBytes[i % keyBytes.length]);
       return btoa(String.fromCharCode(...encrypted));
     } catch (e) {
-      console.error('Encryption error:', e);
       return btoa(text); // Fallback to simple base64
     }
   }
@@ -48,7 +47,6 @@
       const decrypted = encryptedBytes.map((byte, i) => byte ^ keyBytes[i % keyBytes.length]);
       return String.fromCharCode(...decrypted);
     } catch (e) {
-      console.error('Decryption error:', e);
       try {
         return atob(encrypted); // Fallback to simple base64 decode
       } catch {
@@ -306,7 +304,6 @@
       );
       return result;
     } catch (error) {
-      console.error('Get categories error:', error);
       return { success: false, error: error.message };
     }
   }
@@ -352,7 +349,6 @@
       );
       return result;
     } catch (error) {
-      console.error('Get access log error:', error);
       return { success: false, error: error.message };
     }
   }
@@ -373,7 +369,6 @@
       );
       return result;
     } catch (error) {
-      console.error('Create category error:', error);
       return { success: false, error: error.message };
     }
   }
@@ -396,7 +391,6 @@
       );
       return result;
     } catch (error) {
-      console.error('Update category error:', error);
       return { success: false, error: error.message };
     }
   }
@@ -412,7 +406,6 @@
       );
       return result;
     } catch (error) {
-      console.error('Delete category error:', error);
       return { success: false, error: error.message };
     }
   }
@@ -435,6 +428,4 @@
 
   // Initialize encryption on load
   initializeEncryption();
-
-  console.log('Password Service initialized');
 })();
