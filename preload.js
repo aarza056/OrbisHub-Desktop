@@ -55,6 +55,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // File download
     downloadFile: (params) => ipcRenderer.invoke('download-file', params),
     
+    // Bug Reporting
+    bugReportSubmit: (bugData) => ipcRenderer.invoke('bug-report:submit', bugData),
+    bugReportGetSystemInfo: () => ipcRenderer.invoke('bug-report:getSystemInfo'),
+    
     // Message notifications
     startMessagePolling: (userId) => ipcRenderer.invoke('start-message-polling', userId),
     stopMessagePolling: () => ipcRenderer.invoke('stop-message-polling'),

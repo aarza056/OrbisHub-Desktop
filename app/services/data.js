@@ -108,7 +108,8 @@
           password: decryptedPassword,
           domain: c.domain || '',
           type: extra.type || 'Username/Password',
-          description: (typeof c.description === 'string' && !c.description.trim().startsWith('{')) ? (c.description || '') : (extra.note || '')
+          description: (typeof c.description === 'string' && !c.description.trim().startsWith('{')) ? (c.description || '') : (extra.note || ''),
+          preferredMachineId: c.preferred_machine_id || null
         };
       })) : [];
 
@@ -238,16 +239,17 @@
         
         await db.execute(
           `IF EXISTS (SELECT 1 FROM Credentials WHERE id = @param0)
-             UPDATE Credentials SET name = @param1, username = @param2, password = @param3, domain = @param4, description = @param5 WHERE id = @param0
+             UPDATE Credentials SET name = @param1, username = @param2, password = @param3, domain = @param4, description = @param5, preferred_machine_id = @param6 WHERE id = @param0
            ELSE
-             INSERT INTO Credentials (id, name, username, password, domain, description, created_at) VALUES (@param0, @param1, @param2, @param3, @param4, @param5, GETDATE())`,
+             INSERT INTO Credentials (id, name, username, password, domain, description, preferred_machine_id, created_at) VALUES (@param0, @param1, @param2, @param3, @param4, @param5, @param6, GETDATE())`,
           [
             { value: cred.id },
             { value: cred.name },
             { value: cred.username },
             { value: passwordToStore },
             { value: cred.domain || '' },
-            { value: descJson }
+            { value: descJson },
+            { value: cred.preferredMachineId || null }
           ]
         );
       }

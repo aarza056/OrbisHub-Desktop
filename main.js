@@ -953,10 +953,23 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
                 password NVARCHAR(MAX) NOT NULL,
                 domain NVARCHAR(255),
                 description NVARCHAR(MAX),
+                preferred_machine_id NVARCHAR(50),
                 created_at DATETIME DEFAULT GETDATE()
             )
         `);
         migrations.push('Credentials table created');
+        
+        // Add preferred_machine_id column if it doesn't exist (migration for existing databases)
+        await pool.request().query(`
+            IF EXISTS (SELECT * FROM sysobjects WHERE name='Credentials' AND xtype='U')
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Credentials') AND name = 'preferred_machine_id')
+                BEGIN
+                    ALTER TABLE Credentials ADD preferred_machine_id NVARCHAR(50) NULL
+                END
+            END
+        `);
+        migrations.push('Credentials table updated with preferred_machine_id column');
         
         // Servers table
         await pool.request().query(`
@@ -1336,6 +1349,98 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
         `);
         migrations.push('TicketLabelMap table created');
         
+        // ============ PASSWORD MANAGER SYSTEM ============
+        
+        // Password Categories Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PasswordCategories')
+            BEGIN
+                CREATE TABLE PasswordCategories (
+                    id INT PRIMARY KEY IDENTITY(1,1),
+                    name NVARCHAR(100) NOT NULL UNIQUE,
+                    color NVARCHAR(7) NOT NULL,
+                    icon NVARCHAR(50) NULL,
+                    created_at DATETIME2 DEFAULT GETDATE(),
+                    CONSTRAINT CK_PasswordCategory_Color CHECK (color LIKE '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')
+                )
+                
+                INSERT INTO PasswordCategories (name, color, icon) VALUES
+                (N'Personal', '#3b82f6', N'👤'),
+                (N'Work', '#8b5cf6', N'💼'),
+                (N'Financial', '#10b981', N'💳'),
+                (N'Social Media', '#f59e0b', N'📱'),
+                (N'Email', '#06b6d4', N'📧'),
+                (N'Development', '#ec4899', N'💻'),
+                (N'Database', '#ef4444', N'🗄️'),
+                (N'Server', '#f97316', N'🖥️'),
+                (N'Other', '#6b7280', N'📝')
+            END
+        `);
+        migrations.push('PasswordCategories table created');
+        
+        // Password Entries Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PasswordEntries')
+            BEGIN
+                CREATE TABLE PasswordEntries (
+                    id INT PRIMARY KEY IDENTITY(1,1),
+                    name NVARCHAR(255) NOT NULL,
+                    username NVARCHAR(255) NOT NULL,
+                    password_encrypted NVARCHAR(MAX) NOT NULL,
+                    url NVARCHAR(500) NULL,
+                    notes NVARCHAR(MAX) NULL,
+                    category NVARCHAR(100) NULL,
+                    tags NVARCHAR(500) NULL,
+                    created_by NVARCHAR(50) NOT NULL,
+                    created_at DATETIME2 DEFAULT GETDATE(),
+                    updated_at DATETIME2 DEFAULT GETDATE(),
+                    last_accessed DATETIME2 NULL,
+                    is_favorite BIT DEFAULT 0,
+                    CONSTRAINT FK_PasswordEntry_User FOREIGN KEY (created_by) REFERENCES Users(id) ON DELETE NO ACTION
+                )
+                
+                CREATE INDEX IX_PasswordEntries_Name ON PasswordEntries(name)
+                CREATE INDEX IX_PasswordEntries_Category ON PasswordEntries(category)
+                CREATE INDEX IX_PasswordEntries_CreatedBy ON PasswordEntries(created_by)
+            END
+        `);
+        migrations.push('PasswordEntries table created');
+        
+        // Password Access Log Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PasswordAccessLog')
+            BEGIN
+                CREATE TABLE PasswordAccessLog (
+                    id INT PRIMARY KEY IDENTITY(1,1),
+                    password_entry_id INT NOT NULL,
+                    user_id NVARCHAR(50) NOT NULL,
+                    action NVARCHAR(50) NOT NULL,
+                    accessed_at DATETIME2 DEFAULT GETDATE(),
+                    CONSTRAINT FK_PasswordAccessLog_Entry FOREIGN KEY (password_entry_id) REFERENCES PasswordEntries(id) ON DELETE CASCADE,
+                    CONSTRAINT FK_PasswordAccessLog_User FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE NO ACTION,
+                    CONSTRAINT CK_PasswordAccessLog_Action CHECK (action IN ('view', 'copy', 'edit', 'delete', 'create'))
+                )
+                
+                CREATE INDEX IX_PasswordAccessLog_Entry ON PasswordAccessLog(password_entry_id)
+                CREATE INDEX IX_PasswordAccessLog_User ON PasswordAccessLog(user_id)
+                CREATE INDEX IX_PasswordAccessLog_AccessedAt ON PasswordAccessLog(accessed_at)
+            END
+        `);
+        migrations.push('PasswordAccessLog table created');
+        
+        // SystemSettings table (for desktop app configuration)
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SystemSettings')
+            BEGIN
+                CREATE TABLE SystemSettings (
+                    SettingKey NVARCHAR(100) PRIMARY KEY,
+                    SettingValue NVARCHAR(MAX),
+                    UpdatedAt DATETIME2 DEFAULT GETDATE()
+                )
+            END
+        `);
+        migrations.push('SystemSettings table created');
+        
         // Note: Ticket numbers are generated in the application code during insert
         // to avoid conflicts with OUTPUT clause
         
@@ -1509,6 +1614,121 @@ ipcMain.handle('open-external', async (event, url) => {
         return { success: false, error: error.message };
     }
 });
+
+// ==================== BUG REPORTING ====================
+
+// Get system information for bug reports
+ipcMain.handle('bug-report:getSystemInfo', async (event) => {
+    try {
+        return {
+            success: true,
+            data: {
+                os: `${os.platform()} ${os.release()} (${os.arch()})`,
+                appVersion: app.getVersion() || '1.0.0',
+                electronVersion: process.versions.electron,
+                nodeVersion: process.versions.node,
+                timestamp: new Date().toISOString(),
+                totalMemory: `${Math.round(os.totalmem() / 1024 / 1024 / 1024)}GB`,
+                freeMemory: `${Math.round(os.freemem() / 1024 / 1024 / 1024)}GB`
+            }
+        };
+    } catch (error) {
+        console.error('Failed to get system info:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+});
+
+// Submit bug report via email
+ipcMain.handle('bug-report:submit', async (event, bugData) => {
+    try {
+        // Format the email body
+        const emailBody = `
+Bug Report - OrbisHub Desktop
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BUG DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Title: ${bugData.title}
+Severity: ${bugData.severity}
+Category: ${bugData.category}
+Reported By: ${bugData.userName}
+${bugData.userEmail ? `Contact Email: ${bugData.userEmail}` : ''}
+Date: ${new Date(bugData.timestamp).toLocaleString()}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DESCRIPTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${bugData.description}
+
+${bugData.stepsToReproduce ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEPS TO REPRODUCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${bugData.stepsToReproduce}
+` : ''}
+
+${bugData.expectedBehavior ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EXPECTED BEHAVIOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${bugData.expectedBehavior}
+` : ''}
+
+${bugData.actualBehavior ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ACTUAL BEHAVIOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${bugData.actualBehavior}
+` : ''}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SYSTEM INFORMATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Operating System: ${bugData.systemInfo.os}
+App Version: ${bugData.systemInfo.appVersion}
+Electron Version: ${bugData.systemInfo.electronVersion || 'N/A'}
+Node Version: ${bugData.systemInfo.nodeVersion || 'N/A'}
+Total Memory: ${bugData.systemInfo.totalMemory || 'N/A'}
+Free Memory: ${bugData.systemInfo.freeMemory || 'N/A'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This bug report was automatically generated by OrbisHub Desktop.
+        `.trim();
+
+        // Create mailto link with subject and body
+        const subject = encodeURIComponent(`[OrbisHub Bug] [${bugData.severity}] ${bugData.title}`);
+        const body = encodeURIComponent(emailBody);
+        const mailto = `mailto:development@orbis-hub.com?subject=${subject}&body=${body}`;
+
+        // Open default email client
+        await shell.openExternal(mailto);
+
+        console.log('Bug report email composed successfully');
+        
+        return {
+            success: true,
+            message: 'Bug report email opened in your default email client'
+        };
+    } catch (error) {
+        console.error('Failed to submit bug report:', error);
+        return {
+            success: false,
+            error: error.message || 'Failed to open email client'
+        };
+    }
+});
+
+// ==================== END BUG REPORTING ====================
 
 // File selection dialog
 ipcMain.handle('select-file', async (event) => {
