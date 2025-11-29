@@ -4241,6 +4241,13 @@ async function showView(name, updateUrl = true) {
                     await window.TicketUI.init();
                 }
                 break
+                
+            case 'passwords':
+                // Initialize password manager
+                if (window.PasswordUI) {
+                    await window.PasswordUI.init();
+                }
+                break
         }
     } catch (error) {
 

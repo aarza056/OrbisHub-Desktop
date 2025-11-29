@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="styles.css" />
 <link rel="stylesheet" href="../Functions/OrbisAgent/agent-ui.css" />
 <link rel="stylesheet" href="../Functions/TicketManagement/ticket-ui.css" />
+<link rel="stylesheet" href="../Functions/PasswordManager/password-ui.css" />
 </head>
 <body>
 
@@ -391,6 +392,14 @@
       <line x1="12" y1="9" x2="8" y2="9"></line>
     </svg>
     Ticket Management
+  </button>
+  <button class="nav__btn" data-view="passwords">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      <circle cx="12" cy="16" r="1"></circle>
+    </svg>
+    Password Manager
   </button>
 </div>
 
@@ -1469,6 +1478,126 @@
     <div class="ticket-list-container" id="ticketListContainer">
       <div style="padding:40px; text-align:center; color:var(--muted);">
         Loading tickets...
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Password Manager -->
+<section id="view-passwords" class="view">
+  <div class="password-container">
+    <!-- Sidebar -->
+    <aside class="password-sidebar">
+      <div class="password-sidebar-header">
+        <div class="password-sidebar-title">
+          🔐 Password Manager
+        </div>
+        <div class="password-search">
+          <svg class="password-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+          <input type="text" id="passwordSearchInput" placeholder="Search passwords...">
+        </div>
+      </div>
+
+      <div class="password-filters">
+        <div class="password-filter-header">
+          <div class="password-filter-label">Categories</div>
+          <button class="btn-icon btn-icon-sm" id="manageCategoriesBtn" title="Manage Categories">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="password-category-list" id="passwordCategoryList">
+          <!-- Categories will be rendered here -->
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="password-main">
+      <div class="password-header">
+        <div class="password-header-title">Passwords</div>
+        <div class="password-header-actions">
+          <button class="btn btn-secondary" id="passwordFavoritesFilter">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+            </svg>
+            Favorites
+          </button>
+          <button class="btn btn-primary" id="addPasswordBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Add Password
+          </button>
+        </div>
+      </div>
+
+      <div class="password-content">
+        <div class="password-list-container" id="passwordListContainer">
+          <!-- Password table will be rendered here -->
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Manage Categories Modal -->
+  <div id="manageCategoriesModal" class="password-modal" style="display: none;">
+    <div class="password-modal-overlay"></div>
+    <div class="password-modal-content" style="max-width: 700px;">
+      <div class="password-modal-header">
+        <h2>Manage Categories</h2>
+        <button class="password-modal-close" onclick="window.PasswordUI.closeCategoryModal()">×</button>
+      </div>
+      <div class="password-modal-body">
+        <div style="margin-bottom: 20px;">
+          <button class="btn btn-primary" onclick="window.PasswordUI.addNewCategory()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Add Category
+          </button>
+        </div>
+        <div id="categoryListEdit">
+          <!-- Category list will be rendered here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category Edit Modal -->
+  <div id="categoryEditModal" class="password-modal" style="display: none;">
+    <div class="password-modal-overlay"></div>
+    <div class="password-modal-content" style="max-width: 500px;">
+      <div class="password-modal-header">
+        <h2 id="categoryModalTitle">Add Category</h2>
+        <button class="password-modal-close" onclick="window.PasswordUI.closeCategoryEditModal()">×</button>
+      </div>
+      <div class="password-modal-body">
+        <input type="hidden" id="categoryEditId">
+        <div class="form-group">
+          <label>Category Name</label>
+          <input type="text" id="categoryEditName" class="input" placeholder="e.g., Banking" required>
+        </div>
+        <div class="form-group">
+          <label>Icon (Emoji)</label>
+          <input type="text" id="categoryEditIcon" class="input" placeholder="🏦" maxlength="2" required>
+          <div class="input-hint">Enter an emoji character</div>
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <input type="color" id="categoryEditColor" class="input" value="#3b82f6">
+        </div>
+      </div>
+      <div class="password-modal-footer">
+        <button class="btn btn-secondary" onclick="window.PasswordUI.closeCategoryEditModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="window.PasswordUI.saveCategoryEdit()">Save</button>
       </div>
     </div>
   </div>
@@ -3747,6 +3876,9 @@ Channels
 <!-- Ticket Management Module -->
 <script src="../Functions/TicketManagement/ticket-service.js"></script>
 <script src="../Functions/TicketManagement/ticket-ui.js"></script>
+<!-- Password Manager Module -->
+<script src="../Functions/PasswordManager/password-service.js"></script>
+<script src="../Functions/PasswordManager/password-ui.js"></script>
 <!-- Core -->
 <script src="app-main.js"></script>
 </body>
