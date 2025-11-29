@@ -1019,15 +1019,29 @@ async function connectToServer(server) {
 		connectionTypeSelect.value = os === 'Linux' ? 'ssh' : 'rdp'
 	}
 	
-	// Populate credential dropdown
+	// Populate credential dropdown - filter by preferred machine
 	if (credentialSelect) {
 		credentialSelect.innerHTML = '<option value="">-- Select Credential --</option>'
-		db.credentials.forEach(cred => {
+		
+		// Filter credentials: show only those with no preferred machine OR matching this server
+		const filteredCredentials = db.credentials.filter(cred => {
+			// If no preferred machine is set, credential is available for all servers
+			if (!cred.preferredMachineId) return true
+			// If preferred machine matches this server, include it
+			return cred.preferredMachineId === server.id
+		})
+		
+		filteredCredentials.forEach(cred => {
 			const option = document.createElement('option')
 			option.value = cred.id
 			option.textContent = `${cred.name} (${cred.username})`
 			credentialSelect.appendChild(option)
 		})
+		
+		// Show message if no credentials available
+		if (filteredCredentials.length === 0) {
+			credentialSelect.innerHTML = '<option value="">No credentials available for this server</option>'
+		}
 	}
 	
 	if (modal) {
@@ -1376,6 +1390,48 @@ function userRow(u) {
 
 
 // ========== CREDENTIALS MANAGEMENT ==========
+// Render credentials from local storage (for immediate UI updates)
+function renderCredentialsFromLocal(filter = '') {
+    const credListEl = document.getElementById('credentialList')
+    if (!credListEl) return
+    
+    const q = (filter || '').toLowerCase()
+    const db = store.readSync()
+    const credentials = db.credentials || []
+    
+    credListEl.innerHTML = ''
+    
+    credentials
+        .filter(c => !q || c.name.toLowerCase().includes(q) || (c.type && c.type.toLowerCase().includes(q)) || (c.username && c.username.toLowerCase().includes(q)))
+        .forEach(credential => {
+            const el = document.createElement('div')
+            el.className = 'card'
+            el.innerHTML = `
+                <div class="title">${credential.name}</div>
+                <div class="meta muted">${credential.type}</div>
+                ${credential.username ? `<div class="muted" style="font-size:12px; margin-top:8px;">Username: ${credential.username}</div>` : ''}
+                ${credential.description ? `<div class="muted" style="font-size:12px; margin-top:4px;">${credential.description}</div>` : ''}
+                <div class="muted" style="font-size:11px; margin-top:8px; font-family:monospace;">
+                    Password: ${'•'.repeat(12)}
+                </div>
+                <div class="actions row" style="margin-top:12px;">
+                    <button class="btn" data-action="edit" data-id="${credential.id}">Edit</button>
+                    <button class="btn btn-ghost" data-action="delete" data-id="${credential.id}">Delete</button>
+                </div>
+            `
+            
+            el.querySelectorAll('button[data-action]').forEach(b => b.addEventListener('click', (ev) => {
+                const id = b.dataset.id
+                const action = b.dataset.action
+                const db = store.readSync()
+                const cred = (db.credentials || []).find(x => x.id === id)
+                if (cred) onCredentialAction(cred, action)
+            }))
+            
+            credListEl.appendChild(el)
+        })
+}
+
 async function renderCredentials(filter = '') {
     const credListEl = document.getElementById('credentialList')
     if (!credListEl) return
@@ -1465,6 +1521,10 @@ function openEditCredential(credential) {
     document.getElementById('editCredUsername').value = credential.username || ''
     document.getElementById('editCredPassword').value = '' // Don't show password
     document.getElementById('editCredDescription').value = credential.description || ''
+    
+    // Populate preferred machine dropdown
+    populatePreferredMachineDropdown('editCredPreferredMachine', credential.preferredMachineId)
+    
     try {
         editCredentialModal.showModal()
     } catch (e) {
@@ -2361,6 +2421,7 @@ function closeCredentialModal() {
     document.getElementById('credType').value = 'Username/Password'
     document.getElementById('credUsername').value = ''
     document.getElementById('credPassword').value = ''
+    document.getElementById('credPreferredMachine').value = ''
     document.getElementById('credDescription').value = ''
 }
 
@@ -2375,9 +2436,33 @@ function closeDeleteCredentialModal() {
     credentialToDelete = null
 }
 
+// Function to populate preferred machine dropdown with servers
+function populatePreferredMachineDropdown(selectId, selectedServerId = null) {
+    const select = document.getElementById(selectId)
+    if (!select) return
+    
+    const db = store.readSync()
+    const servers = db.servers || []
+    
+    select.innerHTML = '<option value="">-- Available for all servers --</option>'
+    
+    servers.forEach(server => {
+        const option = document.createElement('option')
+        option.value = server.id
+        option.textContent = `${server.displayName || server.hostname} (${server.ipAddress})`
+        if (selectedServerId && server.id === selectedServerId) {
+            option.selected = true
+        }
+        select.appendChild(option)
+    })
+}
+
 // Add credential button
 if (addCredentialBtn && credentialModal) {
     addCredentialBtn.addEventListener('click', () => {
+        // Populate preferred machine dropdown
+        populatePreferredMachineDropdown('credPreferredMachine')
+        
         try {
             credentialModal.showModal()
             document.getElementById('credName')?.focus()
@@ -2416,6 +2501,7 @@ if (addCredentialBtn && credentialModal) {
             const username = document.getElementById('credUsername').value.trim()
             const password = document.getElementById('credPassword').value.trim()
             const description = document.getElementById('credDescription').value.trim()
+            const preferredMachineId = document.getElementById('credPreferredMachine').value.trim()
             
             if (!name) return
         
@@ -2425,7 +2511,8 @@ if (addCredentialBtn && credentialModal) {
             type,
             username,
             password,
-            description
+            description,
+            preferredMachineId: preferredMachineId || null
         }
 
         // Save directly to database
@@ -2441,7 +2528,7 @@ if (addCredentialBtn && credentialModal) {
             const result = await response.json()
 
             if (result.success) {
-
+                // Update local store
                 const db = store.readSync()
                 db.credentials = db.credentials || []
                 db.credentials.push(newCred)
@@ -2450,11 +2537,18 @@ if (addCredentialBtn && credentialModal) {
                 // Credential saved to database
                 
                 // Audit log
-                await logAudit('create', 'credential', name, { type, username })
+                await logAudit('create', 'credential', name, { type, username, preferredMachineId })
                 
-                // Re-render from database
-                await renderCredentials()
+                // Close modal
                 closeCredentialModal()
+                
+                // Immediately render with local data, then refresh from DB
+                renderCredentialsFromLocal()
+                
+                // Also refresh from database after a short delay
+                setTimeout(async () => {
+                    await renderCredentials()
+                }, 200)
             } else {
                 alert('Failed to save credential: ' + (result.error || 'Unknown error'))
             }
@@ -2503,6 +2597,7 @@ if (editCredentialModal) {
             const username = document.getElementById('editCredUsername').value.trim()
             const password = document.getElementById('editCredPassword').value.trim()
             const description = document.getElementById('editCredDescription').value.trim()
+            const preferredMachineId = document.getElementById('editCredPreferredMachine').value.trim()
             
             if (!id || !name) return
 
@@ -2518,7 +2613,8 @@ if (editCredentialModal) {
                     name: credential.name,
                     type: credential.type,
                     username: credential.username,
-                    description: credential.description
+                    description: credential.description,
+                    preferredMachineId: credential.preferredMachineId
                 }
                 
                 // Update credential object
@@ -2527,6 +2623,7 @@ if (editCredentialModal) {
                 credential.username = username
                 if (password) credential.password = password // Only update if not empty
                 credential.description = description
+                credential.preferredMachineId = preferredMachineId || null
                 
                 // Save to database
                 const response = await fetch(`${API_BASE_URL}/api/sync-data`, {
@@ -2548,7 +2645,7 @@ if (editCredentialModal) {
                     // Audit log with old and new values
                     await logAudit('update', 'credential', name, { 
                         old: oldValues,
-                        new: { name, type, username, description }
+                        new: { name, type, username, description, preferredMachineId }
                     })
                     
                     // Re-render from database

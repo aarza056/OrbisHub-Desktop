@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="../Functions/OrbisAgent/agent-ui.css" />
 <link rel="stylesheet" href="../Functions/TicketManagement/ticket-ui.css" />
 <link rel="stylesheet" href="../Functions/PasswordManager/password-ui.css" />
+<link rel="stylesheet" href="../Functions/BugReporting/bug-ui.css" />
 </head>
 <body>
 
@@ -422,6 +423,16 @@
       <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
     </svg>
     Documentation
+  </button>
+  <button class="nav__btn" data-view="bug-report">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+      <rect x="8" y="6" width="8" height="12" rx="2" ry="2"></rect>
+      <line x1="4" y1="10" x2="4" y2="14"></line>
+      <line x1="20" y1="10" x2="20" y2="14"></line>
+      <line x1="8" y1="2" x2="16" y2="2"></line>
+      <path d="M12 6v2"></path>
+    </svg>
+    Report a Bug
   </button>
 </div>
 
@@ -1093,6 +1104,12 @@
     <label class="label">Password
       <input id="credPassword" type="password" class="input" placeholder="••••••••" />
     </label>
+    <label class="label">Preferred Machine (Optional)
+      <select id="credPreferredMachine" class="input">
+        <option value="">-- Available for all servers --</option>
+      </select>
+      <span class="input-hint">Restrict this credential to a specific server</span>
+    </label>
     <label class="label">Description
       <input id="credDescription" class="input" placeholder="Optional" />
     </label>
@@ -1126,6 +1143,12 @@
     </label>
     <label class="label">Password (leave blank to keep)
       <input id="editCredPassword" type="password" class="input" placeholder="••••••••" />
+    </label>
+    <label class="label">Preferred Machine (Optional)
+      <select id="editCredPreferredMachine" class="input">
+        <option value="">-- Available for all servers --</option>
+      </select>
+      <span class="input-hint">Restrict this credential to a specific server</span>
     </label>
     <label class="label">Description
       <input id="editCredDescription" class="input" />
@@ -2345,6 +2368,218 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
     <div class="doc-footer">
       <p>Built with ❤️ for DevOps teams by <strong>Ashot Arzakanyan</strong></p>
       <p class="doc-footer-meta">Version 1.0 • November 2025</p>
+    </div>
+  </div>
+</section>
+
+<!-- Bug Report -->
+<section id="view-bug-report" class="view">
+  <div class="view__header">
+    <h1>🐛 Report a Bug</h1>
+  </div>
+
+  <div class="bug-report-container">
+    <!-- Form Container -->
+    <div id="bugReportFormContainer">
+      <div class="bug-report-header">
+        <h2 class="bug-report-title">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="8" y="6" width="8" height="12" rx="2" ry="2"></rect>
+            <line x1="4" y1="10" x2="4" y2="14"></line>
+            <line x1="20" y1="10" x2="20" y2="14"></line>
+            <line x1="8" y1="2" x2="16" y2="2"></line>
+            <path d="M12 6v2"></path>
+          </svg>
+          Bug Report
+        </h2>
+        <p class="bug-report-subtitle">
+          Help us improve OrbisHub by reporting bugs and issues. Your feedback is valuable!
+          <br>Reports are sent to: <strong>development@orbis-hub.com</strong>
+        </p>
+      </div>
+
+      <!-- Info Box -->
+      <div class="bug-info-box">
+        <svg class="bug-info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+        <div class="bug-info-content">
+          <div class="bug-info-title">Tips for effective bug reports</div>
+          <div class="bug-info-text">
+            Be specific and provide as much detail as possible. Include steps to reproduce, what you expected to happen, and what actually happened. This helps us fix issues faster.
+          </div>
+        </div>
+      </div>
+
+      <!-- Error Message -->
+      <div id="bugErrorMessage" class="bug-error-message" style="display:none;"></div>
+
+      <!-- Bug Report Form -->
+      <div class="bug-report-form">
+        <!-- Basic Information -->
+        <div class="bug-form-section">
+          <h3 class="bug-section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            Basic Information
+          </h3>
+
+          <div class="bug-form-group">
+            <label class="bug-form-label required" for="bugTitle">Bug Title</label>
+            <input 
+              type="text" 
+              id="bugTitle" 
+              class="bug-form-input" 
+              placeholder="Brief, descriptive title of the issue"
+              maxlength="200"
+            />
+            <span class="bug-form-hint">A clear, concise summary of the bug (minimum 5 characters)</span>
+          </div>
+
+          <div class="bug-form-group">
+            <label class="bug-form-label required" for="bugDescription">Description</label>
+            <textarea 
+              id="bugDescription" 
+              class="bug-form-textarea large" 
+              placeholder="Detailed description of the bug..."
+              maxlength="2000"
+            ></textarea>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span class="bug-form-hint">Provide a detailed description of the issue (minimum 20 characters)</span>
+              <span id="bugDescriptionCounter" class="bug-form-hint">0/2000 characters</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Severity -->
+        <div class="bug-form-section">
+          <h3 class="bug-section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            Severity Level
+          </h3>
+          <div id="bugSeverityOptions" class="bug-severity-options"></div>
+        </div>
+
+        <!-- Category -->
+        <div class="bug-form-section">
+          <h3 class="bug-section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="8" y1="6" x2="21" y2="6"></line>
+              <line x1="8" y1="12" x2="21" y2="12"></line>
+              <line x1="8" y1="18" x2="21" y2="18"></line>
+              <line x1="3" y1="6" x2="3.01" y2="6"></line>
+              <line x1="3" y1="12" x2="3.01" y2="12"></line>
+              <line x1="3" y1="18" x2="3.01" y2="18"></line>
+            </svg>
+            Category
+          </h3>
+          <div id="bugCategoryGrid" class="bug-category-grid"></div>
+        </div>
+
+        <!-- Additional Details -->
+        <div class="bug-form-section">
+          <h3 class="bug-section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 11 12 14 22 4"></polyline>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
+            Additional Details (Optional)
+          </h3>
+
+          <div class="bug-form-group">
+            <label class="bug-form-label" for="bugStepsToReproduce">Steps to Reproduce</label>
+            <textarea 
+              id="bugStepsToReproduce" 
+              class="bug-form-textarea" 
+              placeholder="1. Go to...&#10;2. Click on...&#10;3. See error..."
+            ></textarea>
+            <span class="bug-form-hint">List the steps needed to reproduce the bug</span>
+          </div>
+
+          <div class="bug-form-row">
+            <div class="bug-form-group">
+              <label class="bug-form-label" for="bugExpectedBehavior">Expected Behavior</label>
+              <textarea 
+                id="bugExpectedBehavior" 
+                class="bug-form-textarea" 
+                placeholder="What should happen..."
+              ></textarea>
+              <span class="bug-form-hint">What you expected to happen</span>
+            </div>
+
+            <div class="bug-form-group">
+              <label class="bug-form-label" for="bugActualBehavior">Actual Behavior</label>
+              <textarea 
+                id="bugActualBehavior" 
+                class="bug-form-textarea" 
+                placeholder="What actually happened..."
+              ></textarea>
+              <span class="bug-form-hint">What actually happened</span>
+            </div>
+          </div>
+
+          <div class="bug-form-group">
+            <label class="bug-form-label" for="bugUserEmail">Your Email (Optional)</label>
+            <input 
+              type="email" 
+              id="bugUserEmail" 
+              class="bug-form-input" 
+              placeholder="your.email@example.com"
+            />
+            <span class="bug-form-hint">Provide your email if you'd like to receive updates on this bug</span>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="bug-form-actions">
+          <button type="button" id="bugClearBtn" class="bug-clear-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            Clear Form
+          </button>
+          <button type="button" id="bugSubmitBtn" class="bug-submit-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+            Submit Bug Report
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Success Message -->
+    <div id="bugSuccessContainer" class="bug-success-message" style="display:none;">
+      <div class="bug-success-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <h2 class="bug-success-title">Bug Report Submitted!</h2>
+      <p class="bug-success-text">
+        Thank you for taking the time to report this issue. Your bug report has been successfully sent to our development team at <strong>development@orbis-hub.com</strong>.
+        <br><br>
+        We appreciate your help in making OrbisHub better!
+      </p>
+      <div class="bug-success-actions">
+        <button id="bugSubmitAnotherBtn" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
+            <polyline points="1 4 1 10 7 10"></polyline>
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+          </svg>
+          Report Another Bug
+        </button>
+      </div>
     </div>
   </div>
 </section>
@@ -3879,6 +4114,9 @@ Channels
 <!-- Password Manager Module -->
 <script src="../Functions/PasswordManager/password-service.js"></script>
 <script src="../Functions/PasswordManager/password-ui.js"></script>
+<!-- Bug Reporting Module -->
+<script src="../Functions/BugReporting/bug-service.js"></script>
+<script src="../Functions/BugReporting/bug-ui.js"></script>
 <!-- Core -->
 <script src="app-main.js"></script>
 </body>
