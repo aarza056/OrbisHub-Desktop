@@ -674,9 +674,20 @@ ipcMain.handle('db-test-connection', async (event, config) => {
             version: result.recordset[0].version 
         };
     } catch (error) {
+        // Provide helpful error messages for common Docker SQL Server issues
+        let errorMessage = error.message;
+        
+        if (error.message.includes('Login failed')) {
+            errorMessage = `Login failed. ${config.authType === 'windows' ? 'Docker SQL Server requires SQL Server Authentication. Switch to SQL Auth and use username "sa".' : 'Check your username and password.'}`;
+        } else if (error.message.includes('self signed certificate') || error.message.includes('certificate')) {
+            errorMessage = 'Certificate error. Enable "Trust Server Certificate" option.';
+        } else if (error.message.includes('ECONNREFUSED') || error.message.includes('Failed to connect')) {
+            errorMessage = `Cannot reach SQL Server. Check: 1) Container is running, 2) Port is correct (use "localhost,1433" for Docker), 3) Firewall allows connection.`;
+        }
+        
         return { 
             success: false, 
-            error: error.message 
+            error: errorMessage 
         };
     }
 });
@@ -1020,6 +1031,53 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
             )
         `);
         migrations.push('Settings table created');
+        
+        // Agents table (for OrbisAgent PowerShell agents)
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Agents]') AND type in (N'U'))
+            BEGIN
+                CREATE TABLE [dbo].[Agents] (
+                    [AgentId] UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+                    [MachineName] NVARCHAR(255) NOT NULL,
+                    [IPAddress] NVARCHAR(500) NULL,
+                    [OSVersion] NVARCHAR(255) NULL,
+                    [AgentVersion] NVARCHAR(50) NULL,
+                    [LastSeenUtc] DATETIME NOT NULL DEFAULT GETUTCDATE(),
+                    [CreatedUtc] DATETIME NOT NULL DEFAULT GETUTCDATE()
+                );
+
+                CREATE INDEX IX_Agents_MachineName ON [dbo].[Agents]([MachineName]);
+                CREATE INDEX IX_Agents_LastSeenUtc ON [dbo].[Agents]([LastSeenUtc]);
+            END
+        `);
+        migrations.push('Agents table created');
+        
+        // AgentJobs table (for OrbisAgent job queue)
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[AgentJobs]') AND type in (N'U'))
+            BEGIN
+                CREATE TABLE [dbo].[AgentJobs] (
+                    [JobId] UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+                    [AgentId] UNIQUEIDENTIFIER NOT NULL,
+                    [Type] NVARCHAR(100) NOT NULL,
+                    [PayloadJson] NVARCHAR(MAX) NULL,
+                    [Status] NVARCHAR(50) NOT NULL DEFAULT 'Pending',
+                    [CreatedUtc] DATETIME NOT NULL DEFAULT GETUTCDATE(),
+                    [StartedUtc] DATETIME NULL,
+                    [CompletedUtc] DATETIME NULL,
+                    [ResultJson] NVARCHAR(MAX) NULL,
+                    [ErrorMessage] NVARCHAR(MAX) NULL,
+                    CONSTRAINT FK_AgentJobs_Agents FOREIGN KEY ([AgentId]) 
+                        REFERENCES [dbo].[Agents]([AgentId]) ON DELETE CASCADE
+                );
+
+                CREATE INDEX IX_AgentJobs_AgentId ON [dbo].[AgentJobs]([AgentId]);
+                CREATE INDEX IX_AgentJobs_Status ON [dbo].[AgentJobs]([Status]);
+                CREATE INDEX IX_AgentJobs_CreatedUtc ON [dbo].[AgentJobs]([CreatedUtc]);
+                CREATE INDEX IX_AgentJobs_AgentId_Status_CreatedUtc ON [dbo].[AgentJobs]([AgentId], [Status], [CreatedUtc]);
+            END
+        `);
+        migrations.push('AgentJobs table created');
         
         // No pipeline tables created
         

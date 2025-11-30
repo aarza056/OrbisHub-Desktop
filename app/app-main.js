@@ -9270,7 +9270,7 @@ async function createDefaultAdmin() {
         
         // Create default admin user in database
         const adminId = uid()
-        await window.electronAPI.dbExecute(
+        const result = await window.electronAPI.dbExecute(
             `INSERT INTO Users (id, username, password, name, email, role, position, squad, lastLogin, lastActivity, ip, isActive, changePasswordOnLogin, created_at) 
              VALUES (@param0, @param1, @param2, @param3, @param4, @param5, @param6, @param7, @param8, @param9, @param10, @param11, @param12, GETDATE())`,
             [
@@ -9289,6 +9289,14 @@ async function createDefaultAdmin() {
                 { value: 1 } // Force password change on first login
             ]
         )
+        
+        // Check if the insert was successful
+        if (!result || !result.success) {
+            throw new Error('Failed to insert admin user: ' + (result?.error || 'Unknown error'))
+        }
+        
+        console.log('✅ Admin user created successfully with ID:', adminId)
+        return result
 
     } catch (error) {
         console.error('Failed to create default admin:', error)
