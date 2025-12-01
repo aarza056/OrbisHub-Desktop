@@ -84,9 +84,9 @@ if (-not $isAdmin) {
 # Test Core Service connectivity
 Write-Host "[1/5] Testing Core Service connectivity..." -ForegroundColor Green
 try {
-    $testUrl = "$CoreServiceUrl/api/agents"
-    $null = Invoke-RestMethod -Uri $testUrl -Method Get -TimeoutSec 5 -ErrorAction Stop
-    Write-Host "      [OK] Core Service is reachable" -ForegroundColor Green
+    $testUrl = "$CoreServiceUrl/health"
+    $response = Invoke-RestMethod -Uri $testUrl -Method Get -TimeoutSec 5 -ErrorAction Stop
+    Write-Host "      [OK] Core Service is reachable (v$($response.version))" -ForegroundColor Green
 } catch {
     Write-Host "      [FAIL] Cannot reach Core Service at $CoreServiceUrl" -ForegroundColor Red
     Write-Host "      Error: $_" -ForegroundColor Red

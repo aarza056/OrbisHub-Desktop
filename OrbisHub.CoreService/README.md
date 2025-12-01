@@ -38,6 +38,45 @@ The **OrbisHub Core Service** is a Windows Service that acts as the central cont
 
 ## Installation
 
+### Automated Installation (Recommended for New Clients)
+
+Use the automated installation script to set up the Core Service with all dependencies:
+
+```powershell
+# Navigate to the CoreService directory
+cd OrbisHub.CoreService
+
+# Run the installation script as Administrator
+.\Install.ps1
+```
+
+**Optional Parameters:**
+```powershell
+.\Install.ps1 `
+  -InstallPath "C:\Program Files\OrbisHub\CoreService" `
+  -SqlServer "localhost" `
+  -Database "OrbisHub" `
+  -Port 5000
+```
+
+The automated installer will:
+1. ✅ Build and publish the project
+2. ✅ Copy files to the installation directory
+3. ✅ Copy OrbisAgent scripts for download endpoint
+4. ✅ Configure appsettings.json
+5. ✅ Initialize the database schema
+6. ✅ **Grant database permissions to NT AUTHORITY\SYSTEM**
+7. ✅ Configure Windows Firewall
+8. ✅ Install and start the Windows Service
+9. ✅ Test the API endpoint
+
+**After installation, agents can be deployed using:**
+```powershell
+irm http://your-server-ip:5000/api/agent/download/bootstrap | iex
+```
+
+---
+
 ### Quick Installation (Using Pre-Built Files)
 
 If you have the OrbisHub Desktop application installed, the compiled CoreService is already available and ready to deploy.

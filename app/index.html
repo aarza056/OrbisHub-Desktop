@@ -85,6 +85,7 @@
         <label class="label">SQL Server Address
           <input id="setupServerName" class="input" placeholder="localhost\SQLEXPRESS or server.domain.com" value="localhost\SQLEXPRESS" />
           <span class="input-hint">Enter your SQL Server instance name or IP address</span>
+          <span class="input-hint" style="color:#fcd34d;">💡 Docker SQL Server? Use <strong>localhost,1433</strong> and SQL Authentication below</span>
         </label>
         
         <label class="label">Database Name
@@ -110,7 +111,7 @@
         
         <label class="label" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
           <input type="checkbox" id="setupTrustCert" checked />
-          <span>Trust Server Certificate (Required for local SQL Server)</span>
+          <span>Trust Server Certificate (Required for local & Docker SQL Server)</span>
         </label>
         
         <label class="label" style="display:flex; align-items:center; gap:8px; cursor:pointer;">

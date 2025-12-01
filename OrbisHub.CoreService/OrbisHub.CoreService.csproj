@@ -14,4 +14,12 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
   </ItemGroup>
 
+  <!-- Copy OrbisAgent scripts to output directory -->
+  <ItemGroup>
+    <None Include="..\OrbisAgent\*.ps1">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>OrbisAgent\%(Filename)%(Extension)</Link>
+    </None>
+  </ItemGroup>
+
 </Project>

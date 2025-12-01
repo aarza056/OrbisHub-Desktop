@@ -1674,13 +1674,19 @@ body.compact-mode .card { padding: 10px; border-radius: 12px; }
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 12px;
   margin-top: 16px;
   padding: 8px 16px;
   border-radius: 8px;
   font-size: 12px;
   font-weight: 500;
   transition: all 0.3s ease;
+}
+
+.login-db-status-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .login-db-status.is-checking {
@@ -1707,11 +1713,59 @@ body.compact-mode .card { padding: 10px; border-radius: 12px; }
   justify-content: center;
   width: 16px;
   height: 16px;
+  flex-shrink: 0;
 }
 
 .login-db-status-icon svg {
   width: 14px;
   height: 14px;
+}
+
+.login-db-status-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.login-db-setup-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.login-db-setup-btn--icon {
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.login-db-setup-btn:hover {
+  background: color-mix(in srgb, currentColor 15%, transparent);
+  transform: translateY(-1px);
+}
+
+.login-db-setup-btn:active {
+  transform: translateY(0);
+}
+
+.login-db-setup-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.login-db-setup-btn--icon svg {
+  width: 16px;
+  height: 16px;
 }
 
 .btn-primary {
@@ -1747,11 +1801,32 @@ body.compact-mode .card { padding: 10px; border-radius: 12px; }
 .setup-container {
   width: 100%;
   max-width: 600px;
+  max-height: 90vh;
   padding: 48px 40px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 16px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  overflow-y: auto;
+  margin: 20px;
+}
+
+/* Responsive design for smaller screens */
+@media (max-width: 768px) {
+  .setup-container {
+    max-width: 95%;
+    padding: 32px 24px;
+    margin: 10px;
+    max-height: 95vh;
+  }
+}
+
+@media (max-width: 480px) {
+  .setup-container {
+    padding: 24px 16px;
+    margin: 5px;
+    border-radius: 12px;
+  }
 }
 
 .setup-header {
@@ -1764,6 +1839,12 @@ body.compact-mode .card { padding: 10px; border-radius: 12px; }
   font-weight: 700;
   color: var(--text);
   margin: 16px 0 8px 0;
+}
+
+@media (max-width: 480px) {
+  .setup-header h1 {
+    font-size: 22px;
+  }
 }
 
 .setup-tagline {
@@ -1815,11 +1896,30 @@ body.compact-mode .card { padding: 10px; border-radius: 12px; }
   color: var(--text);
 }
 
+@media (max-width: 480px) {
+  .setup-step-header h2 {
+    font-size: 18px;
+  }
+  
+  .setup-step-number {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+}
+
 .setup-form {
   display: flex;
   flex-direction: column;
   gap: 20px;
   margin-bottom: 32px;
+}
+
+@media (max-width: 480px) {
+  .setup-form {
+    gap: 16px;
+    margin-bottom: 24px;
+  }
 }
 
 /* Setup form labels - display text above inputs */
@@ -1847,11 +1947,21 @@ body.compact-mode .card { padding: 10px; border-radius: 12px; }
 
 .setup-form .label .input,
 .setup-form .label input,
-.setup-form .label select {
-  width: 100%;
-  margin: 0;
+.setup-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 32px;
 }
 
+@media (max-width: 480px) {
+  .setup-actions {
+    flex-direction: column;
+  }
+  
+  .setup-actions button {
+    width: 100%;
+  }
+}
 .input-hint {
   display: block;
   font-size: 12px;

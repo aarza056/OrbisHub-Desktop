@@ -9,8 +9,9 @@
  */
 
 const AgentAPI = {
-    // Core Service URL - can be configured
-    coreServiceUrl: 'http://192.168.11.56:5000',
+    // Core Service URL - should point to YOUR local machine, not remote PCs
+    // Remote PCs run OrbisAgent only, which connects to this CoreService
+    coreServiceUrl: 'http://localhost:5000',
 
     /**
      * Set Core Service URL
@@ -40,6 +41,12 @@ const AgentAPI = {
                 
                 if (!response.ok) {
                     const errorMsg = response.data?.error || response.data?.message || `HTTP ${response.status}`;
+                    console.error(`❌ API Error [${endpoint}]:`, {
+                        status: response.status,
+                        statusText: response.statusText,
+                        error: errorMsg,
+                        fullResponse: response.data
+                    });
                     throw new Error(errorMsg);
                 }
                 return response.data;
@@ -48,12 +55,18 @@ const AgentAPI = {
                 const response = await fetch(`${this.coreServiceUrl}${endpoint}`, options);
                 if (!response.ok) {
                     const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    console.error(`❌ API Error [${endpoint}]:`, {
+                        status: response.status,
+                        statusText: response.statusText,
+                        error: error,
+                        url: `${this.coreServiceUrl}${endpoint}`
+                    });
                     throw new Error(error.error || `HTTP ${response.status}`);
                 }
                 return await response.json();
             }
         } catch (error) {
-            console.error(`API call failed: ${endpoint}`, error);
+            console.error(`❌ API call failed: ${endpoint}`, error);
             throw error;
         }
     },
@@ -91,8 +104,14 @@ const AgentAPI = {
                 createdAt: agent.createdUtc
             }));
         } catch (error) {
-            console.error('Failed to get agents:', error);
-            return [];
+            console.error('❌ Failed to get agents from API:', error);
+            console.error('Error details:', {
+                message: error.message,
+                response: error.response,
+                status: error.status,
+                stack: error.stack
+            });
+            throw error; // Re-throw so UI can show the actual error
         }
     },
 

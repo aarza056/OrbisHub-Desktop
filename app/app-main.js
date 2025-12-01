@@ -272,19 +272,47 @@ if (window.electronAPI) {
 
 // In-memory cache for database (no browser storage)
 let memoryCache = null
+let lastConnectionCheckTime = 0
+let lastConnectionCheckResult = null
+const CONNECTION_CHECK_CACHE_MS = 5000 // Cache connection check for 5 seconds
 
 // Database-only store with in-memory cache
 const store = {
     async checkDatabaseConnection() {
         try {
+            // Use cached result if recent enough (prevents excessive connection tests)
+            const now = Date.now()
+            if (lastConnectionCheckResult !== null && (now - lastConnectionCheckTime) < CONNECTION_CHECK_CACHE_MS) {
+                return lastConnectionCheckResult
+            }
+            
             const config = await window.electronAPI.getDbConfig()
             if (!config || !config.server || !config.database) {
+                lastConnectionCheckTime = now
+                lastConnectionCheckResult = false
                 return false
             }
-            // Test actual connection
-            const testResult = await window.electronAPI.testDbConnection(config)
-            return testResult && testResult.success === true
+            
+            // Test actual connection with timeout
+            const testResult = await Promise.race([
+                window.electronAPI.testDbConnection(config),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Connection test timeout')), 3000))
+            ])
+            
+            const isConnected = testResult && testResult.success === true
+            
+            // Cache the result
+            lastConnectionCheckTime = now
+            lastConnectionCheckResult = isConnected
+            
+            return isConnected
         } catch (error) {
+            console.warn('⚠️ Database connection check failed:', error.message)
+            // Don't update cache on error - use previous result if available
+            // This prevents temporary network issues from breaking the app
+            if (lastConnectionCheckResult !== null) {
+                return lastConnectionCheckResult
+            }
             return false
         }
     },
@@ -4539,14 +4567,23 @@ async function updateLoginDbStatus() {
             // No config
             loginDbStatus.className = 'login-db-status is-disconnected'
             loginDbStatus.innerHTML = `
-                <div class="login-db-status-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="15" y1="9" x2="9" y2="15"></line>
-                        <line x1="9" y1="9" x2="15" y2="15"></line>
-                    </svg>
+                <div class="login-db-status-content">
+                    <div class="login-db-status-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="15" y1="9" x2="9" y2="15"></line>
+                            <line x1="9" y1="9" x2="15" y2="15"></line>
+                        </svg>
+                    </div>
+                    <span class="login-db-status-text">Database not configured</span>
                 </div>
-                <span class="login-db-status-text">Database not configured</span>
+                <button class="login-db-setup-btn" onclick="showSetupWizard()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M12 1v6m0 6v6m6-12v6m0 6v6M6 1v6m0 6v6"></path>
+                    </svg>
+                    Setup
+                </button>
             `
             return
         }
@@ -4557,39 +4594,65 @@ async function updateLoginDbStatus() {
             // Connected
             loginDbStatus.className = 'login-db-status is-connected'
             loginDbStatus.innerHTML = `
-                <div class="login-db-status-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
+                <div class="login-db-status-content">
+                    <div class="login-db-status-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    </div>
+                    <span class="login-db-status-text">Database connected: ${config.server}\\${config.database}</span>
                 </div>
-                <span class="login-db-status-text">Database connected: ${config.server}\\${config.database}</span>
+                <button class="login-db-setup-btn login-db-setup-btn--icon" onclick="showSetupWizard()" title="Configure database">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                </button>
             `
         } else {
             // Connection failed
             loginDbStatus.className = 'login-db-status is-disconnected'
             loginDbStatus.innerHTML = `
-                <div class="login-db-status-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="8" x2="12" y2="12"></line>
-                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                    </svg>
+                <div class="login-db-status-content">
+                    <div class="login-db-status-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                    </div>
+                    <span class="login-db-status-text">Database connection failed</span>
                 </div>
-                <span class="login-db-status-text">Database connection failed</span>
+                <button class="login-db-setup-btn" onclick="showSetupWizard()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M12 1v6m0 6v6m6-12v6m0 6v6M6 1v6m0 6v6"></path>
+                    </svg>
+                    Reconfigure
+                </button>
             `
         }
     } catch (error) {
         console.error('Error checking database status:', error)
         loginDbStatus.className = 'login-db-status is-disconnected'
         loginDbStatus.innerHTML = `
-            <div class="login-db-status-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="15" y1="9" x2="9" y2="15"></line>
-                    <line x1="9" y1="9" x2="15" y2="15"></line>
-                </svg>
+            <div class="login-db-status-content">
+                <div class="login-db-status-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                    </svg>
+                </div>
+                <span class="login-db-status-text">Error checking database</span>
             </div>
-            <span class="login-db-status-text">Error checking database</span>
+            <button class="login-db-setup-btn" onclick="showSetupWizard()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M12 1v6m0 6v6m6-12v6m0 6v6M6 1v6m0 6v6"></path>
+                </svg>
+                Setup
+            </button>
         `
     }
 }
@@ -8851,17 +8914,61 @@ async function initializeSetupWizard() {
         return
     }
     
-    // Test if connection works
-    const testResult = await window.electronAPI.testDbConnection(dbConfig)
+    // Database config exists - try connection with retry logic
+    // Don't immediately show setup wizard on connection failure
+    // as it might be a temporary network issue
+    try {
+        const testResult = await testConnectionWithRetry(dbConfig, 2, 1000)
+        
+        if (!testResult || !testResult.success) {
+            console.warn('⚠️ Database connection test failed, but config exists. Proceeding to login.')
+            // Proceed to login screen anyway - the app will handle connection errors gracefully
+            // Users can still access the app and retry the connection
+            showLoginScreen()
+            return
+        }
 
-    if (!testResult || !testResult.success) {
-
-        showSetupWizard()
-        return
+        // Database is ready - show login screen
+        showLoginScreen()
+    } catch (error) {
+        console.error('❌ Database connection error:', error)
+        // Even on error, if config exists, show login screen
+        // The app will handle reconnection attempts
+        showLoginScreen()
     }
+}
 
-    // Database is ready - show login screen
-    showLoginScreen()
+// Helper function to test connection with retry logic
+async function testConnectionWithRetry(config, retries = 2, delayMs = 1000) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            console.log(`🔌 Connection test attempt ${attempt + 1}/${retries + 1}...`)
+            const result = await window.electronAPI.testDbConnection(config)
+            
+            if (result && result.success) {
+                console.log('✅ Database connection successful')
+                return result
+            }
+            
+            // If not successful but we have more retries, wait and try again
+            if (attempt < retries) {
+                console.log(`⏳ Waiting ${delayMs}ms before retry...`)
+                await new Promise(resolve => setTimeout(resolve, delayMs))
+            }
+        } catch (error) {
+            console.warn(`⚠️ Connection test attempt ${attempt + 1} failed:`, error.message)
+            
+            // If this was the last attempt, return failure
+            if (attempt === retries) {
+                return { success: false, error: error.message }
+            }
+            
+            // Wait before next retry
+            await new Promise(resolve => setTimeout(resolve, delayMs))
+        }
+    }
+    
+    return { success: false, error: 'Connection test failed after retries' }
 }
 
 function showSetupWizard() {
@@ -9125,18 +9232,20 @@ async function runMigrations() {
             ).join('')
         }
         
-        // Create default admin user
-        statusText.textContent = 'Creating default admin user...'
-        await createDefaultAdmin()
-        
-        progressFill.style.width = '90%'
-        
-        // Save config
+        // Save config BEFORE creating admin user (so dbExecute can work)
         statusText.textContent = 'Saving configuration...'
         const saveResult = await window.electronAPI.saveDbConfig({
             ...wizardConfig,
             connected: true
         })
+        
+        progressFill.style.width = '70%'
+        
+        // Create default admin user (after config is saved)
+        statusText.textContent = 'Creating default admin user...'
+        await createDefaultAdmin()
+        
+        progressFill.style.width = '90%'
 
         progressFill.style.width = '100%'
         statusText.textContent = 'Setup complete!'
@@ -9163,7 +9272,7 @@ async function createDefaultAdmin() {
         
         // Create default admin user in database
         const adminId = uid()
-        await window.electronAPI.dbExecute(
+        const result = await window.electronAPI.dbExecute(
             `INSERT INTO Users (id, username, password, name, email, role, position, squad, lastLogin, lastActivity, ip, isActive, changePasswordOnLogin, created_at) 
              VALUES (@param0, @param1, @param2, @param3, @param4, @param5, @param6, @param7, @param8, @param9, @param10, @param11, @param12, GETDATE())`,
             [
@@ -9182,6 +9291,14 @@ async function createDefaultAdmin() {
                 { value: 1 } // Force password change on first login
             ]
         )
+        
+        // Check if the insert was successful
+        if (!result || !result.success) {
+            throw new Error('Failed to insert admin user: ' + (result?.error || 'Unknown error'))
+        }
+        
+        console.log('✅ Admin user created successfully with ID:', adminId)
+        return result
 
     } catch (error) {
         console.error('Failed to create default admin:', error)
