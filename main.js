@@ -832,6 +832,56 @@ ipcMain.handle('db-execute', async (event, query, params = []) => {
     }
 });
 
+// Execute query with provided config (for setup wizard before config is saved)
+ipcMain.handle('db-execute-with-config', async (event, config, query, params = []) => {
+    try {
+        const testConfig = {
+            server: config.server,
+            database: config.database,
+            options: {
+                encrypt: config.encrypt,
+                trustServerCertificate: config.trustCert,
+                enableArithAbort: true
+            }
+        };
+
+        if (config.authType === 'sql') {
+            testConfig.user = config.user;
+            testConfig.password = config.password;
+            testConfig.authentication = { type: 'default' };
+        } else {
+            testConfig.authentication = {
+                type: 'ntlm',
+                options: { domain: '', userName: '', password: '' }
+            };
+        }
+
+        const pool = await sql.connect(testConfig);
+        const request = pool.request();
+        
+        // Add parameters
+        params.forEach((param, index) => {
+            let value = param.value;
+            if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'number') {
+                value = Buffer.from(value);
+            }
+            request.input(`param${index}`, value);
+        });
+        
+        const result = await request.query(query);
+        await pool.close();
+        
+        return { 
+            success: true, 
+            rowsAffected: result.rowsAffected[0],
+            data: result.recordset 
+        };
+    } catch (error) {
+        console.error('Database execute with config error:', error);
+        return { success: false, error: error.message };
+    }
+});
+
 // Get database size
 ipcMain.handle('db-get-size', async (event) => {
     try {

@@ -9232,20 +9232,18 @@ async function runMigrations() {
             ).join('')
         }
         
-        // Save config BEFORE creating admin user (so dbExecute can work)
+        // Create default admin user
+        statusText.textContent = 'Creating default admin user...'
+        await createDefaultAdmin()
+        
+        progressFill.style.width = '90%'
+        
+        // Save config
         statusText.textContent = 'Saving configuration...'
         const saveResult = await window.electronAPI.saveDbConfig({
             ...wizardConfig,
             connected: true
         })
-        
-        progressFill.style.width = '70%'
-        
-        // Create default admin user (after config is saved)
-        statusText.textContent = 'Creating default admin user...'
-        await createDefaultAdmin()
-        
-        progressFill.style.width = '90%'
 
         progressFill.style.width = '100%'
         statusText.textContent = 'Setup complete!'
@@ -9270,9 +9268,10 @@ async function createDefaultAdmin() {
             throw new Error('Failed to hash default admin password')
         }
         
-        // Create default admin user in database
+        // Create default admin user in database using wizardConfig
         const adminId = uid()
-        const result = await window.electronAPI.dbExecute(
+        const result = await window.electronAPI.dbExecuteWithConfig(
+            wizardConfig,
             `INSERT INTO Users (id, username, password, name, email, role, position, squad, lastLogin, lastActivity, ip, isActive, changePasswordOnLogin, created_at) 
              VALUES (@param0, @param1, @param2, @param3, @param4, @param5, @param6, @param7, @param8, @param9, @param10, @param11, @param12, GETDATE())`,
             [
