@@ -703,6 +703,8 @@ ipcMain.handle('http-request', async (event, url, options = {}) => {
         const urlObj = new URL(fixedUrl);
         const client = urlObj.protocol === 'https:' ? https : http;
         
+        console.log(`🌐 HTTP Request: ${options.method || 'GET'} ${fixedUrl}`);
+        
         return new Promise((resolve, reject) => {
             const reqOptions = {
                 hostname: urlObj.hostname,
@@ -710,13 +712,15 @@ ipcMain.handle('http-request', async (event, url, options = {}) => {
                 path: urlObj.pathname + urlObj.search,
                 method: options.method || 'GET',
                 headers: options.headers || {},
-                family: 4  // Force IPv4
+                family: 4,  // Force IPv4
+                timeout: 10000 // 10 second timeout
             };
             
             const req = client.request(reqOptions, (res) => {
                 let data = '';
                 res.on('data', (chunk) => data += chunk);
                 res.on('end', () => {
+                    console.log(`✅ HTTP Response: ${res.statusCode} from ${fixedUrl}`);
                     try {
                         const result = {
                             ok: res.statusCode >= 200 && res.statusCode < 300,
@@ -736,9 +740,37 @@ ipcMain.handle('http-request', async (event, url, options = {}) => {
                 });
             });
             
+            req.on('timeout', () => {
+                console.error(`⏱️ HTTP request timeout: ${fixedUrl}`);
+                req.destroy();
+                resolve({ 
+                    ok: false, 
+                    status: 0, 
+                    statusText: 'Timeout',
+                    error: 'Request timeout',
+                    data: { 
+                        error: `Request to ${urlObj.hostname}:${urlObj.port} timed out after 10 seconds. Check if CoreService is running and accessible.` 
+                    }
+                });
+            });
+            
             req.on('error', (error) => {
-                console.error('HTTP request error:', error);
-                resolve({ ok: false, status: 0, error: error.message });
+                console.error('❌ HTTP request error:', {
+                    url: fixedUrl,
+                    error: error.message,
+                    code: error.code,
+                    errno: error.errno,
+                    syscall: error.syscall
+                });
+                resolve({ 
+                    ok: false, 
+                    status: 0, 
+                    statusText: 'Connection Failed',
+                    error: error.message,
+                    data: { 
+                        error: `Cannot connect to ${urlObj.hostname}:${urlObj.port} - ${error.message}. Is the CoreService running?` 
+                    }
+                });
             });
             
             if (options.body) {
@@ -1043,7 +1075,8 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
                     [OSVersion] NVARCHAR(255) NULL,
                     [AgentVersion] NVARCHAR(50) NULL,
                     [LastSeenUtc] DATETIME NOT NULL DEFAULT GETUTCDATE(),
-                    [CreatedUtc] DATETIME NOT NULL DEFAULT GETUTCDATE()
+                    [CreatedUtc] DATETIME NOT NULL DEFAULT GETUTCDATE(),
+                    [Metadata] NVARCHAR(MAX) NULL
                 );
 
                 CREATE INDEX IX_Agents_MachineName ON [dbo].[Agents]([MachineName]);
@@ -1582,53 +1615,95 @@ ipcMain.handle('db-create-database', async (event, config) => {
         // Create database using simplest possible syntax
         console.log(`Creating database '${config.database}'...`);
         try {
-            // First, get SQL Server's default data path
-            const pathQuery = await pool.request().query(`
-                SELECT 
-                    SERVERPROPERTY('InstanceDefaultDataPath') as DataPath,
-                    SERVERPROPERTY('InstanceDefaultLogPath') as LogPath
-            `);
+            // Try simple creation first - let SQL Server use its default paths
+            // This is the most reliable method
+            console.log('Attempting simple CREATE DATABASE (using SQL Server defaults)');
+            await pool.request().query(`CREATE DATABASE [${config.database}]`);
+            console.log(`Database '${config.database}' created successfully with default settings`);
             
-            const dataPath = pathQuery.recordset[0].DataPath;
-            const logPath = pathQuery.recordset[0].LogPath;
-            
-            console.log(`SQL Server data path: ${dataPath}`);
-            console.log(`SQL Server log path: ${logPath}`);
-            
-            // If we have valid paths, use them explicitly
-            if (dataPath && logPath) {
-                const dbName = config.database;
-                await pool.request().query(`
-                    CREATE DATABASE [${dbName}]
-                    ON PRIMARY (
-                        NAME = N'${dbName}',
-                        FILENAME = N'${dataPath}${dbName}.mdf',
-                        SIZE = 8MB,
-                        FILEGROWTH = 64MB
-                    )
-                    LOG ON (
-                        NAME = N'${dbName}_log',
-                        FILENAME = N'${logPath}${dbName}_log.ldf',
-                        SIZE = 8MB,
-                        FILEGROWTH = 64MB
-                    )
-                `);
-            } else {
-                // Fallback to simple creation
-                await pool.request().query(`CREATE DATABASE [${config.database}]`);
+            // If using SQL authentication, set up the login as database owner
+            if (config.authType === 'sql' && config.user) {
+                console.log(`Setting up user '${config.user}' as database owner...`);
+                
+                try {
+                    // Check if login exists at server level
+                    const loginCheck = await pool.request()
+                        .input('loginName', sql.NVarChar, config.user)
+                        .query(`SELECT name FROM sys.server_principals WHERE name = @loginName AND type = 'S'`);
+                    
+                    if (loginCheck.recordset.length === 0) {
+                        // Create the SQL login if it doesn't exist
+                        console.log(`Creating SQL login '${config.user}'...`);
+                        await pool.request().query(`
+                            CREATE LOGIN [${config.user}] 
+                            WITH PASSWORD = '${config.password.replace(/'/g, "''")}'
+                        `);
+                    }
+                    
+                    // Switch to the new database context to create user and set owner
+                    await pool.close();
+                    
+                    // Reconnect to the new database
+                    const newDbConfig = { ...testConfig, database: config.database };
+                    const newPool = await sql.connect(newDbConfig);
+                    
+                    // Create database user mapped to the login
+                    console.log(`Creating database user '${config.user}'...`);
+                    const userCheck = await newPool.request()
+                        .input('userName', sql.NVarChar, config.user)
+                        .query(`SELECT name FROM sys.database_principals WHERE name = @userName`);
+                    
+                    if (userCheck.recordset.length === 0) {
+                        await newPool.request().query(`CREATE USER [${config.user}] FOR LOGIN [${config.user}]`);
+                    }
+                    
+                    // Add user to db_owner role
+                    console.log(`Granting db_owner role to '${config.user}'...`);
+                    await newPool.request().query(`ALTER ROLE db_owner ADD MEMBER [${config.user}]`);
+                    
+                    // Set database owner
+                    console.log(`Setting database owner to '${config.user}'...`);
+                    await newPool.request().query(`ALTER AUTHORIZATION ON DATABASE::[${config.database}] TO [${config.user}]`);
+                    
+                    await newPool.close();
+                    console.log(`✅ User '${config.user}' configured as database owner`);
+                } catch (userError) {
+                    console.warn('Warning: Could not set database owner:', userError.message);
+                    console.warn('Database created but ownership not set. You may need to set this manually.');
+                    // Don't fail the entire operation if this fails
+                }
             }
             
-            console.log(`Database '${config.database}' created successfully`);
         } catch (createError) {
             console.error('Create error:', createError);
+            console.error('Error details:', {
+                message: createError.message,
+                number: createError.number,
+                state: createError.state,
+                class: createError.class,
+                serverName: createError.serverName,
+                procName: createError.procName,
+                lineNumber: createError.lineNumber
+            });
             await pool.close();
+            
+            // Provide more helpful error messages
+            let errorMsg = createError.message;
+            if (createError.message.includes('could not be created')) {
+                errorMsg += '\n\nPossible causes:\n' +
+                    '• SQL Server service may not have write permissions to the data directory\n' +
+                    '• The data/log paths may not exist\n' +
+                    '• Try running SQL Server service as an administrator or check folder permissions';
+            }
+            
             return {
                 success: false,
-                error: `CREATE DATABASE failed: ${createError.message}`
+                error: `CREATE DATABASE failed: ${errorMsg}`
             };
         }
         
-        await pool.close();
+        // Close the master connection if still open
+        try { await pool.close(); } catch(e) {}
         
         return { 
             success: true, 

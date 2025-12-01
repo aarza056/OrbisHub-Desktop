@@ -55,6 +55,21 @@ if (-not (Test-Path $InstallPath)) {
 
 # Copy files
 Copy-Item -Path "$PSScriptRoot\publish\*" -Destination $InstallPath -Recurse -Force
+
+# Copy OrbisAgent files for download endpoint
+$agentSourcePath = Join-Path $PSScriptRoot "..\OrbisAgent"
+$agentDestPath = Join-Path $InstallPath "OrbisAgent"
+if (Test-Path $agentSourcePath) {
+    Write-Host "Copying OrbisAgent files..." -ForegroundColor Yellow
+    if (-not (Test-Path $agentDestPath)) {
+        New-Item -ItemType Directory -Path $agentDestPath -Force | Out-Null
+    }
+    Copy-Item -Path "$agentSourcePath\*.ps1" -Destination $agentDestPath -Force
+    Write-Host "OrbisAgent files copied" -ForegroundColor Green
+} else {
+    Write-Warning "OrbisAgent folder not found at: $agentSourcePath"
+}
+
 Write-Host "Files copied to $InstallPath" -ForegroundColor Green
 
 # Step 3: Configure appsettings.json
@@ -81,6 +96,21 @@ if (Test-Path $sqlScript) {
     }
 } else {
     Write-Warning "Database script not found. Please run it manually: $sqlScript"
+}
+
+# Grant permissions to NT AUTHORITY\SYSTEM
+Write-Host "Granting database permissions to service account..." -ForegroundColor Yellow
+$permissionsScript = Join-Path $PSScriptRoot "GrantServicePermissions.sql"
+if (Test-Path $permissionsScript) {
+    try {
+        sqlcmd -S $SqlServer -i $permissionsScript
+        Write-Host "Database permissions granted successfully" -ForegroundColor Green
+    } catch {
+        Write-Warning "Failed to grant permissions. You may need to run this manually:"
+        Write-Warning "sqlcmd -S $SqlServer -i `"$permissionsScript`""
+    }
+} else {
+    Write-Warning "Permissions script not found: $permissionsScript"
 }
 
 # Step 5: Configure firewall

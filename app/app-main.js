@@ -9232,18 +9232,20 @@ async function runMigrations() {
             ).join('')
         }
         
-        // Create default admin user
-        statusText.textContent = 'Creating default admin user...'
-        await createDefaultAdmin()
-        
-        progressFill.style.width = '90%'
-        
-        // Save config
+        // Save config BEFORE creating admin user (so dbExecute can work)
         statusText.textContent = 'Saving configuration...'
         const saveResult = await window.electronAPI.saveDbConfig({
             ...wizardConfig,
             connected: true
         })
+        
+        progressFill.style.width = '70%'
+        
+        // Create default admin user (after config is saved)
+        statusText.textContent = 'Creating default admin user...'
+        await createDefaultAdmin()
+        
+        progressFill.style.width = '90%'
 
         progressFill.style.width = '100%'
         statusText.textContent = 'Setup complete!'

@@ -67,6 +67,11 @@ public class AgentRepository : IAgentRepository
             var result = await connection.QueryAsync<Agent>(sql);
             return result.ToList();
         }
+        catch (SqlException ex)
+        {
+            _logger.LogError(ex, "SQL Error retrieving all agents. Error Number: {ErrorNumber}, Message: {Message}", ex.Number, ex.Message);
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving all agents");
@@ -138,9 +143,8 @@ public class AgentRepository : IAgentRepository
             var sql = @"
                 UPDATE Agents 
                 SET LastSeenUtc = @LastSeenUtc,
-                    Status = 'Online',
                     AgentVersion = COALESCE(@AgentVersion, AgentVersion),
-                    Metadata = CASE WHEN @Metadata IS NOT NULL THEN @Metadata ELSE Metadata END
+                    Metadata = COALESCE(@Metadata, Metadata)
                 WHERE AgentId = @AgentId";
 
             var rowsAffected = await connection.ExecuteAsync(sql, new
