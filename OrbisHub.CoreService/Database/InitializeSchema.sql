@@ -13,6 +13,8 @@ BEGIN
         [IPAddress] NVARCHAR(500) NULL,
         [OSVersion] NVARCHAR(255) NULL,
         [AgentVersion] NVARCHAR(50) NULL,
+        [Status] NVARCHAR(50) NULL,
+        [Metadata] NVARCHAR(MAX) NULL,
         [LastSeenUtc] DATETIME NOT NULL DEFAULT GETUTCDATE(),
         [CreatedUtc] DATETIME NOT NULL DEFAULT GETUTCDATE()
     );
