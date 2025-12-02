@@ -4601,7 +4601,7 @@ async function updateLoginDbStatus() {
         const testResult = await window.electronAPI.testDbConnection(config)
         
         if (testResult && testResult.success) {
-            // Connected
+            // Connected - no buttons shown when database is connected
             loginDbStatus.className = 'login-db-status is-connected'
             loginDbStatus.innerHTML = `
                 <div class="login-db-status-content">
@@ -4611,23 +4611,6 @@ async function updateLoginDbStatus() {
                         </svg>
                     </div>
                     <span class="login-db-status-text" title="${config.server}\\${config.database}">Database connected</span>
-                </div>
-                <div class="login-db-buttons">
-                    <button class="login-db-setup-btn" onclick="retryDbConnection()">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="23 4 23 10 17 10"></polyline>
-                            <polyline points="1 20 1 14 7 14"></polyline>
-                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                        </svg>
-                        Connect
-                    </button>
-                    <button class="login-db-setup-btn" onclick="showSetupWizard()">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="3"></circle>
-                            <path d="M12 1v6m0 6v6m6-12v6m0 6v6M6 1v6m0 6v6"></path>
-                        </svg>
-                        Setup DB
-                    </button>
                 </div>
             `
         } else {
