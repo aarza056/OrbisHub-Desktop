@@ -1162,9 +1162,10 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
                     [IPAddress] NVARCHAR(500) NULL,
                     [OSVersion] NVARCHAR(255) NULL,
                     [AgentVersion] NVARCHAR(50) NULL,
+                    [Status] NVARCHAR(50) NULL,
+                    [Metadata] NVARCHAR(MAX) NULL,
                     [LastSeenUtc] DATETIME NOT NULL DEFAULT GETUTCDATE(),
-                    [CreatedUtc] DATETIME NOT NULL DEFAULT GETUTCDATE(),
-                    [Metadata] NVARCHAR(MAX) NULL
+                    [CreatedUtc] DATETIME NOT NULL DEFAULT GETUTCDATE()
                 );
 
                 CREATE INDEX IX_Agents_MachineName ON [dbo].[Agents]([MachineName]);
@@ -1172,6 +1173,18 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
             END
         `);
         migrations.push('Agents table created');
+        
+        // Add Status column to Agents table if it doesn't exist (migration for existing databases)
+        await pool.request().query(`
+            IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Agents]') AND type in (N'U'))
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Agents]') AND name = 'Status')
+                BEGIN
+                    ALTER TABLE [dbo].[Agents] ADD [Status] NVARCHAR(50) NULL
+                END
+            END
+        `);
+        migrations.push('Agents table updated with Status column');
         
         // AgentJobs table (for OrbisAgent job queue)
         await pool.request().query(`

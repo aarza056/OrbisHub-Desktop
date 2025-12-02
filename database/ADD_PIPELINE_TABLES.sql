@@ -1,1 +1,0 @@
--- Removed: CI/CD pipeline tables script intentionally blanked.
