@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Database Configuration
     getDbConfig: () => ipcRenderer.invoke('db-get-config'),
     saveDbConfig: (config) => ipcRenderer.invoke('db-save-config', config),
+    clearDbConfig: () => ipcRenderer.invoke('db-clear-config'),
     testDbConnection: (config) => ipcRenderer.invoke('db-test-connection', config),
     runMigrations: (config) => ipcRenderer.invoke('db-run-migrations', config),
     createDatabase: (config) => ipcRenderer.invoke('db-create-database', config),

@@ -1672,15 +1672,18 @@ body.compact-mode .card { padding: 10px; border-radius: 12px; }
 
 .login-db-status {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 12px;
   margin-top: 16px;
-  padding: 8px 16px;
+  padding: 12px 16px;
   border-radius: 8px;
   font-size: 12px;
   font-weight: 500;
   transition: all 0.3s ease;
+  width: 100%;
+  max-width: 100%;
 }
 
 .login-db-status-content {
@@ -1730,13 +1733,13 @@ body.compact-mode .card { padding: 10px; border-radius: 12px; }
 .login-db-setup-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: 4px;
+  padding: 5px 10px;
   border: 1px solid currentColor;
   border-radius: 6px;
   background: transparent;
   color: inherit;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -1745,8 +1748,8 @@ body.compact-mode .card { padding: 10px; border-radius: 12px; }
 }
 
 .login-db-setup-btn--icon {
-  padding: 8px;
-  border-radius: 8px;
+  padding: 6px;
+  border-radius: 6px;
 }
 
 .login-db-setup-btn:hover {
@@ -1759,13 +1762,20 @@ body.compact-mode .card { padding: 10px; border-radius: 12px; }
 }
 
 .login-db-setup-btn svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
 }
 
 .login-db-setup-btn--icon svg {
   width: 16px;
   height: 16px;
+}
+
+.login-db-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-primary {
@@ -1776,6 +1786,19 @@ body.compact-mode .card { padding: 10px; border-radius: 12px; }
 
 .btn-primary:hover {
   background: color-mix(in srgb, var(--primary) 85%, black);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  font-weight: 600;
+  border: none;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
 /* Setup Wizard */
@@ -2005,7 +2028,19 @@ body.compact-mode .card { padding: 10px; border-radius: 12px; }
 .setup-status.is-error {
   background: color-mix(in srgb, #ef4444 15%, var(--panel));
   border: 1px solid color-mix(in srgb, #ef4444 40%, transparent);
-  color: #fca5a5;
+  color: #ffffff;
+}
+
+.setup-status-error {
+  background: color-mix(in srgb, #ef4444 15%, var(--panel));
+  border: 1px solid color-mix(in srgb, #ef4444 40%, transparent);
+  color: #ffffff;
+}
+
+.setup-status-success {
+  background: color-mix(in srgb, #10b981 15%, var(--panel));
+  border: 1px solid color-mix(in srgb, #10b981 40%, transparent);
+  color: #ffffff;
 }
 
 .setup-status.is-info {

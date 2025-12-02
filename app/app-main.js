@@ -4577,13 +4577,23 @@ async function updateLoginDbStatus() {
                     </div>
                     <span class="login-db-status-text">Database not configured</span>
                 </div>
-                <button class="login-db-setup-btn" onclick="showSetupWizard()">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"></circle>
-                        <path d="M12 1v6m0 6v6m6-12v6m0 6v6M6 1v6m0 6v6"></path>
-                    </svg>
-                    Setup
-                </button>
+                <div class="login-db-buttons">
+                    <button class="login-db-setup-btn" onclick="retryDbConnection()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                        Connect
+                    </button>
+                    <button class="login-db-setup-btn" onclick="showSetupWizard()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M12 1v6m0 6v6m6-12v6m0 6v6M6 1v6m0 6v6"></path>
+                        </svg>
+                        Setup DB
+                    </button>
+                </div>
             `
             return
         }
@@ -4600,14 +4610,25 @@ async function updateLoginDbStatus() {
                             <polyline points="20 6 9 17 4 12"></polyline>
                         </svg>
                     </div>
-                    <span class="login-db-status-text">Database connected: ${config.server}\\${config.database}</span>
+                    <span class="login-db-status-text" title="${config.server}\\${config.database}">Database connected</span>
                 </div>
-                <button class="login-db-setup-btn login-db-setup-btn--icon" onclick="showSetupWizard()" title="Configure database">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-                        <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
-                </button>
+                <div class="login-db-buttons">
+                    <button class="login-db-setup-btn" onclick="retryDbConnection()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                        Connect
+                    </button>
+                    <button class="login-db-setup-btn" onclick="showSetupWizard()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M12 1v6m0 6v6m6-12v6m0 6v6M6 1v6m0 6v6"></path>
+                        </svg>
+                        Setup DB
+                    </button>
+                </div>
             `
         } else {
             // Connection failed
@@ -4623,13 +4644,23 @@ async function updateLoginDbStatus() {
                     </div>
                     <span class="login-db-status-text">Database connection failed</span>
                 </div>
-                <button class="login-db-setup-btn" onclick="showSetupWizard()">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"></circle>
-                        <path d="M12 1v6m0 6v6m6-12v6m0 6v6M6 1v6m0 6v6"></path>
-                    </svg>
-                    Reconfigure
-                </button>
+                <div class="login-db-buttons">
+                    <button class="login-db-setup-btn" onclick="retryDbConnection()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                        Connect
+                    </button>
+                    <button class="login-db-setup-btn" onclick="showSetupWizard()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M12 1v6m0 6v6m6-12v6m0 6v6M6 1v6m0 6v6"></path>
+                        </svg>
+                        Setup DB
+                    </button>
+                </div>
             `
         }
     } catch (error) {
@@ -4646,15 +4677,157 @@ async function updateLoginDbStatus() {
                 </div>
                 <span class="login-db-status-text">Error checking database</span>
             </div>
-            <button class="login-db-setup-btn" onclick="showSetupWizard()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M12 1v6m0 6v6m6-12v6m0 6v6M6 1v6m0 6v6"></path>
-                </svg>
-                Setup
-            </button>
+            <div class="login-db-buttons">
+                <button class="login-db-setup-btn" onclick="retryDbConnection()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    Connect
+                </button>
+                <button class="login-db-setup-btn" onclick="showSetupWizard()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M12 1v6m0 6v6m6-12v6m0 6v6M6 1v6m0 6v6"></path>
+                    </svg>
+                    Setup DB
+                </button>
+            </div>
         `
     }
+}
+
+// Retry database connection
+async function retryDbConnection() {
+    showConnectionWizard()
+}
+
+// Show connection wizard with current config
+async function showConnectionWizard() {
+    const config = await window.electronAPI.getDbConfig()
+    
+    const modal = document.getElementById('connectionWizard')
+    
+    // Populate fields with current config
+    document.getElementById('reconnectServerName').value = config.server || ''
+    document.getElementById('reconnectDatabaseName').value = config.database || ''
+    document.getElementById('reconnectAuthType').value = config.authType || 'windows'
+    document.getElementById('reconnectTrustCert').checked = config.trustCert || false
+    document.getElementById('reconnectEncrypt').checked = config.encrypt || false
+    
+    // Show SQL auth fields if applicable
+    const sqlAuthContainer = document.getElementById('reconnectSqlAuthContainer')
+    if (config.authType === 'sql') {
+        sqlAuthContainer.style.display = 'grid'
+        document.getElementById('reconnectUsername').value = config.user || ''
+        document.getElementById('reconnectPassword').value = ''
+    } else {
+        sqlAuthContainer.style.display = 'none'
+        document.getElementById('reconnectUsername').value = ''
+        document.getElementById('reconnectPassword').value = ''
+    }
+    
+    // Clear any previous status
+    const statusEl = document.getElementById('reconnectStatus')
+    statusEl.style.display = 'none'
+    statusEl.textContent = ''
+    
+    modal.showModal()
+    
+    // Setup event listeners
+    setupConnectionWizardListeners(config)
+}
+
+function setupConnectionWizardListeners(config) {
+    const reconnectBtn = document.getElementById('reconnectTestBtn')
+    const statusEl = document.getElementById('reconnectStatus')
+    const authTypeSelect = document.getElementById('reconnectAuthType')
+    
+    // Remove old listeners
+    const newReconnectBtn = reconnectBtn.cloneNode(true)
+    reconnectBtn.parentNode.replaceChild(newReconnectBtn, reconnectBtn)
+    
+    const newAuthTypeSelect = authTypeSelect.cloneNode(true)
+    authTypeSelect.parentNode.replaceChild(newAuthTypeSelect, authTypeSelect)
+    
+    // Restore the auth type value after cloning
+    document.getElementById('reconnectAuthType').value = config.authType || 'windows'
+    
+    // Auth type change handler
+    document.getElementById('reconnectAuthType').addEventListener('change', (e) => {
+        const sqlAuthContainer = document.getElementById('reconnectSqlAuthContainer')
+        if (e.target.value === 'sql') {
+            sqlAuthContainer.style.display = 'grid'
+        } else {
+            sqlAuthContainer.style.display = 'none'
+            document.getElementById('reconnectUsername').value = ''
+            document.getElementById('reconnectPassword').value = ''
+        }
+    })
+    
+    // Reconnect button
+    document.getElementById('reconnectTestBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('reconnectTestBtn')
+        btn.disabled = true
+        btn.innerHTML = '<div class="spinner-ring" style="width:16px; height:16px; border-width:2px; margin-right:6px;"></div> Connecting...'
+        
+        statusEl.style.display = 'block'
+        statusEl.className = 'setup-status'
+        statusEl.innerHTML = 'Testing connection...'
+        
+        // Get current values from form
+        const updatedConfig = {
+            server: document.getElementById('reconnectServerName').value.trim(),
+            database: document.getElementById('reconnectDatabaseName').value.trim(),
+            authType: document.getElementById('reconnectAuthType').value,
+            user: document.getElementById('reconnectUsername').value.trim(),
+            password: document.getElementById('reconnectPassword').value,
+            encrypt: document.getElementById('reconnectEncrypt').checked,
+            trustCert: document.getElementById('reconnectTrustCert').checked
+        }
+        
+        try {
+            const result = await window.electronAPI.testDbConnection(updatedConfig)
+            
+            if (result && result.success) {
+                statusEl.className = 'setup-status setup-status-success'
+                statusEl.innerHTML = '✅ Connection successful! Saving configuration...'
+                
+                // Save the updated configuration with connected flag
+                await window.electronAPI.saveDbConfig({
+                    ...updatedConfig,
+                    connected: true
+                })
+                
+                // Update login screen status
+                await updateLoginDbStatus()
+                
+                setTimeout(() => {
+                    statusEl.innerHTML = '✅ Connection successful! You can now close this dialog and login.'
+                    setTimeout(() => {
+                        document.getElementById('connectionWizard').close()
+                    }, 1000)
+                }, 500)
+            } else {
+                statusEl.className = 'setup-status setup-status-error'
+                statusEl.innerHTML = `❌ Connection failed: ${result?.error || 'Unknown error'}. Please check your settings and try again.`
+            }
+        } catch (error) {
+            statusEl.className = 'setup-status setup-status-error'
+            statusEl.innerHTML = `❌ Error: ${error.message}`
+        } finally {
+            btn.disabled = false
+            btn.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+                Reconnect
+            `
+        }
+    })
 }
 
 async function showApp() {
@@ -4779,11 +4952,16 @@ if (loginForm) {
                 [{ value: username }]
             )
 
+            console.log('User query result:', userQuery)
+
             if (!userQuery || !userQuery.success || !userQuery.data || userQuery.data.length === 0) {
                 if (loadingScreen) {
                     loadingScreen.classList.remove('is-visible')
                 }
-                showLoginError('User not found. Please contact your system administrator.')
+                const errorMsg = userQuery?.error 
+                    ? `User not found. Database error: ${userQuery.error}` 
+                    : 'User not found. Please contact your system administrator.'
+                showLoginError(errorMsg)
                 return
             }
             
@@ -4939,6 +5117,80 @@ if (loginForm) {
                 loadingScreen.classList.remove('is-visible')
             }
             showLoginError('Database connection error. Please check your configuration.')
+        }
+    })
+}
+
+// Clear Configuration button handler
+const clearConfigBtn = document.getElementById('clearConfigBtn')
+if (clearConfigBtn) {
+    clearConfigBtn.addEventListener('click', async () => {
+        // Show custom confirmation modal instead of native confirm (native confirm causes Electron input freeze)
+        const confirmModal = document.getElementById('clearConfigConfirmModal')
+        if (confirmModal) {
+            confirmModal.showModal()
+        }
+    })
+}
+
+// Clear Configuration Confirmation Modal handlers
+const clearConfigConfirmBtn = document.getElementById('clearConfigConfirmBtn')
+const clearConfigCancelBtn = document.getElementById('clearConfigCancelBtn')
+const clearConfigConfirmModal = document.getElementById('clearConfigConfirmModal')
+
+if (clearConfigCancelBtn && clearConfigConfirmModal) {
+    clearConfigCancelBtn.addEventListener('click', () => {
+        clearConfigConfirmModal.close()
+    })
+}
+
+if (clearConfigConfirmBtn && clearConfigConfirmModal) {
+    clearConfigConfirmBtn.addEventListener('click', async () => {
+        const clearConfigBtn = document.getElementById('clearConfigBtn')
+        
+        try {
+            // Close modal
+            clearConfigConfirmModal.close()
+            
+            // Update button state
+            if (clearConfigBtn) {
+                clearConfigBtn.disabled = true
+                clearConfigBtn.innerHTML = '<div class="spinner-ring" style="width:12px; height:12px; border-width:2px; display:inline-block; margin-right:4px;"></div> Clearing...'
+            }
+            
+            const result = await window.electronAPI.clearDbConfig()
+            
+            if (result && result.success) {
+                // Show loading screen with animation for 2-3 seconds
+                const loadingScreen = document.getElementById('loadingScreen')
+                if (loadingScreen) {
+                    const loadingText = loadingScreen.querySelector('.loading-text')
+                    const loadingSubtext = loadingScreen.querySelector('.loading-subtext')
+                    if (loadingText) loadingText.textContent = 'Configuration Cleared'
+                    if (loadingSubtext) loadingSubtext.textContent = 'Reloading application...'
+                    loadingScreen.style.display = 'flex'
+                    loadingScreen.style.pointerEvents = 'all'
+                    loadingScreen.classList.add('is-visible')
+                }
+                
+                // Wait 2.5 seconds then reload
+                setTimeout(() => {
+                    window.location.href = window.location.href
+                }, 2500)
+            } else {
+                alert('Failed to clear configuration: ' + (result?.error || 'Unknown error'))
+                if (clearConfigBtn) {
+                    clearConfigBtn.disabled = false
+                    clearConfigBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:4px;"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg> Clear Configuration'
+                }
+            }
+        } catch (error) {
+            console.error('Error clearing config:', error)
+            alert('Error clearing configuration: ' + error.message)
+            if (clearConfigBtn) {
+                clearConfigBtn.disabled = false
+                clearConfigBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:4px;"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg> Clear Configuration'
+            }
         }
     })
 }
@@ -8909,8 +9161,9 @@ async function initializeSetupWizard() {
     const dbConfig = await window.electronAPI.getDbConfig()
 
     if (!dbConfig || !dbConfig.connected) {
-
-        showSetupWizard()
+        // Show login screen with Connect and Setup DB buttons
+        // Let the user choose whether to connect to existing DB or create new one
+        showLoginScreen()
         return
     }
     
@@ -9020,6 +9273,17 @@ function setupWizardListeners() {
     const testBtn = document.getElementById('setupTestConnectionBtn')
     if (testBtn) {
         testBtn.addEventListener('click', testSetupConnection)
+    }
+    
+    // Cancel button (back to login)
+    const cancelBtn = document.getElementById('setupCancelBtn')
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            hideSetupWizard()
+            showLoginScreen()
+            // Reset wizard to step 1
+            goToSetupStep(1)
+        })
     }
     
     // Next button (Step 1 -> Step 2)
@@ -9234,7 +9498,16 @@ async function runMigrations() {
         
         // Create default admin user
         statusText.textContent = 'Creating default admin user...'
-        await createDefaultAdmin()
+        progressFill.style.width = '80%'
+        
+        try {
+            await createDefaultAdmin()
+            console.log('✅ Admin user creation completed')
+        } catch (adminError) {
+            console.error('❌ Failed to create admin user:', adminError)
+            statusText.textContent = `⚠️ Warning: Admin user creation failed - ${adminError.message}`
+            // Continue anyway - user can create admin manually
+        }
         
         progressFill.style.width = '90%'
         

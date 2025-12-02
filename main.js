@@ -69,10 +69,16 @@ let messageCheckInterval = null;
 let lastCheckedMessageIds = new Set();
 let isInstallingUpdate = false; // Flag to bypass close confirmation when installing update
 
-// Config file paths (support legacy location under product name)
-const userDataDir = app.getPath('userData');
-const configPath = path.join(userDataDir, 'db-config.json');
-const legacyConfigPath = path.join(app.getPath('appData'), 'OrbisHub Desktop', 'db-config.json');
+// Config file paths - use ProgramData for system-wide configuration
+const configDir = path.join('C:', 'ProgramData', 'OrbisHub');
+const configPath = path.join(configDir, 'db-config.json');
+const legacyUserDataDir = app.getPath('userData');
+const legacyConfigPath = path.join(legacyUserDataDir, 'db-config.json');
+
+// Ensure config directory exists
+if (!fs.existsSync(configDir)) {
+    fs.mkdirSync(configDir, { recursive: true });
+}
 
 // Create main window
 function createWindow() {
@@ -172,11 +178,11 @@ function loadDbConfig() {
         // Legacy migration: copy from legacy path if it exists
         if (fs.existsSync(legacyConfigPath)) {
             try {
-                // Ensure userData directory exists
-                if (!fs.existsSync(userDataDir)) {
-                    fs.mkdirSync(userDataDir, { recursive: true });
-                }
                 const data = fs.readFileSync(legacyConfigPath, 'utf8');
+                // Ensure new config directory exists
+                if (!fs.existsSync(configDir)) {
+                    fs.mkdirSync(configDir, { recursive: true });
+                }
                 fs.writeFileSync(configPath, data);
                 dbConfig = JSON.parse(data);
                 console.log('Migrated DB config from legacy path:', legacyConfigPath);
@@ -195,8 +201,8 @@ function loadDbConfig() {
 function saveDbConfig(config) {
     try {
         // Ensure directory exists
-        if (!fs.existsSync(userDataDir)) {
-            fs.mkdirSync(userDataDir, { recursive: true });
+        if (!fs.existsSync(configDir)) {
+            fs.mkdirSync(configDir, { recursive: true });
         }
         fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
         dbConfig = config;
@@ -638,6 +644,38 @@ ipcMain.handle('db-get-config', async () => {
 
 ipcMain.handle('db-save-config', async (event, config) => {
     return saveDbConfig(config);
+});
+
+ipcMain.handle('db-clear-config', async () => {
+    try {
+        // Close existing database pool
+        if (dbPool) {
+            try {
+                await dbPool.close();
+            } catch (e) {
+                console.warn('Error closing pool:', e.message);
+            }
+            dbPool = null;
+        }
+        poolConnectPromise = null;
+        
+        // Delete config file
+        if (fs.existsSync(configPath)) {
+            fs.unlinkSync(configPath);
+        }
+        
+        // Also clean legacy config if exists
+        if (fs.existsSync(legacyConfigPath)) {
+            fs.unlinkSync(legacyConfigPath);
+        }
+        
+        dbConfig = null;
+        console.log('✅ Configuration cache cleared');
+        return { success: true };
+    } catch (error) {
+        console.error('Error clearing config:', error);
+        return { success: false, error: error.message };
+    }
 });
 
 ipcMain.handle('db-test-connection', async (event, config) => {
@@ -1683,10 +1721,19 @@ ipcMain.handle('db-create-database', async (event, config) => {
                     
                     if (loginCheck.recordset.length === 0) {
                         // Create the SQL login if it doesn't exist
-                        console.log(`Creating SQL login '${config.user}'...`);
+                        // Set default database to 'master' to prevent issues if database is dropped later
+                        console.log(`Creating SQL login '${config.user}' with default database = master...`);
                         await pool.request().query(`
                             CREATE LOGIN [${config.user}] 
-                            WITH PASSWORD = '${config.password.replace(/'/g, "''")}'
+                            WITH PASSWORD = '${config.password.replace(/'/g, "''")}',
+                            DEFAULT_DATABASE = [master]
+                        `);
+                    } else {
+                        // Login exists, make sure default database is master
+                        console.log(`Updating SQL login '${config.user}' default database to master...`);
+                        await pool.request().query(`
+                            ALTER LOGIN [${config.user}] 
+                            WITH DEFAULT_DATABASE = [master]
                         `);
                     }
                     
