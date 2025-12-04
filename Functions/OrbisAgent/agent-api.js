@@ -12,6 +12,11 @@ const AgentAPI = {
     // Core Service URL - should point to YOUR local machine, not remote PCs
     // Remote PCs run OrbisAgent only, which connects to this CoreService
     coreServiceUrl: 'http://localhost:5000',
+    
+    // Connection state tracking
+    _lastConnectionState: null,
+    _connectionErrorCount: 0,
+    _silentMode: false,
 
     /**
      * Set Core Service URL
@@ -19,6 +24,14 @@ const AgentAPI = {
      */
     setCoreServiceUrl(url) {
         this.coreServiceUrl = url;
+    },
+    
+    /**
+     * Enable/disable silent mode for connection errors
+     * @param {boolean} silent - Whether to suppress console errors
+     */
+    setSilentMode(silent) {
+        this._silentMode = silent;
     },
 
     /**
@@ -49,6 +62,16 @@ const AgentAPI = {
                     });
                     throw new Error(errorMsg);
                 }
+                
+                // Connection successful - reset error tracking
+                if (this._lastConnectionState !== 'connected') {
+                    this._lastConnectionState = 'connected';
+                    if (this._connectionErrorCount > 0) {
+                        console.log('✅ CoreService connection established');
+                    }
+                    this._connectionErrorCount = 0;
+                }
+                
                 return response.data;
             } else {
                 // Fallback to fetch for non-Electron environments
@@ -66,6 +89,31 @@ const AgentAPI = {
                 return await response.json();
             }
         } catch (error) {
+            const isConnectionError = error.message?.includes('ECONNREFUSED') || 
+                                     error.code === 'ECONNREFUSED' || 
+                                     error.errno === 'ECONNREFUSED' ||
+                                     error.message?.includes('fetch');
+            
+            if (isConnectionError) {
+                this._connectionErrorCount++;
+                
+                // Only log the first error and every 10th error to avoid spam
+                if (!this._silentMode && (this._connectionErrorCount === 1 || this._connectionErrorCount % 10 === 0)) {
+                    console.warn(`⚠️ CoreService not reachable (attempt ${this._connectionErrorCount})`);
+                }
+                
+                // Update connection state only on state change
+                if (this._lastConnectionState !== 'disconnected') {
+                    this._lastConnectionState = 'disconnected';
+                    if (!this._silentMode) {
+                        console.warn('⚠️ CoreService connection lost');
+                    }
+                }
+                
+                throw new Error('CoreService is not running. Please start the OrbisHub CoreService.');
+            }
+            
+            // For non-connection errors, always log
             console.error(`❌ API call failed: ${endpoint}`, error);
             throw error;
         }

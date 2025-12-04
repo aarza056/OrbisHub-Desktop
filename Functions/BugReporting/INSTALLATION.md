@@ -36,7 +36,7 @@ Functions/BugReporting/
   - `bug-report:getSystemInfo` - Collects system information automatically
 
 ### 5. **Email Functionality**
-- **Recipient:** development@orbis-hub.com
+- **Recipient:** info.orbishub@gmail.com
 - **Format:** Professional email with all bug details
 - **System Info:** Automatically includes OS, app version, memory, etc.
 - **Opens:** Default email client (Outlook, Gmail, etc.)

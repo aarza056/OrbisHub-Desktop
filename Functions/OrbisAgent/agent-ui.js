@@ -20,6 +20,11 @@ const AgentUI = {
         if (!agentsList.hasChildNodes() || agentsList.children.length === 0) {
             agentsList.innerHTML = '<div style="padding:20px; text-align:center; color:var(--muted);">Loading agents...</div>'
         }
+        
+        // Enable silent mode for API calls to reduce console spam
+        if (window.AgentAPI) {
+            window.AgentAPI.setSilentMode(true);
+        }
 
         try {
             const agents = await window.AgentAPI.getAllAgents()
@@ -83,16 +88,49 @@ const AgentUI = {
             window.dispatchEvent(new CustomEvent('agentsUpdated', { detail: { agents } }))
 
         } catch (error) {
-            console.error('Failed to render agents:', error)
+            // Only log non-connection errors to console
+            if (!error.message?.includes('CoreService')) {
+                console.error('Failed to render agents:', error);
+            }
+            
+            // Determine user-friendly error message and icon
+            let errorTitle = 'Connection Issue'
+            let errorMessage = error.message
+            let errorIcon = `
+                <svg class="agent-empty-state__icon" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+            `
+            let actionButton = ''
+            
+            if (errorMessage.includes('CoreService') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('5000')) {
+                errorTitle = 'CoreService Not Running'
+                errorMessage = 'The OrbisHub CoreService is not currently running. Agent features require the CoreService to be active.'
+                errorIcon = `
+                    <svg class="agent-empty-state__icon" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                    </svg>
+                `
+                actionButton = `
+                    <div style="margin-top: 20px;">
+                        <p style="color: var(--muted); margin-bottom: 12px; font-size: 14px;">To start the CoreService:</p>
+                        <ol style="text-align: left; display: inline-block; color: var(--muted); font-size: 13px; line-height: 1.8;">
+                            <li>Open PowerShell as Administrator</li>
+                            <li>Navigate to: <code style="background: var(--bg-secondary); padding: 2px 6px; border-radius: 3px;">OrbisHub.CoreService</code></li>
+                            <li>Run: <code style="background: var(--bg-secondary); padding: 2px 6px; border-radius: 3px;">dotnet run</code></li>
+                        </ol>
+                    </div>
+                `
+            }
+            
             agentsList.innerHTML = `
                 <div class="agent-empty-state">
-                    <svg class="agent-empty-state__icon" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.5">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="15" y1="9" x2="9" y2="15"></line>
-                        <line x1="9" y1="9" x2="15" y2="15"></line>
-                    </svg>
-                    <h3 class="agent-empty-state__title" style="color:#ef4444;">Failed to Load Agents</h3>
-                    <p class="agent-empty-state__description">${error.message}</p>
+                    ${errorIcon}
+                    <h3 class="agent-empty-state__title" style="color:#f59e0b;">${errorTitle}</h3>
+                    <p class="agent-empty-state__description">${errorMessage}</p>
+                    ${actionButton}
                 </div>
             `
         }
