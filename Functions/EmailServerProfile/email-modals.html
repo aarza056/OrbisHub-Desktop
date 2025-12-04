@@ -1,0 +1,303 @@
+<!-- Email Server Profile Configuration Modal -->
+<dialog id="emailProfileModal" class="email-modal">
+  <div class="modal-header-email">
+    <h2 id="emailProfileModalTitle">Create Email Server Profile</h2>
+    <button class="btn-close-modal" onclick="EmailUI.closeModal('emailProfileModal')" aria-label="Close">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+  </div>
+
+  <form id="emailProfileForm" onsubmit="return false;">
+    <div class="modal-body-email">
+      
+      <!-- Basic Information -->
+      <div class="form-section">
+        <h3 class="form-section-title">Basic Information</h3>
+        <div>
+          <label>Profile Name <span style="color: #ef4444;">*</span></label>
+          <input id="emailProfileName" type="text" class="input" placeholder="e.g., Company SMTP Server" required />
+        </div>
+        <div>
+          <label>Description</label>
+          <input id="emailProfileDescription" type="text" class="input" placeholder="Optional description" />
+        </div>
+      </div>
+
+      <!-- SMTP Configuration -->
+      <div class="form-section">
+        <h3 class="form-section-title">SMTP Server Configuration</h3>
+        <div class="form-row">
+          <div>
+            <label>SMTP Host <span style="color: #ef4444;">*</span></label>
+            <input id="emailSmtpHost" type="text" class="input" placeholder="smtp.gmail.com" required />
+            <span class="help-text">Your email provider's SMTP server address</span>
+          </div>
+          <div>
+            <label>SMTP Port <span style="color: #ef4444;">*</span></label>
+            <input id="emailSmtpPort" type="number" class="input" placeholder="587" required />
+            <span class="help-text">Common: 587 (TLS), 465 (SSL), 25 (Plain)</span>
+          </div>
+        </div>
+
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input id="emailUseTLS" type="checkbox" checked />
+            <span class="checkbox-custom"></span>
+            <span>Use TLS (Recommended for port 587)</span>
+          </label>
+          <label class="checkbox-label">
+            <input id="emailUseSSL" type="checkbox" />
+            <span class="checkbox-custom"></span>
+            <span>Use SSL (For port 465)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Authentication -->
+      <div class="form-section">
+        <h3 class="form-section-title">Authentication</h3>
+        <div class="checkbox-group" style="margin-bottom: 16px;">
+          <label class="checkbox-label">
+            <input id="emailAuthRequired" type="checkbox" checked />
+            <span class="checkbox-custom"></span>
+            <span>Require Authentication</span>
+          </label>
+        </div>
+
+        <div id="emailAuthFields">
+          <div class="form-row">
+            <div>
+              <label>Username</label>
+              <input id="emailUsername" type="text" class="input" placeholder="your-email@example.com" autocomplete="off" />
+              <span class="help-text">SMTP username (usually your email)</span>
+            </div>
+            <div>
+              <label>Password</label>
+              <input id="emailPassword" type="password" class="input" placeholder="••••••••" autocomplete="new-password" />
+              <span class="help-text warning">Will be encrypted before storage</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sender Information -->
+      <div class="form-section">
+        <h3 class="form-section-title">Sender Information</h3>
+        <div class="form-row">
+          <div>
+            <label>From Email <span style="color: #ef4444;">*</span></label>
+            <input id="emailFromEmail" type="email" class="input" placeholder="noreply@company.com" required />
+            <span class="help-text">Email address shown as sender</span>
+          </div>
+          <div>
+            <label>From Name <span style="color: #ef4444;">*</span></label>
+            <input id="emailFromName" type="text" class="input" placeholder="OrbisHub System" required />
+            <span class="help-text">Friendly name shown as sender</span>
+          </div>
+        </div>
+        <div>
+          <label>Reply-To Email</label>
+          <input id="emailReplyTo" type="email" class="input" placeholder="support@company.com" />
+          <span class="help-text">Optional: Where replies should go</span>
+        </div>
+      </div>
+
+      <!-- Advanced Settings -->
+      <div class="form-section">
+        <h3 class="form-section-title">Advanced Settings</h3>
+        <div class="form-row">
+          <div>
+            <label>Max Retries on Failure</label>
+            <input id="emailMaxRetries" type="number" class="input" min="0" max="10" value="3" />
+            <span class="help-text">How many times to retry failed emails</span>
+          </div>
+          <div>
+            <label>Retry Interval (minutes)</label>
+            <input id="emailRetryInterval" type="number" class="input" min="1" max="60" value="5" />
+            <span class="help-text">Wait time between retries</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div>
+            <label>Max Emails Per Hour</label>
+            <input id="emailMaxPerHour" type="number" class="input" min="1" placeholder="No limit" />
+            <span class="help-text">Rate limiting (optional)</span>
+          </div>
+          <div>
+            <label>Max Emails Per Day</label>
+            <input id="emailMaxPerDay" type="number" class="input" min="1" placeholder="No limit" />
+            <span class="help-text">Daily sending limit (optional)</span>
+          </div>
+        </div>
+
+        <div class="checkbox-group" style="margin-top: 16px;">
+          <label class="checkbox-label">
+            <input id="emailIsActive" type="checkbox" checked />
+            <span class="checkbox-custom"></span>
+            <span><strong>Active</strong> - Enable this profile for sending emails</span>
+          </label>
+          <label class="checkbox-label">
+            <input id="emailIsDefault" type="checkbox" />
+            <span class="checkbox-custom"></span>
+            <span><strong>Set as Default</strong> - Use this profile when no specific profile is selected</span>
+          </label>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="modal-footer-email">
+      <button type="button" class="btn btn-secondary" onclick="EmailUI.closeModal('emailProfileModal')">Cancel</button>
+      <button type="submit" id="saveEmailProfileBtn" class="btn btn-primary">Save Profile</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Email Queue Viewer Modal -->
+<dialog id="emailQueueModal">
+  <div class="modal-header-email">
+    <h2>Email Queue</h2>
+    <button class="btn-close-modal" onclick="EmailUI.closeModal('emailQueueModal')" aria-label="Close">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+  </div>
+
+  <div class="modal-body-email" style="max-width: 900px;">
+    <!-- Queue Statistics -->
+    <div class="email-queue-stats">
+      <div class="queue-stat-card">
+        <div class="queue-stat-value" id="queuePendingCount">0</div>
+        <div class="queue-stat-label">Pending</div>
+      </div>
+      <div class="queue-stat-card">
+        <div class="queue-stat-value" id="queueSendingCount">0</div>
+        <div class="queue-stat-label">Sending</div>
+      </div>
+      <div class="queue-stat-card">
+        <div class="queue-stat-value" id="queueSentCount">0</div>
+        <div class="queue-stat-label">Sent</div>
+      </div>
+      <div class="queue-stat-card">
+        <div class="queue-stat-value" id="queueFailedCount">0</div>
+        <div class="queue-stat-label">Failed</div>
+      </div>
+    </div>
+
+    <!-- Queue Items Table -->
+    <div style="overflow-x: auto;">
+      <table class="email-queue-table">
+        <thead>
+          <tr>
+            <th>To</th>
+            <th>Subject</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Attempts</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="emailQueueTableBody">
+          <tr>
+            <td colspan="7" style="text-align: center; padding: 40px; color: #6b7280;">
+              Loading queue...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="modal-footer-email">
+    <button type="button" class="btn btn-secondary" onclick="EmailUI.closeModal('emailQueueModal')">Close</button>
+    <button type="button" class="btn btn-primary" onclick="EmailQueueUI.refreshQueue()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="23 4 23 10 17 10"></polyline>
+        <polyline points="1 20 1 14 7 14"></polyline>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+      </svg>
+      Refresh
+    </button>
+  </div>
+</dialog>
+
+<!-- Test Email Modal -->
+<dialog id="testEmailModal">
+  <div class="modal-header-email">
+    <h2>Send Test Email</h2>
+    <button class="btn-close-modal" onclick="EmailUI.closeModal('testEmailModal')" aria-label="Close">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+  </div>
+
+  <form id="testEmailForm" onsubmit="return false;">
+    <div class="modal-body-email">
+      <p style="margin-bottom: 20px; color: #6b7280;">
+        Send a test email to verify your SMTP configuration is working correctly.
+      </p>
+
+      <label class="label">
+        Recipient Email <span style="color: #ef4444;">*</span>
+        <input id="testEmailRecipient" type="email" class="input" placeholder="your-email@example.com" required />
+        <span class="help-text">Enter the email address where you want to receive the test email</span>
+      </label>
+    </div>
+
+    <div class="modal-footer-email">
+      <button type="button" class="btn btn-secondary" onclick="EmailUI.closeModal('testEmailModal')">Cancel</button>
+      <button type="submit" class="btn btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+          <polyline points="22,6 12,13 2,6"></polyline>
+        </svg>
+        Send Test Email
+      </button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Delete Confirmation Modal -->
+<dialog id="deleteEmailProfileModal">
+  <div class="modal-header-email">
+    <h2>Delete Email Profile</h2>
+    <button class="btn-close-modal" onclick="EmailUI.closeModal('deleteEmailProfileModal')" aria-label="Close">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+  </div>
+
+  <div class="modal-body-email">
+    <div class="delete-warning">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+        <line x1="12" y1="9" x2="12" y2="13"></line>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>
+      <p>Are you sure you want to delete <strong id="deleteProfileName"></strong>?</p>
+      <p class="delete-consequence">This action cannot be undone. All configuration for this email profile will be permanently deleted.</p>
+    </div>
+  </div>
+
+  <div class="modal-footer-email">
+    <button type="button" class="btn btn-secondary" onclick="EmailUI.closeModal('deleteEmailProfileModal')">Cancel</button>
+    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
+      Delete Profile
+    </button>
+  </div>
+</dialog>
+

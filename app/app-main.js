@@ -10197,6 +10197,41 @@ showView = async function(name, updateUrl = true) {
     }
 }
 
+// ========== SYSTEM CONFIGURATION TAB SWITCHING ==========
+const SystemConfig = {
+    switchTab(tabName) {
+        // Update tab buttons
+        const tabs = document.querySelectorAll('.system-config-tab')
+        tabs.forEach(tab => {
+            if (tab.getAttribute('data-tab') === tabName) {
+                tab.classList.add('active')
+            } else {
+                tab.classList.remove('active')
+            }
+        })
+
+        // Update content sections
+        const contents = document.querySelectorAll('.system-config-content')
+        contents.forEach(content => {
+            content.classList.remove('active')
+        })
+
+        // Show selected content
+        if (tabName === 'coreservice') {
+            document.getElementById('systemConfigCoreService')?.classList.add('active')
+        } else if (tabName === 'emailserver') {
+            document.getElementById('systemConfigEmailServer')?.classList.add('active')
+            // Initialize email profiles when tab is shown
+            if (window.EmailUI && typeof window.EmailUI.init === 'function') {
+                window.EmailUI.init()
+            }
+        }
+    }
+}
+
+// Make it globally accessible
+window.SystemConfig = SystemConfig
+
 // ========== ORBISAGENT MODULE INITIALIZATION ==========
 // Initialize OrbisAgent UI when view is shown
 document.addEventListener('DOMContentLoaded', () => {

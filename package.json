@@ -46,7 +46,8 @@
   "dependencies": {
     "electron-log": "^5.4.3",
     "electron-updater": "^6.6.2",
-    "mssql": "^10.0.2"
+    "mssql": "^10.0.2",
+    "nodemailer": "^6.9.7"
   },
   "devDependencies": {
     "electron": "^28.0.0",

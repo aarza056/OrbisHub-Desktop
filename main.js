@@ -986,6 +986,282 @@ ipcMain.handle('decrypt-message', async (event, encryptedMessage) => {
     }
 });
 
+// ========== EMAIL SERVER PROFILE HANDLERS ==========
+// Test email profile connection
+ipcMain.handle('test-email-profile', async (event, profileId, testEmail) => {
+    try {
+        const nodemailer = require('nodemailer');
+        
+        // Get profile from database
+        const pool = await getDbPool();
+        if (!pool) {
+            throw new Error('Database connection not available');
+        }
+
+        const result = await pool.request()
+            .input('profileId', sql.NVarChar, profileId)
+            .query('SELECT * FROM EmailServerProfiles WHERE id = @profileId');
+
+        if (!result.recordset || result.recordset.length === 0) {
+            throw new Error('Email profile not found');
+        }
+
+        const profile = result.recordset[0];
+
+        // Decrypt password if encrypted
+        let smtpPassword = profile.password_encrypted;
+        if (smtpPassword) {
+            try {
+                smtpPassword = decryptMessage(smtpPassword);
+            } catch (decryptError) {
+                console.error('Failed to decrypt SMTP password:', decryptError);
+                throw new Error('Failed to decrypt SMTP password');
+            }
+        }
+
+        // Configure transporter
+        const transportConfig = {
+            host: profile.smtpHost,
+            port: profile.smtpPort,
+            secure: profile.useSSL, // true for 465, false for other ports
+            auth: profile.authRequired ? {
+                user: profile.username,
+                pass: smtpPassword
+            } : undefined,
+            tls: {
+                rejectUnauthorized: false // Allow self-signed certificates
+            }
+        };
+
+        // Add TLS if specified
+        if (profile.useTLS) {
+            transportConfig.requireTLS = true;
+        }
+
+        const transporter = nodemailer.createTransport(transportConfig);
+
+        // Verify connection
+        await transporter.verify();
+
+        // Send test email
+        const mailOptions = {
+            from: `"${profile.fromName}" <${profile.fromEmail}>`,
+            to: testEmail,
+            subject: 'OrbisHub Email Server Test',
+            html: `
+                <html>
+                <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <h2 style="color: #2563eb;">✅ Test Email Successful</h2>
+                        <p>This is a test email from your OrbisHub Email Server Profile: <strong>${profile.name}</strong></p>
+                        <p><strong>Configuration Details:</strong></p>
+                        <ul style="background: #f3f4f6; padding: 15px; border-radius: 6px;">
+                            <li>SMTP Server: ${profile.smtpHost}:${profile.smtpPort}</li>
+                            <li>Security: ${profile.useSSL ? 'SSL' : ''}${profile.useSSL && profile.useTLS ? ' + ' : ''}${profile.useTLS ? 'TLS' : ''}</li>
+                            <li>Authentication: ${profile.authRequired ? 'Enabled' : 'Disabled'}</li>
+                        </ul>
+                        <p style="margin-top: 20px; color: #666; font-size: 14px;">
+                            If you received this email, your SMTP configuration is working correctly!
+                        </p>
+                        <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
+                        <p style="color: #999; font-size: 12px;">OrbisHub - IT Management System</p>
+                    </div>
+                </body>
+                </html>
+            `,
+            text: `Test Email Successful\n\nThis is a test email from your OrbisHub Email Server Profile: ${profile.name}\n\nConfiguration:\nSMTP Server: ${profile.smtpHost}:${profile.smtpPort}\nSecurity: ${profile.useSSL ? 'SSL' : ''}${profile.useSSL && profile.useTLS ? ' + ' : ''}${profile.useTLS ? 'TLS' : ''}\nAuthentication: ${profile.authRequired ? 'Enabled' : 'Disabled'}\n\nIf you received this email, your SMTP configuration is working correctly!\n\n---\nOrbisHub - IT Management System`
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        
+        return {
+            success: true,
+            message: `Test email sent successfully to ${testEmail}`,
+            messageId: info.messageId
+        };
+    } catch (error) {
+        console.error('Email test failed:', error);
+        return {
+            success: false,
+            message: error.message || 'Failed to send test email',
+            error: error.toString()
+        };
+    }
+});
+
+// Send email from queue
+ipcMain.handle('send-email-from-queue', async (event, emailQueueId) => {
+    try {
+        const nodemailer = require('nodemailer');
+        
+        const pool = await getDbPool();
+        if (!pool) {
+            throw new Error('Database connection not available');
+        }
+
+        // Get email from queue
+        const emailResult = await pool.request()
+            .input('emailId', sql.Int, emailQueueId)
+            .query('SELECT * FROM EmailQueue WHERE id = @emailId');
+
+        if (!emailResult.recordset || emailResult.recordset.length === 0) {
+            throw new Error('Email not found in queue');
+        }
+
+        const email = emailResult.recordset[0];
+
+        // Update status to sending
+        await pool.request()
+            .input('emailId', sql.Int, emailQueueId)
+            .query('UPDATE EmailQueue SET status = \'sending\', lastAttemptDate = GETDATE() WHERE id = @emailId');
+
+        // Get email server profile
+        let profileId = email.emailServerProfileId;
+        
+        // If no specific profile, get default
+        if (!profileId) {
+            const defaultProfileResult = await pool.request()
+                .query('SELECT TOP 1 id FROM EmailServerProfiles WHERE isActive = 1 AND isDefault = 1');
+            
+            if (defaultProfileResult.recordset && defaultProfileResult.recordset.length > 0) {
+                profileId = defaultProfileResult.recordset[0].id;
+            } else {
+                throw new Error('No email server profile available');
+            }
+        }
+
+        // Get profile
+        const profileResult = await pool.request()
+            .input('profileId', sql.NVarChar, profileId)
+            .query('SELECT * FROM EmailServerProfiles WHERE id = @profileId');
+
+        if (!profileResult.recordset || profileResult.recordset.length === 0) {
+            throw new Error('Email server profile not found');
+        }
+
+        const profile = profileResult.recordset[0];
+
+        // Decrypt password
+        let smtpPassword = profile.password_encrypted;
+        if (smtpPassword) {
+            smtpPassword = decryptMessage(smtpPassword);
+        }
+
+        // Configure transporter
+        const transportConfig = {
+            host: profile.smtpHost,
+            port: profile.smtpPort,
+            secure: profile.useSSL,
+            auth: profile.authRequired ? {
+                user: profile.username,
+                pass: smtpPassword
+            } : undefined,
+            tls: {
+                rejectUnauthorized: false
+            }
+        };
+
+        if (profile.useTLS) {
+            transportConfig.requireTLS = true;
+        }
+
+        const transporter = nodemailer.createTransport(transportConfig);
+
+        // Prepare mail options
+        const mailOptions = {
+            from: `"${profile.fromName}" <${profile.fromEmail}>`,
+            to: email.toName ? `"${email.toName}" <${email.toEmail}>` : email.toEmail,
+            subject: email.subject,
+            html: email.bodyHtml,
+            text: email.bodyText
+        };
+
+        if (profile.replyToEmail) {
+            mailOptions.replyTo = profile.replyToEmail;
+        }
+
+        // Parse CC and BCC if available
+        if (email.ccEmails) {
+            try {
+                mailOptions.cc = JSON.parse(email.ccEmails);
+            } catch (e) {}
+        }
+        if (email.bccEmails) {
+            try {
+                mailOptions.bcc = JSON.parse(email.bccEmails);
+            } catch (e) {}
+        }
+
+        // Send email
+        const info = await transporter.sendMail(mailOptions);
+
+        // Update queue status to sent
+        await pool.request()
+            .input('emailId', sql.Int, emailQueueId)
+            .query('UPDATE EmailQueue SET status = \'sent\', sentAt = GETDATE() WHERE id = @emailId');
+
+        // Add to sent history
+        await pool.request()
+            .input('emailQueueId', sql.Int, emailQueueId)
+            .input('profileId', sql.NVarChar, profileId)
+            .input('toEmail', sql.NVarChar, email.toEmail)
+            .input('subject', sql.NVarChar, email.subject)
+            .input('emailType', sql.NVarChar, email.emailType)
+            .input('sentBy', sql.NVarChar, email.createdBy)
+            .input('bodyPreview', sql.NVarChar, email.bodyText ? email.bodyText.substring(0, 1000) : null)
+            .input('relatedEntityType', sql.NVarChar, email.relatedEntityType)
+            .input('relatedEntityId', sql.NVarChar, email.relatedEntityId)
+            .query(`
+                INSERT INTO EmailSentHistory (emailQueueId, emailServerProfileId, toEmail, subject, emailType, sentBy, bodyPreview, relatedEntityType, relatedEntityId)
+                VALUES (@emailQueueId, @profileId, @toEmail, @subject, @emailType, @sentBy, @bodyPreview, @relatedEntityType, @relatedEntityId)
+            `);
+
+        return {
+            success: true,
+            message: 'Email sent successfully',
+            messageId: info.messageId
+        };
+    } catch (error) {
+        console.error('Failed to send email from queue:', error);
+        
+        // Update queue with error
+        try {
+            const pool = await getDbPool();
+            const newAttempts = (email.attempts || 0) + 1;
+            const maxAttempts = email.maxAttempts || 3;
+            const newStatus = newAttempts >= maxAttempts ? 'failed' : 'pending';
+            
+            // Calculate next retry time
+            const retryMinutes = 5;
+            const nextRetryDate = newStatus === 'pending' ? new Date(Date.now() + retryMinutes * 60000) : null;
+
+            await pool.request()
+                .input('emailId', sql.Int, emailQueueId)
+                .input('attempts', sql.Int, newAttempts)
+                .input('errorMessage', sql.NVarChar, error.message)
+                .input('status', sql.NVarChar, newStatus)
+                .input('nextRetryDate', sql.DateTime2, nextRetryDate)
+                .query(`
+                    UPDATE EmailQueue 
+                    SET attempts = @attempts, 
+                        errorMessage = @errorMessage, 
+                        status = @status,
+                        nextRetryDate = @nextRetryDate,
+                        lastAttemptDate = GETDATE()
+                    WHERE id = @emailId
+                `);
+        } catch (updateError) {
+            console.error('Failed to update email queue error:', updateError);
+        }
+
+        return {
+            success: false,
+            message: error.message || 'Failed to send email',
+            error: error.toString()
+        };
+    }
+});
+
 // Run migrations - Create database schema
 ipcMain.handle('db-run-migrations', async (event, config) => {
     try {
@@ -1632,6 +1908,206 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
             END
         `);
         migrations.push('SystemSettings table created');
+        
+        // ============ EMAIL SERVER PROFILE SYSTEM ============
+        
+        // Email Server Profiles Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'EmailServerProfiles')
+            BEGIN
+                CREATE TABLE EmailServerProfiles (
+                    id NVARCHAR(50) PRIMARY KEY,
+                    name NVARCHAR(255) NOT NULL,
+                    description NVARCHAR(500) NULL,
+                    smtpHost NVARCHAR(255) NOT NULL,
+                    smtpPort INT NOT NULL DEFAULT 587,
+                    useSSL BIT NOT NULL DEFAULT 1,
+                    useTLS BIT NOT NULL DEFAULT 1,
+                    authRequired BIT NOT NULL DEFAULT 1,
+                    username NVARCHAR(255) NULL,
+                    password_encrypted NVARCHAR(MAX) NULL,
+                    fromEmail NVARCHAR(255) NOT NULL,
+                    fromName NVARCHAR(255) NOT NULL,
+                    replyToEmail NVARCHAR(255) NULL,
+                    isActive BIT NOT NULL DEFAULT 1,
+                    isDefault BIT NOT NULL DEFAULT 0,
+                    maxRetriesOnFailure INT NOT NULL DEFAULT 3,
+                    retryIntervalMinutes INT NOT NULL DEFAULT 5,
+                    maxEmailsPerHour INT NULL,
+                    maxEmailsPerDay INT NULL,
+                    lastTestDate DATETIME2 NULL,
+                    lastTestStatus NVARCHAR(50) NULL,
+                    lastTestMessage NVARCHAR(MAX) NULL,
+                    createdBy NVARCHAR(50) NOT NULL,
+                    createdAt DATETIME2 DEFAULT GETDATE(),
+                    updatedBy NVARCHAR(50) NULL,
+                    updatedAt DATETIME2 NULL,
+                    CONSTRAINT FK_EmailServerProfile_CreatedBy FOREIGN KEY (createdBy) REFERENCES Users(id) ON DELETE NO ACTION,
+                    CONSTRAINT CK_EmailServerProfile_Port CHECK (smtpPort BETWEEN 1 AND 65535)
+                )
+                
+                CREATE INDEX IX_EmailServerProfiles_IsActive ON EmailServerProfiles(isActive)
+                CREATE INDEX IX_EmailServerProfiles_IsDefault ON EmailServerProfiles(isDefault)
+                CREATE INDEX IX_EmailServerProfiles_CreatedAt ON EmailServerProfiles(createdAt)
+            END
+        `);
+        migrations.push('EmailServerProfiles table created');
+        
+        // Email Queue Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'EmailQueue')
+            BEGIN
+                CREATE TABLE EmailQueue (
+                    id INT PRIMARY KEY IDENTITY(1,1),
+                    emailServerProfileId NVARCHAR(50) NULL,
+                    toEmail NVARCHAR(255) NOT NULL,
+                    toName NVARCHAR(255) NULL,
+                    ccEmails NVARCHAR(MAX) NULL,
+                    bccEmails NVARCHAR(MAX) NULL,
+                    subject NVARCHAR(500) NOT NULL,
+                    bodyHtml NVARCHAR(MAX) NULL,
+                    bodyText NVARCHAR(MAX) NULL,
+                    attachments NVARCHAR(MAX) NULL,
+                    emailType NVARCHAR(50) NOT NULL,
+                    relatedEntityType NVARCHAR(50) NULL,
+                    relatedEntityId NVARCHAR(50) NULL,
+                    status NVARCHAR(50) NOT NULL DEFAULT 'pending',
+                    priority INT NOT NULL DEFAULT 5,
+                    attempts INT NOT NULL DEFAULT 0,
+                    maxAttempts INT NOT NULL DEFAULT 3,
+                    lastAttemptDate DATETIME2 NULL,
+                    nextRetryDate DATETIME2 NULL,
+                    errorMessage NVARCHAR(MAX) NULL,
+                    createdBy NVARCHAR(50) NULL,
+                    createdAt DATETIME2 DEFAULT GETDATE(),
+                    sentAt DATETIME2 NULL,
+                    CONSTRAINT FK_EmailQueue_Profile FOREIGN KEY (emailServerProfileId) REFERENCES EmailServerProfiles(id) ON DELETE SET NULL,
+                    CONSTRAINT CK_EmailQueue_Status CHECK (status IN ('pending', 'sending', 'sent', 'failed', 'cancelled')),
+                    CONSTRAINT CK_EmailQueue_Priority CHECK (priority BETWEEN 1 AND 10)
+                )
+                
+                CREATE INDEX IX_EmailQueue_Status ON EmailQueue(status)
+                CREATE INDEX IX_EmailQueue_Priority ON EmailQueue(priority)
+                CREATE INDEX IX_EmailQueue_NextRetryDate ON EmailQueue(nextRetryDate)
+                CREATE INDEX IX_EmailQueue_EmailType ON EmailQueue(emailType)
+                CREATE INDEX IX_EmailQueue_CreatedAt ON EmailQueue(createdAt)
+                CREATE INDEX IX_EmailQueue_Status_Priority_NextRetry ON EmailQueue(status, priority, nextRetryDate)
+            END
+        `);
+        migrations.push('EmailQueue table created');
+        
+        // Email Templates Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'EmailTemplates')
+            BEGIN
+                CREATE TABLE EmailTemplates (
+                    id NVARCHAR(50) PRIMARY KEY,
+                    name NVARCHAR(255) NOT NULL,
+                    description NVARCHAR(500) NULL,
+                    emailType NVARCHAR(50) NOT NULL,
+                    subject NVARCHAR(500) NOT NULL,
+                    bodyHtml NVARCHAR(MAX) NOT NULL,
+                    bodyText NVARCHAR(MAX) NULL,
+                    variables NVARCHAR(MAX) NULL,
+                    isActive BIT NOT NULL DEFAULT 1,
+                    isSystem BIT NOT NULL DEFAULT 0,
+                    createdBy NVARCHAR(50) NOT NULL,
+                    createdAt DATETIME2 DEFAULT GETDATE(),
+                    updatedBy NVARCHAR(50) NULL,
+                    updatedAt DATETIME2 NULL,
+                    CONSTRAINT FK_EmailTemplate_CreatedBy FOREIGN KEY (createdBy) REFERENCES Users(id) ON DELETE NO ACTION
+                )
+                
+                CREATE INDEX IX_EmailTemplates_EmailType ON EmailTemplates(emailType)
+                CREATE INDEX IX_EmailTemplates_IsActive ON EmailTemplates(isActive)
+            END
+        `);
+        migrations.push('EmailTemplates table created');
+        
+        // Email Sent History Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'EmailSentHistory')
+            BEGIN
+                CREATE TABLE EmailSentHistory (
+                    id INT PRIMARY KEY IDENTITY(1,1),
+                    emailQueueId INT NULL,
+                    emailServerProfileId NVARCHAR(50) NULL,
+                    toEmail NVARCHAR(255) NOT NULL,
+                    subject NVARCHAR(500) NOT NULL,
+                    emailType NVARCHAR(50) NOT NULL,
+                    sentAt DATETIME2 DEFAULT GETDATE(),
+                    sentBy NVARCHAR(50) NULL,
+                    bodyPreview NVARCHAR(1000) NULL,
+                    relatedEntityType NVARCHAR(50) NULL,
+                    relatedEntityId NVARCHAR(50) NULL,
+                    CONSTRAINT FK_EmailHistory_Queue FOREIGN KEY (emailQueueId) REFERENCES EmailQueue(id) ON DELETE SET NULL,
+                    CONSTRAINT FK_EmailHistory_Profile FOREIGN KEY (emailServerProfileId) REFERENCES EmailServerProfiles(id) ON DELETE SET NULL
+                )
+                
+                CREATE INDEX IX_EmailSentHistory_SentAt ON EmailSentHistory(sentAt)
+                CREATE INDEX IX_EmailSentHistory_EmailType ON EmailSentHistory(emailType)
+                CREATE INDEX IX_EmailSentHistory_ToEmail ON EmailSentHistory(toEmail)
+            END
+        `);
+        migrations.push('EmailSentHistory table created');
+        
+        // Insert default email templates
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT 1 FROM EmailTemplates WHERE emailType = 'password_reset')
+            BEGIN
+                DECLARE @systemUserId NVARCHAR(50)
+                SELECT TOP 1 @systemUserId = id FROM Users WHERE username = 'admin' OR role = 'admin' ORDER BY created_at
+                
+                IF @systemUserId IS NOT NULL
+                BEGIN
+                    INSERT INTO EmailTemplates (id, name, description, emailType, subject, bodyHtml, bodyText, variables, isActive, isSystem, createdBy)
+                    VALUES (
+                        NEWID(),
+                        'Password Reset Request',
+                        'Email template for password reset requests',
+                        'password_reset',
+                        'OrbisHub - Password Reset Request',
+                        '<html><body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;"><div style="max-width: 600px; margin: 0 auto; padding: 20px;"><h2 style="color: #2563eb;">Password Reset Request</h2><p>Hello {{userName}},</p><p>We received a request to reset your password for your OrbisHub account.</p><p>Click the link below to reset your password:</p><p style="margin: 20px 0;"><a href="{{resetLink}}" style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Reset Password</a></p><p style="color: #666; font-size: 14px;">This link will expire in {{expiryTime}}.</p><p style="color: #666; font-size: 14px;">If you did not request a password reset, please ignore this email.</p><hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;"><p style="color: #999; font-size: 12px;">OrbisHub - IT Management System</p></div></body></html>',
+                        'Password Reset Request\n\nHello {{userName}},\n\nWe received a request to reset your password for your OrbisHub account.\n\nClick the link below to reset your password:\n{{resetLink}}\n\nThis link will expire in {{expiryTime}}.\n\nIf you did not request a password reset, please ignore this email.\n\n---\nOrbisHub - IT Management System',
+                        '["userName", "resetLink", "expiryTime"]',
+                        1,
+                        1,
+                        @systemUserId
+                    )
+                    
+                    INSERT INTO EmailTemplates (id, name, description, emailType, subject, bodyHtml, bodyText, variables, isActive, isSystem, createdBy)
+                    VALUES (
+                        NEWID(),
+                        'Bug Report Notification',
+                        'Email template for bug report notifications',
+                        'bug_report',
+                        'OrbisHub - New Bug Report: {{bugTitle}}',
+                        '<html><body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;"><div style="max-width: 600px; margin: 0 auto; padding: 20px;"><h2 style="color: #ef4444;">🐛 New Bug Report</h2><p><strong>Title:</strong> {{bugTitle}}</p><p><strong>Reported by:</strong> {{reporterName}} ({{reporterEmail}})</p><p><strong>Severity:</strong> <span style="color: #ef4444;">{{severity}}</span></p><p><strong>Description:</strong></p><div style="background: #f3f4f6; padding: 15px; border-radius: 6px; margin: 10px 0;">{{bugDescription}}</div><p style="margin-top: 20px;"><a href="{{bugLink}}" style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">View Bug Details</a></p><hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;"><p style="color: #999; font-size: 12px;">OrbisHub - IT Management System</p></div></body></html>',
+                        'New Bug Report\n\nTitle: {{bugTitle}}\nReported by: {{reporterName}} ({{reporterEmail}})\nSeverity: {{severity}}\n\nDescription:\n{{bugDescription}}\n\nView details: {{bugLink}}\n\n---\nOrbisHub - IT Management System',
+                        '["bugTitle", "reporterName", "reporterEmail", "severity", "bugDescription", "bugLink"]',
+                        1,
+                        1,
+                        @systemUserId
+                    )
+                    
+                    INSERT INTO EmailTemplates (id, name, description, emailType, subject, bodyHtml, bodyText, variables, isActive, isSystem, createdBy)
+                    VALUES (
+                        NEWID(),
+                        'Account Locked Notification',
+                        'Email template for account lockout notifications',
+                        'notification',
+                        'OrbisHub - Your Account Has Been Locked',
+                        '<html><body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;"><div style="max-width: 600px; margin: 0 auto; padding: 20px;"><h2 style="color: #f59e0b;">⚠️ Account Locked</h2><p>Hello {{userName}},</p><p>Your OrbisHub account has been locked due to multiple failed login attempts.</p><p><strong>Lockout Details:</strong></p><ul><li>Failed attempts: {{failedAttempts}}</li><li>Locked until: {{lockoutExpiry}}</li><li>IP Address: {{ipAddress}}</li></ul><p>Your account will be automatically unlocked after the lockout period expires.</p><p>If this was not you, please contact your system administrator immediately.</p><hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;"><p style="color: #999; font-size: 12px;">OrbisHub - IT Management System</p></div></body></html>',
+                        'Account Locked\n\nHello {{userName}},\n\nYour OrbisHub account has been locked due to multiple failed login attempts.\n\nLockout Details:\n- Failed attempts: {{failedAttempts}}\n- Locked until: {{lockoutExpiry}}\n- IP Address: {{ipAddress}}\n\nYour account will be automatically unlocked after the lockout period expires.\n\nIf this was not you, please contact your system administrator immediately.\n\n---\nOrbisHub - IT Management System',
+                        '["userName", "failedAttempts", "lockoutExpiry", "ipAddress"]',
+                        1,
+                        1,
+                        @systemUserId
+                    )
+                END
+            END
+        `);
+        migrations.push('Default email templates created');
         
         // Note: Ticket numbers are generated in the application code during insert
         // to avoid conflicts with OUTPUT clause

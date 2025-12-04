@@ -39,6 +39,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     encryptMessage: (message) => ipcRenderer.invoke('encrypt-message', message),
     decryptMessage: (encryptedMessage) => ipcRenderer.invoke('decrypt-message', encryptedMessage),
     
+    // Email Server Profile
+    testEmailProfile: (profileId, testEmail) => ipcRenderer.invoke('test-email-profile', profileId, testEmail),
+    sendEmailFromQueue: (emailQueueId) => ipcRenderer.invoke('send-email-from-queue', emailQueueId),
+    
     // Server utilities
     testServer: (ipAddress, serverName, port = 3389) => 
         ipcRenderer.invoke('test-server', { ipAddress, serverName, port }),

@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="../Functions/TicketManagement/ticket-ui.css" />
 <link rel="stylesheet" href="../Functions/PasswordManager/password-ui.css" />
 <link rel="stylesheet" href="../Functions/BugReporting/bug-ui.css" />
+<link rel="stylesheet" href="../Functions/EmailServerProfile/email-ui.css" />
 </head>
 <body>
 
@@ -1972,9 +1973,29 @@
     <h1>🔧 System Configuration</h1>
     <div style="flex:1"></div>
   </div>
+
+  <!-- Configuration Tabs -->
+  <div class="system-config-tabs">
+    <button class="system-config-tab active" data-tab="coreservice" onclick="SystemConfig.switchTab('coreservice')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+      Core Service
+    </button>
+    <button class="system-config-tab" data-tab="emailserver" onclick="SystemConfig.switchTab('emailserver')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+        <polyline points="22,6 12,13 2,6"/>
+      </svg>
+      Email Server
+    </button>
+  </div>
   
-  <div class="documentation-container">
-    <!-- OrbisHub CoreService Section -->
+  <!-- Core Service Tab Content -->
+  <div id="systemConfigCoreService" class="system-config-content active">
+    <div class="documentation-container">
+      <!-- OrbisHub CoreService Section -->
     <div class="doc-section">
       <h2 class="doc-section-title">🔧 OrbisHub CoreService</h2>
       
@@ -2126,6 +2147,148 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
         <code style="background: var(--bg-secondary); padding: 8px 12px; border-radius: 4px; display: inline-block; margin-top: 8px;">
           http://your-server:5000/swagger
         </code>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- Email Server Profile Tab Content -->
+  <div id="systemConfigEmailServer" class="system-config-content">
+    <div class="documentation-container">
+      <div class="doc-section">
+        <h2 class="doc-section-title">📧 Email Server Profile</h2>
+        <p class="doc-section-description" style="margin-bottom: 24px;">
+          Configure SMTP email server profiles to enable password recovery, bug report notifications, 
+          and other automated email communications. Similar to CRM Dynamics Email Server Profiles.
+        </p>
+
+        <!-- Email Profile Header Actions -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <div>
+            <h3 style="margin: 0;">Email Server Profiles</h3>
+            <p class="muted" style="margin: 4px 0 0 0; font-size: 13px;">
+              Create and manage SMTP configurations for outbound emails
+            </p>
+          </div>
+          <button class="btn btn-primary" id="createEmailProfileBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Create Email Profile
+          </button>
+        </div>
+
+        <!-- Email Profiles List (populated by JavaScript) -->
+        <div id="emailProfilesList">
+          <div class="empty-state">
+            <div class="empty-icon">📧</div>
+            <h3>Loading email profiles...</h3>
+          </div>
+        </div>
+
+        <!-- Email Configuration Tips -->
+        <div class="doc-card" style="margin-top: 32px;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+            <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, var(--primary) 0%, color-mix(in oklab, var(--primary) 80%, #000) 100%); display: flex; align-items: center; justify-content: center;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+            </div>
+            <div>
+              <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: var(--text);">Common SMTP Provider Settings</h3>
+              <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--muted);">Quick reference for popular email providers</p>
+            </div>
+          </div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+              <tr style="background: color-mix(in oklab, var(--bg) 50%, var(--panel)); border-bottom: 2px solid var(--border);">
+                <th style="padding: 12px; text-align: left; font-weight: 600; color: var(--text);">Provider</th>
+                <th style="padding: 12px; text-align: left; font-weight: 600; color: var(--text);">SMTP Host</th>
+                <th style="padding: 12px; text-align: left; font-weight: 600; color: var(--text);">Port</th>
+                <th style="padding: 12px; text-align: left; font-weight: 600; color: var(--text);">Security</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 12px; color: var(--text);"><strong>Gmail</strong></td>
+                <td style="padding: 12px; font-family: monospace; color: var(--primary);">smtp.gmail.com</td>
+                <td style="padding: 12px; color: var(--text);">587 (TLS) or 465 (SSL)</td>
+                <td style="padding: 12px; color: var(--text);">TLS/SSL</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 12px; color: var(--text);"><strong>Outlook / Office 365</strong></td>
+                <td style="padding: 12px; font-family: monospace; color: var(--primary);">smtp.office365.com</td>
+                <td style="padding: 12px; color: var(--text);">587</td>
+                <td style="padding: 12px; color: var(--text);">TLS</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 12px; color: var(--text);"><strong>Yahoo Mail</strong></td>
+                <td style="padding: 12px; font-family: monospace; color: var(--primary);">smtp.mail.yahoo.com</td>
+                <td style="padding: 12px; color: var(--text);">587 or 465</td>
+                <td style="padding: 12px; color: var(--text);">TLS/SSL</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 12px; color: var(--text);"><strong>SendGrid</strong></td>
+                <td style="padding: 12px; font-family: monospace; color: var(--primary);">smtp.sendgrid.net</td>
+                <td style="padding: 12px; color: var(--text);">587</td>
+                <td style="padding: 12px; color: var(--text);">TLS</td>
+              </tr>
+              <tr>
+                <td style="padding: 12px; color: var(--text);"><strong>Custom / Exchange</strong></td>
+                <td style="padding: 12px; font-family: monospace; color: var(--primary);">mail.yourdomain.com</td>
+                <td style="padding: 12px; color: var(--text);">25, 587, or 465</td>
+                <td style="padding: 12px; color: var(--text);">Varies</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="margin-top: 20px; padding: 16px; background: color-mix(in oklab, var(--primary) 8%, transparent); border-left: 4px solid var(--primary); border-radius: 8px;">
+            <div style="display: flex; gap: 12px;">
+              <div style="flex-shrink: 0;">💡</div>
+              <div>
+                <strong style="color: var(--text); font-size: 13px;">Gmail Users:</strong>
+                <p style="margin: 6px 0 0 0; font-size: 13px; color: var(--muted); line-height: 1.5;">
+                  You'll need to create an App Password instead of using your regular password. 
+                  Go to your Google Account → Security → 2-Step Verification → App passwords.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Features Overview -->
+        <div class="doc-card" style="margin-top: 20px;">
+          <h3>✨ Email Features</h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 16px;">
+            <div>
+              <h4 style="font-size: 14px; margin: 0 0 8px 0; color: #2563eb;">🔐 Password Recovery</h4>
+              <p style="margin: 0; font-size: 13px; color: #6b7280;">
+                Send password reset links to users who forgot their credentials
+              </p>
+            </div>
+            <div>
+              <h4 style="font-size: 14px; margin: 0 0 8px 0; color: #2563eb;">🐛 Bug Reports</h4>
+              <p style="margin: 0; font-size: 13px; color: #6b7280;">
+                Automatically notify admins when users report bugs in the system
+              </p>
+            </div>
+            <div>
+              <h4 style="font-size: 14px; margin: 0 0 8px 0; color: #2563eb;">🔔 Notifications</h4>
+              <p style="margin: 0; font-size: 13px; color: #6b7280;">
+                Send account lockout alerts and security notifications
+              </p>
+            </div>
+            <div>
+              <h4 style="font-size: 14px; margin: 0 0 8px 0; color: #2563eb;">📧 Custom Emails</h4>
+              <p style="margin: 0; font-size: 13px; color: #6b7280;">
+                Use templates to send custom emails for any purpose
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -3615,6 +3778,9 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
 </form>
 </dialog>
 
+<!-- Email Server Profile Modals -->
+<!-- Modals loaded dynamically from Functions/EmailServerProfile/email-modals.html -->
+
 <dialog id="clearAuditModal" class="modal">
 <form method="dialog" class="card" style="max-width:500px;">
 <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
@@ -4355,6 +4521,9 @@ Channels
 <!-- Bug Reporting Module -->
 <script src="../Functions/BugReporting/bug-service.js"></script>
 <script src="../Functions/BugReporting/bug-ui.js"></script>
+<!-- Email Server Profile Module -->
+<script src="../Functions/EmailServerProfile/email-service.js"></script>
+<script src="../Functions/EmailServerProfile/email-ui.js"></script>
 <!-- Core -->
 <script src="app-main.js"></script>
 </body>
