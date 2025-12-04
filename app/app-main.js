@@ -10225,6 +10225,12 @@ const SystemConfig = {
             if (window.EmailUI && typeof window.EmailUI.init === 'function') {
                 window.EmailUI.init()
             }
+        } else if (tabName === 'notifications') {
+            document.getElementById('systemConfigNotifications')?.classList.add('active')
+            // Load notification settings when tab is shown
+            if (typeof loadNotificationSettings === 'function') {
+                loadNotificationSettings()
+            }
         }
     }
 }

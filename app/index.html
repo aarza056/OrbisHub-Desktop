@@ -57,7 +57,7 @@
   </div>
 </form>
 <div class="login-footer">
-  <p class="muted" style="font-size:12px; text-align:center; margin-bottom:8px;">For Admins, By Admins</p>
+  <p class="muted" style="font-size:12px; text-align:center; margin-bottom:8px;">Centralized platform for SysAdmins & DevOps</p>
   <button id="clearConfigBtn" class="btn-link" style="font-size:11px; color:var(--muted); text-decoration:none; background:none; border:none; cursor:pointer; padding:4px 8px; display:block; margin:0 auto;" title="Clear all configuration and start fresh">
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:4px;">
       <polyline points="1 4 1 10 7 10"></polyline>
@@ -522,7 +522,7 @@
     </svg>
     Audit Logs
   </button>
-  <button class="nav__btn" data-view="admin-notifications">
+  <button class="nav__btn" data-view="admin-notifications" style="display:none;">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
       <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
@@ -556,7 +556,7 @@
       <circle cx="11" cy="11" r="8"></circle>
       <path d="m21 21-4.35-4.35"></path>
     </svg>
-    ElasticSearch
+    ElasticSearch(comming soon)
   </button>
 </div>
 
@@ -1875,7 +1875,7 @@
 </section>
 
 <!-- Notifications Configuration -->
-<section id="view-admin-notifications" class="view">
+<section id="view-admin-notifications" class="view" style="display:none;">
   <div class="view__header">
     <h1>Notifications Configuration</h1>
     <div style="flex:1"></div>
@@ -1998,6 +1998,13 @@
         <polyline points="22,6 12,13 2,6"/>
       </svg>
       Email Server
+    </button>
+    <button class="system-config-tab" data-tab="notifications" onclick="SystemConfig.switchTab('notifications')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+      </svg>
+      Notifications
     </button>
   </div>
   
@@ -2166,10 +2173,7 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
     <div class="documentation-container">
       <div class="doc-section">
         <h2 class="doc-section-title">📧 Email Server Profile</h2>
-        <p class="doc-section-description" style="margin-bottom: 24px;">
-          Configure SMTP email server profiles to enable password recovery, bug report notifications, 
-          and other automated email communications. Similar to CRM Dynamics Email Server Profiles.
-        </p>
+        
 
         <!-- Email Profile Header Actions -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
@@ -2299,6 +2303,103 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Notifications Tab Content -->
+  <div id="systemConfigNotifications" class="system-config-content">
+    <div class="documentation-container">
+      <div class="stack">
+      <div class="card">
+        <h3>System Alerts</h3>
+        <p class="muted" style="margin-bottom:20px;">Configure notifications for system events, errors, and critical alerts.</p>
+        
+        <div style="display:flex; align-items:center; margin-bottom:16px;">
+          <label style="flex:1; font-weight:500;">Enable System Alerts</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="notifySystemEnabled">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <label class="label">Alert Level
+          <select id="notifySystemLevel" class="input" style="margin-top:8px;">
+            <option value="all">All Alerts</option>
+            <option value="warning">Warnings & Errors</option>
+            <option value="error">Errors Only</option>
+          </select>
+        </label>
+        
+        <label class="label">Recipients
+          <input type="text" id="notifySystemRecipients" class="input" placeholder="email@example.com, user@domain.com" style="margin-top:8px;">
+          <span style="font-size:11px; color:var(--muted); margin-top:4px; display:block;">Comma-separated email addresses or usernames</span>
+        </label>
+      </div>
+      
+      <div class="card">
+        <h3>Daily Summary Reports</h3>
+        <p class="muted" style="margin-bottom:20px;">Receive daily summary of all activities and system status.</p>
+        
+        <div style="display:flex; align-items:center; margin-bottom:16px;">
+          <label style="flex:1; font-weight:500;">Enable Daily Summary</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="notifySummaryEnabled">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <label class="label">Delivery Time
+          <input type="time" id="notifySummaryTime" class="input" value="09:00" style="margin-top:8px;">
+        </label>
+        
+        <label class="label">Recipients
+          <input type="text" id="notifySummaryRecipients" class="input" placeholder="email@example.com, user@domain.com" style="margin-top:8px;">
+          <span style="font-size:11px; color:var(--muted); margin-top:4px; display:block;">Comma-separated email addresses or usernames</span>
+        </label>
+      </div>
+      
+      <div class="card">
+        <h3>Environment Health Monitoring</h3>
+        <p class="muted" style="margin-bottom:20px;">Get notified when environment health status changes.</p>
+        
+        <div style="display:flex; align-items:center; margin-bottom:16px;">
+          <label style="flex:1; font-weight:500;">Enable Health Monitoring</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="notifyHealthEnabled">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <label class="label">Notify When Status Changes To
+          <select id="notifyHealthStatus" class="input" style="margin-top:8px;">
+            <option value="all">Any Status Change</option>
+            <option value="unhealthy">Unhealthy Only</option>
+            <option value="critical">Critical Only</option>
+          </select>
+        </label>
+        
+        <label class="label">Recipients
+          <input type="text" id="notifyHealthRecipients" class="input" placeholder="email@example.com, user@domain.com" style="margin-top:8px;">
+          <span style="font-size:11px; color:var(--muted); margin-top:4px; display:block;">Comma-separated email addresses or usernames</span>
+        </label>
+      </div>
+      
+      <div style="display:flex; gap:12px; margin-top:20px;">
+        <button id="saveNotificationsBtn" class="btn" style="background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color:white; border:none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          Save Notification Settings
+        </button>
+        <button id="testNotificationBtn" class="btn btn-ghost">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+          Send Test Notification
+        </button>
+      </div>
+    </div>
     </div>
   </div>
 </section>
