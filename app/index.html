@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="../Functions/PasswordManager/password-ui.css" />
 <link rel="stylesheet" href="../Functions/BugReporting/bug-ui.css" />
 <link rel="stylesheet" href="../Functions/EmailServerProfile/email-ui.css" />
+<link rel="stylesheet" href="../Functions/UserRecovery/recovery-ui.css" />
 </head>
 <body>
 
@@ -46,9 +47,17 @@
     <input id="loginPassword" type="password" class="input" placeholder="Enter your password" required autocomplete="current-password" />
   </label>
   <button type="submit" class="btn btn-primary" style="width:100%; margin-top:8px;">Sign In</button>
+  
+  <!-- Forgot Password Link -->
+  <div style="text-align: center; margin-top: 15px;">
+    <a href="#" class="forgot-password-link" onclick="RecoveryUI.openForgotPasswordModal(); return false;"
+       style="color: #667eea; text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s;">
+      Forgot Password?
+    </a>
+  </div>
 </form>
 <div class="login-footer">
-  <p class="muted" style="font-size:12px; text-align:center; margin-bottom:8px;">Secure admin access for DevOps teams</p>
+  <p class="muted" style="font-size:12px; text-align:center; margin-bottom:8px;">For Admins, By Admins</p>
   <button id="clearConfigBtn" class="btn-link" style="font-size:11px; color:var(--muted); text-decoration:none; background:none; border:none; cursor:pointer; padding:4px 8px; display:block; margin:0 auto;" title="Clear all configuration and start fresh">
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:4px;">
       <polyline points="1 4 1 10 7 10"></polyline>
@@ -4524,6 +4533,9 @@ Channels
 <!-- Email Server Profile Module -->
 <script src="../Functions/EmailServerProfile/email-service.js"></script>
 <script src="../Functions/EmailServerProfile/email-ui.js"></script>
+<!-- User Recovery Module -->
+<script src="../Functions/UserRecovery/recovery-service.js"></script>
+<script src="../Functions/UserRecovery/recovery-ui.js"></script>
 <!-- Core -->
 <script src="app-main.js"></script>
 </body>

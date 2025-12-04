@@ -1,0 +1,232 @@
+<!-- User Recovery Modal -->
+<dialog id="forgotPasswordModal" class="recovery-modal">
+  <div class="recovery-modal-header">
+    <h2>
+      <span class="icon">🔐</span>
+      <span>Account Recovery</span>
+    </h2>
+    <button type="button" class="recovery-modal-close" onclick="RecoveryUI.closeForgotPasswordModal()" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+  </div>
+
+  <div class="recovery-modal-body">
+    <!-- Step 1: Request Password Reset -->
+    <div id="requestResetStep" class="recovery-step" style="display: block;">
+      <div class="step-header">
+        <h3>Forgot Your Password?</h3>
+        <p>Enter your username or email address and we'll send you instructions to reset your password.</p>
+      </div>
+
+      <form id="requestResetForm">
+        <div class="recovery-form-group">
+          <label for="recoveryUsernameOrEmail" class="recovery-form-label required">Username or Email</label>
+          <input 
+            type="text" 
+            id="recoveryUsernameOrEmail" 
+            class="recovery-input" 
+            placeholder="Enter your username or email"
+            autocomplete="username"
+            required
+          />
+          <div class="recovery-help-text">
+            Enter the username or email address associated with your account.
+          </div>
+        </div>
+
+        <div id="requestResetError" class="recovery-message error"></div>
+        <div id="requestResetSuccess" class="recovery-message success"></div>
+
+        <div class="info-box">
+          <p>
+            <strong>📧 What happens next?</strong><br>
+            If your account is found, we'll send a password reset token to your registered email address. The token will be valid for 60 minutes.
+          </p>
+        </div>
+
+        <div class="recovery-actions">
+          <button type="button" class="recovery-btn recovery-btn-secondary" onclick="RecoveryUI.closeForgotPasswordModal()">
+            Cancel
+          </button>
+          <button type="submit" id="requestResetBtn" class="recovery-btn recovery-btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+              <polyline points="22,6 12,13 2,6"></polyline>
+            </svg>
+            Send Reset Email
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Step 2: Verify Token -->
+    <div id="verifyTokenStep" class="recovery-step">
+      <div class="step-header">
+        <h3>Enter Reset Token</h3>
+        <p>Check your email for the password reset token and enter it below.</p>
+      </div>
+
+      <a href="#" class="back-link" onclick="RecoveryUI.backToRequestStep(); return false;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+        Back
+      </a>
+
+      <form id="verifyTokenForm">
+        <div class="recovery-form-group">
+          <label for="resetToken" class="recovery-form-label required">Reset Token</label>
+          <input 
+            type="text" 
+            id="resetToken" 
+            class="recovery-input" 
+            placeholder="Enter the token from your email"
+            style="font-family: 'Courier New', monospace; letter-spacing: 1px;"
+            autocomplete="off"
+            required
+          />
+          <div class="recovery-help-text">
+            Copy and paste the token exactly as it appears in the email.
+          </div>
+        </div>
+
+        <div id="verifyTokenError" class="recovery-message error"></div>
+        <div id="verifyTokenSuccess" class="recovery-message success"></div>
+
+        <div class="info-box">
+          <p>
+            <strong>📧 Haven't received the email?</strong><br>
+            Check your spam folder. The email should arrive within a few minutes. If you still don't see it, go back and request a new token.
+          </p>
+        </div>
+
+        <div class="recovery-actions">
+          <button type="button" class="recovery-btn recovery-btn-secondary" onclick="RecoveryUI.backToRequestStep()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+            Back
+          </button>
+          <button type="submit" id="verifyTokenBtn" class="recovery-btn recovery-btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Verify Token
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Step 3: Reset Password -->
+    <div id="resetPasswordStep" class="recovery-step">
+      <div class="step-header">
+        <h3>Create New Password</h3>
+        <p>Choose a strong password for your account.</p>
+      </div>
+
+      <a href="#" class="back-link" onclick="RecoveryUI.backToVerifyStep(); return false;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+        Back
+      </a>
+
+      <div class="user-display">
+        <span class="icon">👤</span>
+        <div class="user-info">
+          <p class="user-label">Resetting password for</p>
+          <p class="user-value" id="resetUsernameDisplay">Username</p>
+        </div>
+      </div>
+
+      <form id="resetPasswordForm">
+        <div class="recovery-form-group">
+          <label for="recoveryNewPassword" class="recovery-form-label required">New Password</label>
+          <div class="recovery-input-wrapper password">
+            <input 
+              type="password" 
+              id="recoveryNewPassword" 
+              class="recovery-input" 
+              placeholder="Enter new password"
+              autocomplete="new-password"
+              minlength="8"
+              required
+            />
+            <button type="button" class="toggle-password" tabindex="-1">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <defs>
+                  <symbol id="eye-icon">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </symbol>
+                  <symbol id="eye-off-icon">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                  </symbol>
+                </defs>
+                <use xlink:href="#eye-icon"></use>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="recovery-form-group">
+          <label for="recoveryConfirmNewPassword" class="recovery-form-label required">Confirm New Password</label>
+          <div class="recovery-input-wrapper password">
+            <input 
+              type="password" 
+              id="recoveryConfirmNewPassword" 
+              class="recovery-input" 
+              placeholder="Confirm new password"
+              autocomplete="new-password"
+              minlength="8"
+              required
+            />
+            <button type="button" class="toggle-password" tabindex="-1">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <use xlink:href="#eye-icon"></use>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="password-requirements">
+          <h4>Password Requirements:</h4>
+          <ul>
+            <li>At least 8 characters long</li>
+            <li>Contains at least one letter</li>
+            <li>Contains at least one number</li>
+          </ul>
+        </div>
+
+        <div id="resetPasswordError" class="recovery-message error"></div>
+        <div id="resetPasswordSuccess" class="recovery-message success"></div>
+
+        <div class="warning-box">
+          <p>
+            <strong>⚠️ Security Notice:</strong> After resetting your password, you'll be able to login immediately with your new credentials. Make sure to use a strong, unique password.
+          </p>
+        </div>
+
+        <div class="recovery-actions">
+          <button type="button" class="recovery-btn recovery-btn-secondary" onclick="RecoveryUI.backToVerifyStep()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+            Back
+          </button>
+          <button type="submit" id="resetPasswordBtn" class="recovery-btn recovery-btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 15v2m-6 4h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2z"></path>
+              <path d="M6 9V7a6 6 0 0 1 12 0v2"></path>
+            </svg>
+            Reset Password
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</dialog>

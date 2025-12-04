@@ -2109,6 +2109,194 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
         `);
         migrations.push('Default email templates created');
         
+        // ============ USER RECOVERY SYSTEM ============
+        
+        // Password Reset Tokens Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PasswordResetTokens')
+            BEGIN
+                CREATE TABLE PasswordResetTokens (
+                    id NVARCHAR(50) PRIMARY KEY,
+                    userId NVARCHAR(50) NOT NULL,
+                    token NVARCHAR(255) NOT NULL UNIQUE,
+                    expiresAt DATETIME2 NOT NULL,
+                    isUsed BIT NOT NULL DEFAULT 0,
+                    usedAt DATETIME2 NULL,
+                    requestedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+                    requestIp NVARCHAR(50) NULL,
+                    userAgent NVARCHAR(500) NULL,
+                    emailSentTo NVARCHAR(255) NOT NULL,
+                    emailSentAt DATETIME2 NULL,
+                    emailStatus NVARCHAR(50) NULL,
+                    createdAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+                    CONSTRAINT FK_PasswordResetToken_User FOREIGN KEY (userId) REFERENCES Users(id) ON DELETE CASCADE
+                )
+                
+                CREATE INDEX IX_PasswordResetTokens_Token ON PasswordResetTokens(token)
+                CREATE INDEX IX_PasswordResetTokens_UserId ON PasswordResetTokens(userId)
+                CREATE INDEX IX_PasswordResetTokens_ExpiresAt ON PasswordResetTokens(expiresAt)
+            END
+        `);
+        migrations.push('PasswordResetTokens table created');
+        
+        // Account Recovery Audit Log Table
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'AccountRecoveryLog')
+            BEGIN
+                CREATE TABLE AccountRecoveryLog (
+                    id NVARCHAR(50) PRIMARY KEY,
+                    userId NVARCHAR(50) NULL,
+                    username NVARCHAR(50) NULL,
+                    email NVARCHAR(255) NULL,
+                    action NVARCHAR(50) NOT NULL,
+                    status NVARCHAR(50) NOT NULL,
+                    requestIp NVARCHAR(50) NULL,
+                    userAgent NVARCHAR(500) NULL,
+                    failureReason NVARCHAR(500) NULL,
+                    metadata NVARCHAR(MAX) NULL,
+                    createdAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+                    CONSTRAINT FK_AccountRecoveryLog_User FOREIGN KEY (userId) REFERENCES Users(id) ON DELETE SET NULL
+                )
+                
+                CREATE INDEX IX_AccountRecoveryLog_UserId ON AccountRecoveryLog(userId)
+                CREATE INDEX IX_AccountRecoveryLog_CreatedAt ON AccountRecoveryLog(createdAt)
+            END
+        `);
+        migrations.push('AccountRecoveryLog table created');
+        
+        // Create stored procedures for User Recovery
+        await pool.request().query(`
+            IF OBJECT_ID('sp_CreatePasswordResetToken', 'P') IS NOT NULL
+                DROP PROCEDURE sp_CreatePasswordResetToken;
+        `);
+        
+        await pool.request().query(`
+            CREATE PROCEDURE sp_CreatePasswordResetToken
+                @userId NVARCHAR(50),
+                @token NVARCHAR(255),
+                @email NVARCHAR(255),
+                @expiryMinutes INT = 60,
+                @requestIp NVARCHAR(50) = NULL,
+                @userAgent NVARCHAR(500) = NULL
+            AS
+            BEGIN
+                SET NOCOUNT ON;
+                
+                DECLARE @tokenId NVARCHAR(50) = NEWID();
+                DECLARE @expiresAt DATETIME2 = DATEADD(MINUTE, @expiryMinutes, GETDATE());
+                
+                UPDATE PasswordResetTokens 
+                SET isUsed = 1, usedAt = GETDATE()
+                WHERE userId = @userId AND isUsed = 0;
+                
+                INSERT INTO PasswordResetTokens (
+                    id, userId, token, expiresAt, requestedAt, requestIp, 
+                    userAgent, emailSentTo, emailStatus
+                )
+                VALUES (
+                    @tokenId, @userId, @token, @expiresAt, GETDATE(), @requestIp,
+                    @userAgent, @email, 'pending'
+                );
+                
+                SELECT * FROM PasswordResetTokens WHERE id = @tokenId;
+            END
+        `);
+        migrations.push('sp_CreatePasswordResetToken stored procedure created');
+        
+        await pool.request().query(`
+            IF OBJECT_ID('sp_VerifyPasswordResetToken', 'P') IS NOT NULL
+                DROP PROCEDURE sp_VerifyPasswordResetToken;
+        `);
+        
+        await pool.request().query(`
+            CREATE PROCEDURE sp_VerifyPasswordResetToken
+                @token NVARCHAR(255),
+                @markAsUsed BIT = 0
+            AS
+            BEGIN
+                SET NOCOUNT ON;
+                
+                DECLARE @tokenRecord TABLE (
+                    id NVARCHAR(50),
+                    userId NVARCHAR(50),
+                    token NVARCHAR(255),
+                    expiresAt DATETIME2,
+                    isUsed BIT,
+                    isValid BIT
+                );
+                
+                INSERT INTO @tokenRecord
+                SELECT 
+                    id, userId, token, expiresAt, isUsed,
+                    CASE 
+                        WHEN isUsed = 0 AND expiresAt > GETDATE() THEN 1
+                        ELSE 0
+                    END as isValid
+                FROM PasswordResetTokens
+                WHERE token = @token;
+                
+                IF @markAsUsed = 1
+                BEGIN
+                    UPDATE PasswordResetTokens
+                    SET isUsed = 1, usedAt = GETDATE(), emailStatus = 'used'
+                    WHERE token = @token AND isUsed = 0;
+                END
+                
+                SELECT * FROM @tokenRecord;
+            END
+        `);
+        migrations.push('sp_VerifyPasswordResetToken stored procedure created');
+        
+        await pool.request().query(`
+            IF OBJECT_ID('sp_CleanupExpiredResetTokens', 'P') IS NOT NULL
+                DROP PROCEDURE sp_CleanupExpiredResetTokens;
+        `);
+        
+        await pool.request().query(`
+            CREATE PROCEDURE sp_CleanupExpiredResetTokens
+                @retentionDays INT = 30
+            AS
+            BEGIN
+                SET NOCOUNT ON;
+                
+                DECLARE @cutoffDate DATETIME2 = DATEADD(DAY, -@retentionDays, GETDATE());
+                DECLARE @deletedCount INT;
+                
+                DELETE FROM PasswordResetTokens
+                WHERE expiresAt < @cutoffDate;
+                
+                SET @deletedCount = @@ROWCOUNT;
+                
+                DELETE FROM AccountRecoveryLog
+                WHERE createdAt < @cutoffDate;
+                
+                SELECT @deletedCount as DeletedTokens, @@ROWCOUNT as DeletedLogEntries;
+            END
+        `);
+        migrations.push('sp_CleanupExpiredResetTokens stored procedure created');
+        
+        await pool.request().query(`
+            IF OBJECT_ID('sp_GetUserForRecovery', 'P') IS NOT NULL
+                DROP PROCEDURE sp_GetUserForRecovery;
+        `);
+        
+        await pool.request().query(`
+            CREATE PROCEDURE sp_GetUserForRecovery
+                @usernameOrEmail NVARCHAR(255)
+            AS
+            BEGIN
+                SET NOCOUNT ON;
+                
+                SELECT id, username, email, name, isActive
+                FROM Users
+                WHERE (username = @usernameOrEmail OR email = @usernameOrEmail)
+                    AND isActive = 1
+                    AND email IS NOT NULL
+                    AND email != '';
+            END
+        `);
+        migrations.push('sp_GetUserForRecovery stored procedure created');
+        
         // Note: Ticket numbers are generated in the application code during insert
         // to avoid conflicts with OUTPUT clause
         

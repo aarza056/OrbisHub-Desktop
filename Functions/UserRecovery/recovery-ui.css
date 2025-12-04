@@ -1,0 +1,566 @@
+/**
+ * User Recovery UI Styles
+ * Styling for password reset and account recovery interface
+ * Uses OrbisHub design system variables and patterns
+ */
+
+/* Recovery Modal */
+#forgotPasswordModal {
+  max-width: 500px;
+  width: 90%;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  background: var(--panel);
+  color: var(--text);
+}
+
+#forgotPasswordModal::backdrop {
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+}
+
+/* Modal Header */
+.recovery-modal-header {
+  background: linear-gradient(135deg, var(--primary) 0%, color-mix(in oklab, var(--primary) 80%, #764ba2) 100%);
+  padding: 30px;
+  text-align: center;
+  border-radius: 12px 12px 0 0;
+  position: relative;
+}
+
+.recovery-modal-header h2 {
+  color: white;
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.recovery-modal-header .icon {
+  font-size: 28px;
+}
+
+.recovery-modal-close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.recovery-modal-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.recovery-modal-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Modal Body */
+.recovery-modal-body {
+  padding: 30px;
+}
+
+/* Recovery Steps */
+.recovery-step {
+  display: none;
+}
+
+.recovery-step.active {
+  display: block;
+}
+
+/* Step Header */
+.step-header {
+  margin-bottom: 25px;
+}
+
+.step-header h3 {
+  font-size: 18px;
+  color: var(--text);
+  margin: 0 0 8px 0;
+  font-weight: 600;
+}
+
+.step-header p {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Form Groups */
+.recovery-form-group {
+  margin-bottom: 20px;
+}
+
+.recovery-form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.recovery-form-label.required::after {
+  content: ' *';
+  color: #ef4444;
+}
+
+.recovery-input-wrapper {
+  position: relative;
+}
+
+.recovery-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.recovery-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 20%, transparent);
+}
+
+.recovery-input.error {
+  border-color: #ef4444;
+}
+
+/* Password Input with Toggle */
+.recovery-input-wrapper.password {
+  position: relative;
+}
+
+.recovery-input-wrapper.password .recovery-input {
+  padding-right: 45px;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.toggle-password:hover {
+  color: var(--primary);
+}
+
+.toggle-password svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Help Text */
+.recovery-help-text {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* Password Requirements */
+.password-requirements {
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+  border-left: 3px solid var(--primary);
+  padding: 12px 15px;
+  border-radius: 6px;
+  margin-top: 15px;
+}
+
+.password-requirements h4 {
+  font-size: 13px;
+  color: var(--text);
+  margin: 0 0 8px 0;
+  font-weight: 600;
+}
+
+.password-requirements ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.password-requirements li {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 3px 0;
+  padding-left: 20px;
+  position: relative;
+}
+
+.password-requirements li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #10b981;
+  font-weight: 600;
+}
+
+/* Token Display */
+.token-display {
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+  border: 2px solid color-mix(in oklab, var(--primary) 30%, transparent);
+  border-radius: 8px;
+  padding: 15px;
+  margin: 20px 0;
+  text-align: center;
+}
+
+.token-display h4 {
+  font-size: 13px;
+  color: var(--primary);
+  margin: 0 0 10px 0;
+  font-weight: 600;
+}
+
+.token-display .token-value {
+  font-size: 16px;
+  font-family: 'Courier New', monospace;
+  color: var(--text);
+  font-weight: 600;
+  letter-spacing: 1px;
+  padding: 10px;
+  background: var(--panel);
+  border-radius: 6px;
+  word-break: break-all;
+}
+
+/* User Display */
+.user-display {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-display .icon {
+  font-size: 24px;
+}
+
+.user-display .user-info {
+  flex: 1;
+}
+
+.user-display .user-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.user-display .user-value {
+  font-size: 14px;
+  color: var(--text);
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Messages */
+.recovery-message {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  display: none;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.recovery-message.error {
+  background: color-mix(in oklab, #ef4444 15%, transparent);
+  border: 1px solid #ef4444;
+  color: #dc2626;
+}
+
+.recovery-message.success {
+  background: color-mix(in oklab, #10b981 15%, transparent);
+  border: 1px solid #10b981;
+  color: #047857;
+}
+
+.recovery-message.info {
+  background: color-mix(in oklab, var(--primary) 15%, transparent);
+  border: 1px solid var(--primary);
+  color: var(--primary);
+}
+
+.recovery-message strong {
+  font-weight: 600;
+}
+
+/* Buttons */
+.recovery-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 25px;
+}
+
+.recovery-btn {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.recovery-btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.recovery-btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px color-mix(in oklab, var(--primary) 40%, transparent);
+}
+
+.recovery-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.recovery-btn-secondary {
+  background: var(--panel);
+  color: var(--primary);
+  border: 2px solid var(--primary);
+}
+
+.recovery-btn-secondary:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--border) 50%, transparent);
+}
+
+.recovery-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Spinner Animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+/* Link Buttons */
+.recovery-link {
+  color: var(--primary);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: color 0.2s;
+  margin-top: 15px;
+}
+
+.recovery-link:hover {
+  color: color-mix(in oklab, var(--primary) 80%, black);
+  text-decoration: underline;
+}
+
+.recovery-link svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Back Link */
+.back-link {
+  color: #6b7280;
+  text-decoration: none;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 20px;
+  transition: color 0.2s;
+}
+
+.back-link:hover {
+  color: var(--primary);
+}
+
+.back-link svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Divider */
+.recovery-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 20px 0;
+}
+
+/* Info Box */
+.info-box {
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+  border-left: 4px solid var(--primary);
+  padding: 15px;
+  border-radius: 6px;
+  margin: 20px 0;
+}
+
+.info-box p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--primary);
+  line-height: 1.5;
+}
+
+.info-box strong {
+  font-weight: 600;
+}
+
+/* Warning Box */
+.warning-box {
+  background: color-mix(in oklab, #ef4444 10%, transparent);
+  border-left: 4px solid #ef4444;
+  padding: 15px;
+  border-radius: 6px;
+  margin: 20px 0;
+}
+
+.warning-box p {
+  margin: 0;
+  font-size: 13px;
+  color: #dc2626;
+  line-height: 1.5;
+}
+
+.warning-box strong {
+  font-weight: 600;
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+  #forgotPasswordModal {
+    max-width: 95%;
+  }
+
+  .recovery-modal-header {
+    padding: 20px;
+  }
+
+  .recovery-modal-header h2 {
+    font-size: 20px;
+  }
+
+  .recovery-modal-body {
+    padding: 20px;
+  }
+
+  .recovery-actions {
+    flex-direction: column;
+  }
+
+  .recovery-btn {
+    width: 100%;
+  }
+}
+
+/* Animations */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.recovery-step {
+  animation: slideDown 0.3s ease-out;
+}
+
+/* Login Screen Forgot Password Link */
+.forgot-password-link {
+  color: var(--primary);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  display: inline-block;
+  margin-top: 15px;
+  transition: color 0.2s;
+}
+
+.forgot-password-link:hover {
+  color: color-mix(in oklab, var(--primary) 80%, black);
+  text-decoration: underline;
+}
+
+/* Toast notification styles (if needed) */
+.recovery-toast {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  background: #10b981;
+  color: white;
+  padding: 16px 24px;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 10000;
+  animation: slideInUp 0.3s ease-out;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
