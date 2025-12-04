@@ -1744,13 +1744,18 @@
           <input type="text" id="categoryEditName" class="input" placeholder="e.g., Banking" required>
         </div>
         <div class="form-group">
-          <label>Icon (Emoji)</label>
-          <input type="text" id="categoryEditIcon" class="input" placeholder="🏦" maxlength="10" required>
-          <div class="input-hint">Enter an emoji character</div>
-        </div>
-        <div class="form-group">
-          <label>Color</label>
-          <input type="color" id="categoryEditColor" class="input" value="#3b82f6">
+          <label>Icon</label>
+          <select id="categoryEditIcon" class="input" required>
+            <option value="👤">👤 Personal</option>
+            <option value="💼">💼 Work</option>
+            <option value="💳">💳 Financial</option>
+            <option value="📱">📱 Social Media</option>
+            <option value="📧">📧 Email</option>
+            <option value="💻">💻 Development</option>
+            <option value="🗄️">🗄️ Database</option>
+            <option value="🖥️">🖥️ Server</option>
+            <option value="📝">📝 Other</option>
+          </select>
         </div>
       </div>
       <div class="password-modal-footer">

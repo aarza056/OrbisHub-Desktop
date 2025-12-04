@@ -859,8 +859,7 @@
     document.getElementById('categoryModalTitle').textContent = 'Add Category';
     document.getElementById('categoryEditId').value = '';
     document.getElementById('categoryEditName').value = '';
-    document.getElementById('categoryEditIcon').value = '';
-    document.getElementById('categoryEditColor').value = '#3b82f6';
+    document.getElementById('categoryEditIcon').value = '📝';
     document.getElementById('categoryEditModal').style.display = 'flex';
   }
 
@@ -869,7 +868,6 @@
     document.getElementById('categoryEditId').value = id;
     document.getElementById('categoryEditName').value = name;
     document.getElementById('categoryEditIcon').value = icon;
-    document.getElementById('categoryEditColor').value = color;
     document.getElementById('categoryEditModal').style.display = 'flex';
   }
 
@@ -880,11 +878,11 @@
   async function saveCategoryEdit() {
     const id = document.getElementById('categoryEditId').value;
     const name = document.getElementById('categoryEditName').value.trim();
-    const icon = document.getElementById('categoryEditIcon').value.trim();
-    const color = document.getElementById('categoryEditColor').value;
+    const icon = document.getElementById('categoryEditIcon').value;
+    const color = '#3b82f6'; // Default color
 
-    if (!name || !icon) {
-      showError('Please fill all fields');
+    if (!name) {
+      showError('Please enter a category name');
       return;
     }
 
