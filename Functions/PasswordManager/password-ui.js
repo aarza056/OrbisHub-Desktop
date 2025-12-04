@@ -86,8 +86,8 @@
     const result = await service.getPasswords(currentFilter);
     if (result.success) {
       allPasswords = result.data;
-      renderCategories();
       renderPasswordList();
+      renderCategories();
     } else {
       showError('Failed to load passwords');
     }
@@ -106,8 +106,8 @@
       return matchesSearch && matchesCategory && matchesFavorites;
     });
 
-    renderCategories();
     renderPasswordList(filtered);
+    renderCategories();
   }
 
   // ==================== RENDERING ====================
@@ -392,6 +392,9 @@
   // ==================== PASSWORD MODAL ====================
 
   function openPasswordModal(password = null) {
+    // Close any existing modal first
+    closePasswordModal();
+    
     const isEdit = !!password;
     const modalHtml = `
       <div class="password-modal" id="passwordModal">
@@ -555,11 +558,50 @@
     }
   }
 
-  async function deletePassword(id) {
-    if (!confirm('Are you sure you want to delete this password?')) return;
+  let pendingDeletePasswordId = null;
+
+  function deletePassword(id) {
+    // Store the ID and show confirmation modal
+    pendingDeletePasswordId = id;
+    const modal = document.getElementById('deletePasswordConfirmModal');
+    if (modal) {
+      modal.style.display = 'flex';
+    }
+  }
+
+  function closeDeletePasswordModal() {
+    pendingDeletePasswordId = null;
+    const modal = document.getElementById('deletePasswordConfirmModal');
+    if (modal) {
+      modal.style.display = 'none';
+    }
+  }
+
+  async function confirmDeletePassword() {
+    if (!pendingDeletePasswordId) return;
+
+    const id = pendingDeletePasswordId;
+    const modal = document.getElementById('deletePasswordConfirmModal');
+    const confirmBtn = document.getElementById('deletePasswordConfirmBtn');
+
+    // Update button state
+    if (confirmBtn) {
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<div class="spinner-ring" style="width:12px; height:12px; border-width:2px; display:inline-block; margin-right:4px;"></div> Deleting...';
+    }
 
     const result = await service.deletePassword(id);
+    
+    // Reset button state
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Delete';
+    }
+
     if (result.success) {
+      // Close modal
+      closeDeletePasswordModal();
+      
       showToast('Password deleted successfully', 'success');
       currentPassword = null;
       const container = document.getElementById('passwordDetailContainer');
@@ -849,12 +891,12 @@
         showToast(`Category ${id ? 'updated' : 'created'} successfully`, 'success');
         closeCategoryEditModal();
         
-        // Reload categories
+        // Reload categories and passwords to update counts
         const categoriesResult = await service.getCategories();
         if (categoriesResult.success) {
           categories = categoriesResult.data;
+          await loadPasswords();
           renderCategoryList();
-          renderCategories();
         }
       } else {
         showError(result.error || 'Failed to save category');
@@ -864,33 +906,83 @@
     }
   }
 
-  async function deleteCategory(id, name, count) {
+  let pendingDeleteCategory = null;
+
+  function deleteCategory(id, name, count) {
+    // Store the category info and show confirmation modal
+    pendingDeleteCategory = { id, name, count };
+    
+    const modal = document.getElementById('deleteCategoryConfirmModal');
+    const messageEl = document.getElementById('deleteCategoryMessage');
+    const warningEl = document.getElementById('deleteCategoryWarning');
+    const warningTextEl = document.getElementById('deleteCategoryWarningText');
+    
     if (count > 0) {
-      if (!confirm(`Category "${name}" has ${count} password${count !== 1 ? 's' : ''}. Deleting it will set those passwords to "Other" category. Continue?`)) {
-        return;
-      }
+      messageEl.textContent = `Category "${name}" contains ${count} password${count !== 1 ? 's' : ''}.`;
+      warningEl.style.display = 'block';
+      warningTextEl.textContent = `Deleting this category will move ${count} password${count !== 1 ? 's' : ''} to the "Other" category. This action cannot be undone.`;
     } else {
-      if (!confirm(`Delete category "${name}"?`)) {
-        return;
-      }
+      messageEl.textContent = `Are you sure you want to delete the category "${name}"?`;
+      warningEl.style.display = 'none';
+    }
+    
+    if (modal) {
+      modal.style.display = 'flex';
+    }
+  }
+
+  function closeDeleteCategoryModal() {
+    pendingDeleteCategory = null;
+    const modal = document.getElementById('deleteCategoryConfirmModal');
+    if (modal) {
+      modal.style.display = 'none';
+    }
+  }
+
+  async function confirmDeleteCategory() {
+    if (!pendingDeleteCategory) return;
+
+    const { id } = pendingDeleteCategory;
+    const modal = document.getElementById('deleteCategoryConfirmModal');
+    const confirmBtn = document.getElementById('deleteCategoryConfirmBtn');
+
+    // Update button state
+    if (confirmBtn) {
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<div class="spinner-ring" style="width:12px; height:12px; border-width:2px; display:inline-block; margin-right:4px;"></div> Deleting...';
     }
 
     try {
       const result = await service.deleteCategory(id);
+      
+      // Reset button state
+      if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Delete';
+      }
+
       if (result.success) {
+        // Close modal
+        closeDeleteCategoryModal();
+        
         showToast('Category deleted successfully', 'success');
         
         // Reload categories and passwords
         const categoriesResult = await service.getCategories();
         if (categoriesResult.success) {
           categories = categoriesResult.data;
-          renderCategoryList();
           await loadPasswords();
+          renderCategoryList();
         }
       } else {
         showError(result.error || 'Failed to delete category');
       }
     } catch (error) {
+      // Reset button state
+      if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Delete';
+      }
       showError('Failed to delete category');
     }
   }
@@ -903,6 +995,8 @@
     savePassword,
     editPassword,
     deletePassword,
+    closeDeletePasswordModal,
+    confirmDeletePassword,
     copyPassword,
     copyUsername,
     openCategoryModal,
@@ -912,6 +1006,8 @@
     closeCategoryEditModal,
     saveCategoryEdit,
     deleteCategory,
+    closeDeleteCategoryModal,
+    confirmDeleteCategory,
     togglePasswordVisibility,
     toggleModalPasswordVisibility,
     copyToClipboard,

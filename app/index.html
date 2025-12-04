@@ -1759,6 +1759,70 @@
       </div>
     </div>
   </div>
+
+  <!-- Delete Password Confirmation Modal -->
+  <div id="deletePasswordConfirmModal" class="password-modal" style="display: none;">
+    <div class="password-modal-overlay"></div>
+    <div class="password-modal-content" style="max-width: 480px;">
+      <div class="password-modal-header" style="border-bottom: none; padding-bottom: 0;">
+        <button class="password-modal-close" onclick="window.PasswordUI.closeDeletePasswordModal()" style="margin-left: auto;">×</button>
+      </div>
+      <div class="password-modal-body" style="text-align: center; padding-top: 0;">
+        <div style="width: 64px; height: 64px; border-radius: 16px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.1) 100%); border: 2px solid rgba(239, 68, 68, 0.3); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        </div>
+        <h2 style="margin: 0 0 12px 0; font-size: 20px; font-weight: 600;">Delete Password?</h2>
+        <p style="margin: 0 0 20px 0; color: var(--muted); font-size: 14px; line-height: 1.6;">
+          This will permanently delete this password entry. This action cannot be undone.
+        </p>
+        <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 24px; text-align: left;">
+          <p style="margin: 0; font-size: 13px; color: #fca5a5;">
+            <strong style="display: block; margin-bottom: 8px;">⚠️ Warning</strong>
+            This password will be permanently removed from the database and cannot be recovered.
+          </p>
+        </div>
+      </div>
+      <div class="password-modal-footer" style="gap: 12px; justify-content: center;">
+        <button class="btn btn-secondary" onclick="window.PasswordUI.closeDeletePasswordModal()" style="min-width: 120px;">Cancel</button>
+        <button class="btn btn-danger" onclick="window.PasswordUI.confirmDeletePassword()" id="deletePasswordConfirmBtn" style="min-width: 120px;">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Category Confirmation Modal -->
+  <div id="deleteCategoryConfirmModal" class="password-modal" style="display: none;">
+    <div class="password-modal-overlay"></div>
+    <div class="password-modal-content" style="max-width: 480px;">
+      <div class="password-modal-header" style="border-bottom: none; padding-bottom: 0;">
+        <button class="password-modal-close" onclick="window.PasswordUI.closeDeleteCategoryModal()" style="margin-left: auto;">×</button>
+      </div>
+      <div class="password-modal-body" style="text-align: center; padding-top: 0;">
+        <div style="width: 64px; height: 64px; border-radius: 16px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.1) 100%); border: 2px solid rgba(239, 68, 68, 0.3); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        </div>
+        <h2 style="margin: 0 0 12px 0; font-size: 20px; font-weight: 600;">Delete Category?</h2>
+        <p id="deleteCategoryMessage" style="margin: 0 0 20px 0; color: var(--muted); font-size: 14px; line-height: 1.6;">
+          This will permanently delete this category.
+        </p>
+        <div id="deleteCategoryWarning" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 24px; text-align: left; display: none;">
+          <p style="margin: 0; font-size: 13px; color: #fca5a5;">
+            <strong style="display: block; margin-bottom: 8px;">⚠️ Warning</strong>
+            <span id="deleteCategoryWarningText"></span>
+          </p>
+        </div>
+      </div>
+      <div class="password-modal-footer" style="gap: 12px; justify-content: center;">
+        <button class="btn btn-secondary" onclick="window.PasswordUI.closeDeleteCategoryModal()" style="min-width: 120px;">Cancel</button>
+        <button class="btn btn-danger" onclick="window.PasswordUI.confirmDeleteCategory()" id="deleteCategoryConfirmBtn" style="min-width: 120px;">Delete</button>
+      </div>
+    </div>
+  </div>
 </section>
 
 <!-- Notifications Configuration -->
