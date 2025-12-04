@@ -4059,8 +4059,19 @@ function filterSummaryActivity(filter) {
     updateRecentActivity(db)
 }
 
-// Update uptime every minute
-setInterval(updateSummaryUptime, 60000)
+let summaryUptimeInterval = null
+
+function startSummaryUptimeUpdates() {
+    if (summaryUptimeInterval) return
+    summaryUptimeInterval = setInterval(updateSummaryUptime, 60000)
+}
+
+function stopSummaryUptimeUpdates() {
+    if (summaryUptimeInterval) {
+        clearInterval(summaryUptimeInterval)
+        summaryUptimeInterval = null
+    }
+}
 
 function updateRecentActivity(db) {
     const activityContainer = document.getElementById('summaryRecentActivity')
@@ -4269,6 +4280,11 @@ async function showView(name, updateUrl = true) {
         stopConversationPolling()
         stopUnreadPolling()
     }
+    
+    // Stop uptime updates when leaving Summary view
+    if (actual !== 'summary') {
+        stopSummaryUptimeUpdates()
+    }
 
     // Auto-refresh data from database when switching views
     try {
@@ -4276,6 +4292,7 @@ async function showView(name, updateUrl = true) {
         switch (actual) {
             case 'summary':
                 await updateSummaryDashboard()
+                startSummaryUptimeUpdates()
                 break
                 
             case 'servers':
@@ -4846,10 +4863,10 @@ async function showApp() {
     // Check database connection status initially
     checkSystemConfiguration(false)
     
-    // Set up periodic database connection check (every 10 seconds)
+    // Set up periodic database connection check (every 30 seconds)
     setInterval(() => {
         checkSystemConfiguration(false)
-    }, 10000)
+    }, 30000)
 }
 
 function updateUserMenu() {
@@ -5518,10 +5535,7 @@ setTimeout(() => {
     checkSystemConfiguration(true)
 }, 2000)
 
-// Periodically check database status (every 10 seconds)
-setInterval(() => {
-    checkSystemConfiguration(false)
-}, 10000)
+// Note: Periodic database status check is handled in showDashboard()
 
 // ============================================
 // DATABASE CONNECTION CONFIGURATION

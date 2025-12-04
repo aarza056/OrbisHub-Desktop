@@ -2073,10 +2073,16 @@ function startMessageNotificationPolling() {
         clearInterval(messageCheckInterval);
     }
     
-    // Check every 2 seconds for new messages
+    // Check every 5 seconds for new messages (balanced approach)
+    // Only queries for unread messages, minimizing database load
     messageCheckInterval = setInterval(async () => {
         try {
             if (!dbPool || !mainWindow) return;
+            
+            // Skip if window is minimized or hidden to save resources
+            if (mainWindow.isMinimized() || !mainWindow.isVisible()) {
+                return;
+            }
             
             // Query for unread messages that we haven't seen yet
             const result = await dbPool.request().query(`
@@ -2109,7 +2115,7 @@ function startMessageNotificationPolling() {
         } catch (error) {
             console.error('Error checking for new messages:', error);
         }
-    }, 2000); // Check every 2 seconds
+    }, 5000); // Check every 5 seconds (12 queries/min vs 30 queries/min)
 }
 
 // Stop message polling
