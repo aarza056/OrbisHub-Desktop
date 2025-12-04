@@ -200,9 +200,10 @@
       const icon = CATEGORY_ICONS[p.category] || (category && category.icon) || '📝';
       const color = category ? category.color : '#6b7280';
       const passwordMask = '•'.repeat(12);
+      const isActive = currentPassword && currentPassword.id === p.id ? 'active' : '';
       
       html += `
-        <tr class="password-table-row" data-id="${p.id}">
+        <tr class="password-table-row ${isActive}" data-id="${p.id}">
           <td>
             <div class="password-table-icon" style="background: ${color}20; color: ${color};">
               ${icon}
@@ -217,7 +218,7 @@
           <td class="password-table-username">
             <div class="password-table-password">
               <span>${escapeHtml(p.username)}</span>
-              <button class="btn-icon btn-icon-sm" onclick="window.PasswordUI.copyUsername(${p.id}, '${escapeHtml(p.username)}')" title="Copy Username">
+              <button class="btn-icon btn-icon-sm" onclick="event.stopPropagation(); window.PasswordUI.copyUsername(${p.id}, '${escapeHtml(p.username)}')" title="Copy Username">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -228,7 +229,7 @@
           <td>
             <div class="password-table-password">
               <span class="password-masked">${passwordMask}</span>
-              <button class="btn-icon btn-icon-sm" onclick="window.PasswordUI.copyPassword(${p.id})" title="Copy Password">
+              <button class="btn-icon btn-icon-sm" onclick="event.stopPropagation(); window.PasswordUI.copyPassword(${p.id})" title="Copy Password">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -244,13 +245,13 @@
           <td class="password-table-url">${p.url ? escapeHtml(p.url) : '-'}</td>
           <td>
             <div class="password-table-actions">
-              <button class="btn-icon" onclick="window.PasswordUI.editPassword(${p.id})" title="Edit">
+              <button class="btn-icon" onclick="event.stopPropagation(); window.PasswordUI.editPassword(${p.id})" title="Edit">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                 </svg>
               </button>
-              <button class="btn-icon btn-icon-danger" onclick="window.PasswordUI.deletePassword(${p.id})" title="Delete">
+              <button class="btn-icon btn-icon-danger" onclick="event.stopPropagation(); window.PasswordUI.deletePassword(${p.id})" title="Delete">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="3 6 5 6 21 6"></polyline>
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -268,6 +269,14 @@
     `;
 
     container.innerHTML = html;
+
+    // Add click handlers to rows
+    container.querySelectorAll('.password-table-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const id = parseInt(row.dataset.id);
+        loadPasswordDetail(id);
+      });
+    });
   }
 
   async function loadPasswordDetail(id) {
@@ -276,6 +285,12 @@
       currentPassword = result.data;
       renderPasswordDetail();
       renderPasswordList(); // Update list to show active item
+      
+      // Show detail panel
+      const detailPanel = document.getElementById('passwordDetailPanel');
+      if (detailPanel) {
+        detailPanel.style.display = 'flex';
+      }
     } else {
       showError('Failed to load password details');
     }
@@ -361,9 +376,7 @@
         <div class="password-detail-section">
           <div class="password-detail-label">URL</div>
           <div class="password-detail-value">
-            <a href="${escapeHtml(currentPassword.url)}" target="_blank" style="flex: 1; color: var(--primary); text-decoration: none;">
-              ${escapeHtml(currentPassword.url)}
-            </a>
+            <span style="flex: 1;">${escapeHtml(currentPassword.url)}</span>
             <div class="password-detail-actions">
               <button class="password-action-btn" onclick="window.PasswordUI.copyToClipboard('${escapeHtml(currentPassword.url)}', this)" title="Copy URL">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -379,9 +392,7 @@
         ${currentPassword.notes ? `
         <div class="password-detail-section">
           <div class="password-detail-label">Notes</div>
-          <div class="password-detail-value" style="white-space: pre-wrap;">
-            ${escapeHtml(currentPassword.notes)}
-          </div>
+          <div class="password-detail-value notes-field">${escapeHtml(currentPassword.notes)}</div>
         </div>
         ` : ''}
 
@@ -441,31 +452,18 @@
                   </button>
                 </div>
                 <div class="password-strength" id="passwordStrength"></div>
-                <div class="password-generator">
-                  <div class="password-generator-options">
-                    <label class="password-generator-option">
-                      <input type="checkbox" id="genUppercase" checked> Uppercase
-                    </label>
-                    <label class="password-generator-option">
-                      <input type="checkbox" id="genLowercase" checked> Lowercase
-                    </label>
-                    <label class="password-generator-option">
-                      <input type="checkbox" id="genNumbers" checked> Numbers
-                    </label>
-                    <label class="password-generator-option">
-                      <input type="checkbox" id="genSymbols" checked> Symbols
-                    </label>
-                  </div>
-                  <div class="password-generator-length">
-                    <span style="font-size: 14px;">Length:</span>
-                    <input type="range" id="genLength" min="8" max="32" value="16">
-                    <span id="genLengthValue" style="font-size: 14px; font-weight: 600;">16</span>
-                  </div>
-                  <div class="password-generator-actions">
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="window.PasswordUI.generatePassword()">
-                      🎲 Generate Password
-                    </button>
-                  </div>
+              </div>
+
+              <div class="password-form-group">
+                <label class="password-form-label required">Confirm Password</label>
+                <div style="position: relative;">
+                  <input type="password" class="password-form-input" id="passwordConfirm" placeholder="Confirm password" value="${password ? escapeHtml(password.password_decrypted) : ''}" required>
+                  <button type="button" class="password-action-btn" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%);" onclick="window.PasswordUI.toggleConfirmPasswordVisibility()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                  </button>
                 </div>
               </div>
 
@@ -511,12 +509,6 @@
     const passwordInput = document.getElementById('passwordPassword');
     passwordInput.addEventListener('input', updatePasswordStrength);
 
-    // Set up length slider
-    const lengthSlider = document.getElementById('genLength');
-    lengthSlider.addEventListener('input', (e) => {
-      document.getElementById('genLengthValue').textContent = e.target.value;
-    });
-
     updatePasswordStrength();
   }
 
@@ -529,6 +521,7 @@
     const name = document.getElementById('passwordName').value.trim();
     const username = document.getElementById('passwordUsername').value.trim();
     const password = document.getElementById('passwordPassword').value;
+    const confirmPassword = document.getElementById('passwordConfirm').value;
     const url = document.getElementById('passwordUrl').value.trim();
     const category = document.getElementById('passwordCategory').value;
     const notes = document.getElementById('passwordNotes').value.trim();
@@ -536,6 +529,11 @@
 
     if (!name || !username || !password) {
       showError('Please fill in all required fields');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      showError('Passwords do not match');
       return;
     }
 
@@ -655,6 +653,11 @@
 
   function toggleModalPasswordVisibility() {
     const field = document.getElementById('passwordPassword');
+    field.type = field.type === 'password' ? 'text' : 'password';
+  }
+
+  function toggleConfirmPasswordVisibility() {
+    const field = document.getElementById('passwordConfirm');
     field.type = field.type === 'password' ? 'text' : 'password';
   }
 
@@ -994,6 +997,15 @@
     }
   }
 
+  function closePasswordDetail() {
+    currentPassword = null;
+    const detailPanel = document.getElementById('passwordDetailPanel');
+    if (detailPanel) {
+      detailPanel.style.display = 'none';
+    }
+    renderPasswordList(); // Update list to remove active state
+  }
+
   // Export functions
   window.PasswordUI = {
     init: initPasswordManager,
@@ -1006,6 +1018,7 @@
     confirmDeletePassword,
     copyPassword,
     copyUsername,
+    closePasswordDetail,
     openCategoryModal,
     closeCategoryModal,
     addNewCategory,
@@ -1017,6 +1030,7 @@
     confirmDeleteCategory,
     togglePasswordVisibility,
     toggleModalPasswordVisibility,
+    toggleConfirmPasswordVisibility,
     copyToClipboard,
     generatePassword
   };
