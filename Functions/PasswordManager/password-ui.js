@@ -30,8 +30,14 @@
 
   // ==================== INITIALIZATION ====================
 
+  let eventListenersSetup = false;
+
   async function initPasswordManager() {
     try {
+      // Reset filters to default state when view is shown
+      currentFilter = { category: null, search: '', favorites: false };
+      currentPassword = null;
+
       // Load categories
       const categoriesResult = await service.getCategories();
       if (categoriesResult.success) {
@@ -42,8 +48,11 @@
       // Load passwords
       await loadPasswords();
 
-      // Set up event listeners
-      setupEventListeners();
+      // Set up event listeners only once
+      if (!eventListenersSetup) {
+        setupEventListeners();
+        eventListenersSetup = true;
+      }
     } catch (error) {
       showError('Failed to initialize Password Manager');
     }
