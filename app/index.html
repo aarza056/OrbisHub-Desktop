@@ -1427,6 +1427,24 @@
       </button>
     </div>
   </div>
+  
+  <!-- Audit Log Detail Modal -->
+  <div id="auditDetailModal" class="audit-detail-modal" style="display: none;" onclick="if(event.target === this) closeAuditDetailModal()">
+    <div class="audit-detail-modal-content">
+      <div class="audit-detail-modal-header">
+        <h3>Audit Log Details</h3>
+        <button class="btn-icon" onclick="closeAuditDetailModal()" title="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div id="auditDetailContainer" class="audit-detail-body">
+        <!-- Audit details will be rendered here -->
+      </div>
+    </div>
+  </div>
 </section>
 
 <!-- Messages View (Slack/Teams-like) -->

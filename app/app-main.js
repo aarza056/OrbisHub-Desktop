@@ -1641,6 +1641,9 @@ async function renderAuditLogs(searchQuery = '', actionFilter = '', entityFilter
     tbody.innerHTML = ''
     pageData.forEach(log => {
         const row = document.createElement('tr')
+        row.style.cursor = 'pointer'
+        row.dataset.logId = log.id
+        
         const timestamp = new Date(log.timestamp)
         const formattedTime = timestamp.toLocaleString('en-US', {
             year: 'numeric',
@@ -1681,6 +1684,10 @@ async function renderAuditLogs(searchQuery = '', actionFilter = '', entityFilter
             <td style="font-family:monospace; font-size:13px;">${log.ip}</td>
             <td class="audit-details" title="${detailsTitle}">${detailsStr}</td>
         `
+        
+        // Add click handler to open detail modal
+        row.addEventListener('click', () => openAuditDetailModal(log))
+        
         tbody.appendChild(row)
     })
     
@@ -1827,6 +1834,168 @@ function initializeAuditPagination() {
             goToAuditPage(totalPages)
         })
     }
+}
+
+// Audit Log Detail Modal Functions
+function openAuditDetailModal(log) {
+    const modal = document.getElementById('auditDetailModal')
+    const container = document.getElementById('auditDetailContainer')
+    if (!modal || !container) return
+    
+    const timestamp = new Date(log.timestamp)
+    const formattedTime = timestamp.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZoneName: 'short'
+    })
+    
+    // Determine action icon and color
+    let actionIcon = '📝'
+    let actionColor = '#6b7280'
+    
+    switch(log.action.toLowerCase()) {
+        case 'create':
+            actionIcon = '✨'
+            actionColor = '#4ade80'
+            break
+        case 'update':
+            actionIcon = '✏️'
+            actionColor = '#facc15'
+            break
+        case 'delete':
+            actionIcon = '🗑️'
+            actionColor = '#ef4444'
+            break
+        case 'run':
+        case 'execute':
+            actionIcon = '▶️'
+            actionColor = '#3b82f6'
+            break
+        case 'login':
+        case 'logout':
+            actionIcon = '🔐'
+            actionColor = '#8b5cf6'
+            break
+    }
+    
+    let detailsHtml = `
+        <div class="audit-detail-header-badge">
+            <div class="audit-detail-icon" style="background: ${actionColor}20; color: ${actionColor};">
+                ${actionIcon}
+            </div>
+            <div class="audit-detail-info">
+                <div class="audit-detail-title">${log.action.toUpperCase()}: ${log.entityName}</div>
+                <div class="audit-detail-meta">
+                    ${formattedTime} · ${log.entityType}
+                </div>
+            </div>
+        </div>
+        
+        <div class="audit-detail-section">
+            <div class="audit-detail-label">User</div>
+            <div class="audit-detail-value">
+                <strong>${log.user}</strong> (@${log.username})
+            </div>
+        </div>
+        
+        <div class="audit-detail-section">
+            <div class="audit-detail-label">Timestamp</div>
+            <div class="audit-detail-value monospace">${formattedTime}</div>
+        </div>
+        
+        <div class="audit-detail-section">
+            <div class="audit-detail-label">IP Address</div>
+            <div class="audit-detail-value monospace">${log.ip || '—'}</div>
+        </div>
+        
+        <div class="audit-detail-section">
+            <div class="audit-detail-label">Entity Type</div>
+            <div class="audit-detail-value">${log.entityType}</div>
+        </div>
+        
+        <div class="audit-detail-section">
+            <div class="audit-detail-label">Entity Name</div>
+            <div class="audit-detail-value">${log.entityName}</div>
+        </div>
+    `
+    
+    // Add details section
+    if (log.details && Object.keys(log.details).length > 0) {
+        if (log.action === 'update' && log.details.old && log.details.new) {
+            // Show detailed change comparison
+            detailsHtml += `
+                <div class="audit-detail-section">
+                    <div class="audit-detail-label">Changes</div>
+                    <div class="audit-changes-grid">
+            `
+            
+            const allKeys = new Set([...Object.keys(log.details.old || {}), ...Object.keys(log.details.new || {})])
+            allKeys.forEach(key => {
+                const oldValue = log.details.old[key] !== undefined ? log.details.old[key] : '(not set)'
+                const newValue = log.details.new[key] !== undefined ? log.details.new[key] : '(not set)'
+                
+                if (oldValue !== newValue) {
+                    detailsHtml += `
+                        <div class="audit-change-item">
+                            <div class="audit-change-field">${key}</div>
+                            <div class="audit-change-values">
+                                <div class="audit-change-old">
+                                    <div class="audit-change-label">Old Value</div>
+                                    <div class="audit-change-value">${escapeHtml(String(oldValue))}</div>
+                                </div>
+                                <div class="audit-change-arrow">→</div>
+                                <div class="audit-change-new">
+                                    <div class="audit-change-label">New Value</div>
+                                    <div class="audit-change-value">${escapeHtml(String(newValue))}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `
+                }
+            })
+            
+            detailsHtml += `
+                    </div>
+                </div>
+            `
+        } else {
+            // Show raw details as JSON
+            detailsHtml += `
+                <div class="audit-detail-section">
+                    <div class="audit-detail-label">Details</div>
+                    <div class="audit-detail-value">
+                        <pre>${escapeHtml(JSON.stringify(log.details, null, 2))}</pre>
+                    </div>
+                </div>
+            `
+        }
+    }
+    
+    container.innerHTML = detailsHtml
+    modal.style.display = 'flex'
+}
+
+function closeAuditDetailModal() {
+    const modal = document.getElementById('auditDetailModal')
+    if (modal) {
+        modal.style.display = 'none'
+    }
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    }
+    return String(text).replace(/[&<>"']/g, m => map[m])
 }
 
 
