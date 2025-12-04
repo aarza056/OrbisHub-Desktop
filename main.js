@@ -2551,8 +2551,163 @@ ipcMain.handle('bug-report:getSystemInfo', async (event) => {
 // Submit bug report via email
 ipcMain.handle('bug-report:submit', async (event, bugData) => {
     try {
-        // Format the email body
-        const emailBody = `
+        const pool = await getDbPool();
+        if (!pool) {
+            throw new Error('Database connection not available');
+        }
+
+        // Get default email profile
+        const profileResult = await pool.request()
+            .query('SELECT TOP 1 id FROM EmailServerProfiles WHERE isActive = 1 AND isDefault = 1');
+
+        if (!profileResult.recordset || profileResult.recordset.length === 0) {
+            throw new Error('No active email server profile found. Please configure an email server profile first.');
+        }
+
+        const profileId = profileResult.recordset[0].id;
+
+        // Helper function to escape HTML
+        const escapeHtml = (text) => {
+            if (!text) return '';
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;')
+                .replace(/\n/g, '<br>');
+        };
+
+        // Get severity color
+        const severityColors = {
+            'Critical': '#ef4444',
+            'High': '#f97316',
+            'Medium': '#eab308',
+            'Low': '#3b82f6',
+            'Minor': '#8b5cf6'
+        };
+
+        const severityColor = severityColors[bugData.severity] || '#6b7280';
+
+        // Format HTML email body
+        const emailBodyHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f9fafb; margin: 0; padding: 0; }
+        .container { max-width: 700px; margin: 20px auto; background: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); color: white; padding: 30px; text-align: center; }
+        .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
+        .header p { margin: 10px 0 0 0; opacity: 0.9; font-size: 14px; }
+        .severity-badge { display: inline-block; padding: 6px 16px; border-radius: 20px; font-weight: 600; font-size: 14px; margin-top: 15px; background: ${severityColor}; color: white; }
+        .content { padding: 30px; }
+        .section { margin-bottom: 30px; }
+        .section-title { font-size: 18px; font-weight: 600; color: #1f2937; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #e5e7eb; }
+        .info-grid { display: table; width: 100%; border-collapse: collapse; }
+        .info-row { display: table-row; }
+        .info-label { display: table-cell; padding: 8px 0; font-weight: 600; color: #6b7280; width: 160px; }
+        .info-value { display: table-cell; padding: 8px 0; color: #1f2937; }
+        .description-box { background: #f3f4f6; padding: 20px; border-radius: 6px; border-left: 4px solid ${severityColor}; margin-top: 10px; }
+        .system-info { background: #fef3c7; padding: 15px; border-radius: 6px; font-size: 13px; }
+        .footer { background: #f9fafb; padding: 20px; text-align: center; color: #6b7280; font-size: 12px; border-top: 1px solid #e5e7eb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🐛 Bug Report</h1>
+            <p>OrbisHub Desktop Application</p>
+            <div class="severity-badge">${bugData.severity} Severity</div>
+        </div>
+        
+        <div class="content">
+            <div class="section">
+                <div class="section-title">📋 Bug Details</div>
+                <div class="info-grid">
+                    <div class="info-row">
+                        <div class="info-label">Title:</div>
+                        <div class="info-value"><strong>${escapeHtml(bugData.title)}</strong></div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Category:</div>
+                        <div class="info-value">${escapeHtml(bugData.category)}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">Reported By:</div>
+                        <div class="info-value">${escapeHtml(bugData.userName)}</div>
+                    </div>
+                    ${bugData.userEmail ? `
+                    <div class="info-row">
+                        <div class="info-label">Contact Email:</div>
+                        <div class="info-value">${escapeHtml(bugData.userEmail)}</div>
+                    </div>
+                    ` : ''}
+                    <div class="info-row">
+                        <div class="info-label">Date:</div>
+                        <div class="info-value">${new Date(bugData.timestamp).toLocaleString()}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">📝 Description</div>
+                <div class="description-box">
+                    ${escapeHtml(bugData.description)}
+                </div>
+            </div>
+
+            ${bugData.stepsToReproduce ? `
+            <div class="section">
+                <div class="section-title">🔄 Steps to Reproduce</div>
+                <div class="description-box">
+                    ${escapeHtml(bugData.stepsToReproduce)}
+                </div>
+            </div>
+            ` : ''}
+
+            ${bugData.expectedBehavior ? `
+            <div class="section">
+                <div class="section-title">✅ Expected Behavior</div>
+                <div class="description-box">
+                    ${escapeHtml(bugData.expectedBehavior)}
+                </div>
+            </div>
+            ` : ''}
+
+            ${bugData.actualBehavior ? `
+            <div class="section">
+                <div class="section-title">❌ Actual Behavior</div>
+                <div class="description-box">
+                    ${escapeHtml(bugData.actualBehavior)}
+                </div>
+            </div>
+            ` : ''}
+
+            <div class="section">
+                <div class="section-title">💻 System Information</div>
+                <div class="system-info">
+                    <strong>Operating System:</strong> ${escapeHtml(bugData.systemInfo.os || 'N/A')}<br>
+                    <strong>App Version:</strong> ${escapeHtml(bugData.systemInfo.appVersion || 'N/A')}<br>
+                    <strong>Electron Version:</strong> ${escapeHtml(bugData.systemInfo.electronVersion || 'N/A')}<br>
+                    <strong>Node Version:</strong> ${escapeHtml(bugData.systemInfo.nodeVersion || 'N/A')}<br>
+                    <strong>Total Memory:</strong> ${escapeHtml(bugData.systemInfo.totalMemory || 'N/A')}<br>
+                    <strong>Free Memory:</strong> ${escapeHtml(bugData.systemInfo.freeMemory || 'N/A')}
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            This bug report was automatically generated by OrbisHub Desktop<br>
+            &copy; ${new Date().getFullYear()} OrbisHub - IT Management System
+        </div>
+    </div>
+</body>
+</html>
+        `.trim();
+
+        // Format plain text email body
+        const emailBodyText = `
 Bug Report - OrbisHub Desktop
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2600,8 +2755,8 @@ ${bugData.actualBehavior}
 SYSTEM INFORMATION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Operating System: ${bugData.systemInfo.os}
-App Version: ${bugData.systemInfo.appVersion}
+Operating System: ${bugData.systemInfo.os || 'N/A'}
+App Version: ${bugData.systemInfo.appVersion || 'N/A'}
 Electron Version: ${bugData.systemInfo.electronVersion || 'N/A'}
 Node Version: ${bugData.systemInfo.nodeVersion || 'N/A'}
 Total Memory: ${bugData.systemInfo.totalMemory || 'N/A'}
@@ -2612,25 +2767,162 @@ Free Memory: ${bugData.systemInfo.freeMemory || 'N/A'}
 This bug report was automatically generated by OrbisHub Desktop.
         `.trim();
 
-        // Create mailto link with subject and body
-        const subject = encodeURIComponent(`[OrbisHub Bug] [${bugData.severity}] ${bugData.title}`);
-        const body = encodeURIComponent(emailBody);
-        const mailto = `mailto:info.orbishub@gmail.com?subject=${subject}&body=${body}`;
+        // Prepare CC emails array if user provided their email
+        let ccEmails = null;
+        if (bugData.userEmail && bugData.userEmail.trim()) {
+            ccEmails = JSON.stringify([bugData.userEmail.trim()]);
+        }
 
-        // Open default email client
-        await shell.openExternal(mailto);
+        // Insert email into queue
+        const queueResult = await pool.request()
+            .input('profileId', sql.NVarChar, profileId)
+            .input('toEmail', sql.NVarChar, 'info.orbishub@gmail.com')
+            .input('toName', sql.NVarChar, 'OrbisHub Support')
+            .input('ccEmails', sql.NVarChar, ccEmails)
+            .input('subject', sql.NVarChar, `[OrbisHub Bug] [${bugData.severity}] ${bugData.title}`)
+            .input('bodyHtml', sql.NVarChar, emailBodyHtml)
+            .input('bodyText', sql.NVarChar, emailBodyText)
+            .input('emailType', sql.NVarChar, 'bug-report')
+            .input('priority', sql.Int, bugData.severity === 'Critical' ? 1 : bugData.severity === 'High' ? 2 : 5)
+            .input('maxAttempts', sql.Int, 3)
+            .query(`
+                INSERT INTO EmailQueue (
+                    emailServerProfileId, toEmail, toName, ccEmails, subject, 
+                    bodyHtml, bodyText, emailType, status, priority, 
+                    attempts, maxAttempts, createdAt
+                ) 
+                OUTPUT INSERTED.id 
+                VALUES (
+                    @profileId, @toEmail, @toName, @ccEmails, @subject,
+                    @bodyHtml, @bodyText, @emailType, 'pending', @priority,
+                    0, @maxAttempts, GETDATE()
+                )
+            `);
 
-        console.log('Bug report email composed successfully');
+        if (!queueResult.recordset || queueResult.recordset.length === 0) {
+            throw new Error('Failed to queue bug report email');
+        }
+
+        const emailQueueId = queueResult.recordset[0].id;
+
+        // Immediately attempt to send the email
+        const nodemailer = require('nodemailer');
         
-        return {
-            success: true,
-            message: 'Bug report email opened in your default email client'
-        };
+        try {
+            // Get email server profile details
+            const profileDetailsResult = await pool.request()
+                .input('profileId', sql.NVarChar, profileId)
+                .query('SELECT * FROM EmailServerProfiles WHERE id = @profileId');
+
+            if (!profileDetailsResult.recordset || profileDetailsResult.recordset.length === 0) {
+                throw new Error('Email server profile not found');
+            }
+
+            const profile = profileDetailsResult.recordset[0];
+
+            // Update status to sending
+            await pool.request()
+                .input('emailId', sql.Int, emailQueueId)
+                .query('UPDATE EmailQueue SET status = \'sending\', lastAttemptDate = GETDATE() WHERE id = @emailId');
+
+            // Decrypt password
+            let smtpPassword = profile.password_encrypted;
+            if (smtpPassword) {
+                smtpPassword = decryptMessage(smtpPassword);
+            }
+
+            // Configure transporter
+            const transportConfig = {
+                host: profile.smtpHost,
+                port: profile.smtpPort,
+                secure: profile.useSSL,
+                auth: profile.authRequired ? {
+                    user: profile.username,
+                    pass: smtpPassword
+                } : undefined,
+                tls: {
+                    rejectUnauthorized: false
+                }
+            };
+
+            if (profile.useTLS) {
+                transportConfig.requireTLS = true;
+            }
+
+            const transporter = nodemailer.createTransport(transportConfig);
+
+            // Prepare mail options
+            const mailOptions = {
+                from: `"${profile.fromName}" <${profile.fromEmail}>`,
+                to: `"OrbisHub Support" <info.orbishub@gmail.com>`,
+                subject: `[OrbisHub Bug] [${bugData.severity}] ${bugData.title}`,
+                html: emailBodyHtml,
+                text: emailBodyText
+            };
+
+            if (profile.replyToEmail) {
+                mailOptions.replyTo = profile.replyToEmail;
+            }
+
+            // Add CC if user provided email
+            if (bugData.userEmail && bugData.userEmail.trim()) {
+                mailOptions.cc = bugData.userEmail.trim();
+            }
+
+            // Send email
+            const info = await transporter.sendMail(mailOptions);
+
+            // Update queue status to sent
+            await pool.request()
+                .input('emailId', sql.Int, emailQueueId)
+                .input('messageId', sql.NVarChar, info.messageId || null)
+                .query(`
+                    UPDATE EmailQueue 
+                    SET status = 'sent', 
+                        sentAt = GETDATE(), 
+                        lastAttemptDate = GETDATE()
+                    WHERE id = @emailId
+                `);
+
+            console.log('Bug report email sent successfully:', info.messageId);
+            
+            return {
+                success: true,
+                message: `Bug report sent successfully${bugData.userEmail ? ' (CC sent to your email)' : ''}`,
+                emailQueueId: emailQueueId,
+                messageId: info.messageId
+            };
+
+        } catch (emailError) {
+            console.error('Failed to send bug report email:', emailError);
+            
+            // Update queue with error
+            await pool.request()
+                .input('emailId', sql.Int, emailQueueId)
+                .input('errorMessage', sql.NVarChar, emailError.message || 'Unknown error')
+                .query(`
+                    UPDATE EmailQueue 
+                    SET status = 'failed', 
+                        attempts = attempts + 1, 
+                        lastAttemptDate = GETDATE(),
+                        errorMessage = @errorMessage
+                    WHERE id = @emailId
+                `);
+
+            // Return queued status - it will be retried later
+            return {
+                success: true,
+                message: 'Bug report queued for sending. Email server may be temporarily unavailable.',
+                emailQueueId: emailQueueId,
+                warning: 'Email queued but not sent immediately: ' + emailError.message
+            };
+        }
+
     } catch (error) {
         console.error('Failed to submit bug report:', error);
         return {
             success: false,
-            error: error.message || 'Failed to open email client'
+            error: error.message || 'Failed to submit bug report'
         };
     }
 });
