@@ -3519,190 +3519,533 @@ function populateNotificationChannels() {
 }
 
 // Load saved notification settings
-function loadNotificationSettings() {
-    const db = store.readSync()
-    const settings = db.notificationSettings || {
+async function loadNotificationSettings() {
+    let settings = {
         system: {
             enabled: false,
             level: 'all',
-            channel: '',
+            profileId: '',
             recipients: ''
         },
         summary: {
             enabled: false,
             time: '09:00',
-            channel: '',
+            profileId: '',
             recipients: ''
         },
         health: {
             enabled: false,
             status: 'all',
-            channel: '',
+            profileId: '',
             recipients: ''
         }
     }
     
-    // Load system alerts
-    document.getElementById('notifySystemEnabled').checked = settings.system.enabled
-    document.getElementById('notifySystemLevel').value = settings.system.level
-    document.getElementById('notifySystemChannel').value = settings.system.channel
-    document.getElementById('notifySystemRecipients').value = settings.system.recipients
-    
-    // Load daily summary
-    document.getElementById('notifySummaryEnabled').checked = settings.summary.enabled
-    document.getElementById('notifySummaryTime').value = settings.summary.time
-    document.getElementById('notifySummaryChannel').value = settings.summary.channel
-    document.getElementById('notifySummaryRecipients').value = settings.summary.recipients
-    
-    // Load health monitoring
-    document.getElementById('notifyHealthEnabled').checked = settings.health.enabled
-    document.getElementById('notifyHealthStatus').value = settings.health.status
-    document.getElementById('notifyHealthChannel').value = settings.health.channel
-    document.getElementById('notifyHealthRecipients').value = settings.health.recipients
-}
-
-// Save notification settings
-const saveNotificationsBtn = document.getElementById('saveNotificationsBtn')
-if (saveNotificationsBtn) {
-    saveNotificationsBtn.addEventListener('click', () => {
-        const db = store.readSync()
+    try {
+        // Load from database first
+        const result = await window.electronAPI.dbQuery(
+            'SELECT SettingValue FROM SystemSettings WHERE SettingKey = @param0',
+            [{ value: 'NotificationSettings' }]
+        )
         
-        db.notificationSettings = {
-            system: {
-                enabled: document.getElementById('notifySystemEnabled').checked,
-                level: document.getElementById('notifySystemLevel').value,
-                channel: document.getElementById('notifySystemChannel').value,
-                recipients: document.getElementById('notifySystemRecipients').value
-            },
-            summary: {
-                enabled: document.getElementById('notifySummaryEnabled').checked,
-                time: document.getElementById('notifySummaryTime').value,
-                channel: document.getElementById('notifySummaryChannel').value,
-                recipients: document.getElementById('notifySummaryRecipients').value
-            },
-            health: {
-                enabled: document.getElementById('notifyHealthEnabled').checked,
-                status: document.getElementById('notifyHealthStatus').value,
-                channel: document.getElementById('notifyHealthChannel').value,
-                recipients: document.getElementById('notifyHealthRecipients').value
+        if (result.success && result.data && result.data.length > 0) {
+            const dbSettings = JSON.parse(result.data[0].SettingValue)
+            settings = { ...settings, ...dbSettings }
+            console.log('✅ Loaded notification settings from database')
+        } else {
+            // Fallback to local store
+            const db = store.readSync()
+            if (db.notificationSettings) {
+                settings = { ...settings, ...db.notificationSettings }
+                console.log('📁 Loaded notification settings from local store')
             }
         }
-        
-        store.write(db)
-        
-        // Show success message
-        const btn = saveNotificationsBtn
-        const originalText = btn.innerHTML
-        btn.innerHTML = `
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
-                <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-            Saved Successfully!
-        `
-        btn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-        
-        setTimeout(() => {
-            btn.innerHTML = originalText
-            btn.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
-        }, 2000)
-    })
+    } catch (error) {
+        console.error('Error loading notification settings:', error)
+        // Fallback to local store
+        const db = store.readSync()
+        if (db.notificationSettings) {
+            settings = { ...settings, ...db.notificationSettings }
+        }
+    }
+    
+    // Load email server profiles
+    await loadEmailProfilesForNotifications()
+    
+    // Attach event listeners
+    attachNotificationEventListeners()
+    
+    // Load system alerts
+    const notifySystemEnabled = document.getElementById('notifySystemEnabled')
+    const notifySystemLevel = document.getElementById('notifySystemLevel')
+    const notifySystemProfile = document.getElementById('notifySystemProfile')
+    const notifySystemRecipients = document.getElementById('notifySystemRecipients')
+    
+    if (notifySystemEnabled) notifySystemEnabled.checked = settings.system.enabled
+    if (notifySystemLevel) notifySystemLevel.value = settings.system.level
+    if (notifySystemProfile) notifySystemProfile.value = settings.system.profileId || ''
+    if (notifySystemRecipients) notifySystemRecipients.value = settings.system.recipients
+    
+    // Load daily summary
+    const notifySummaryEnabled = document.getElementById('notifySummaryEnabled')
+    const notifySummaryTime = document.getElementById('notifySummaryTime')
+    const notifySummaryProfile = document.getElementById('notifySummaryProfile')
+    const notifySummaryRecipients = document.getElementById('notifySummaryRecipients')
+    
+    if (notifySummaryEnabled) notifySummaryEnabled.checked = settings.summary.enabled
+    if (notifySummaryTime) notifySummaryTime.value = settings.summary.time
+    if (notifySummaryProfile) notifySummaryProfile.value = settings.summary.profileId || ''
+    if (notifySummaryRecipients) notifySummaryRecipients.value = settings.summary.recipients
+    
+    // Load health monitoring
+    const notifyHealthEnabled = document.getElementById('notifyHealthEnabled')
+    const notifyHealthStatus = document.getElementById('notifyHealthStatus')
+    const notifyHealthProfile = document.getElementById('notifyHealthProfile')
+    const notifyHealthRecipients = document.getElementById('notifyHealthRecipients')
+    
+    if (notifyHealthEnabled) notifyHealthEnabled.checked = settings.health.enabled
+    if (notifyHealthStatus) notifyHealthStatus.value = settings.health.status
+    if (notifyHealthProfile) notifyHealthProfile.value = settings.health.profileId || ''
+    if (notifyHealthRecipients) notifyHealthRecipients.value = settings.health.recipients
 }
 
-// Send test notification
-const testNotificationBtn = document.getElementById('testNotificationBtn')
-if (testNotificationBtn) {
-    testNotificationBtn.addEventListener('click', async () => {
-        const db = store.readSync()
-        
-        // Get first enabled notification channel
-        let testChannel = null
-        let testRecipients = ''
-        
-        if (document.getElementById('notifySystemEnabled').checked) {
-            testChannel = document.getElementById('notifySystemChannel').value
-            testRecipients = document.getElementById('notifySystemRecipients').value
-        } else if (document.getElementById('notifySummaryEnabled').checked) {
-            testChannel = document.getElementById('notifySummaryChannel').value
-            testRecipients = document.getElementById('notifySummaryRecipients').value
-        } else if (document.getElementById('notifyHealthEnabled').checked) {
-            testChannel = document.getElementById('notifyHealthChannel').value
-            testRecipients = document.getElementById('notifyHealthRecipients').value
-        }
-        
-        if (!testChannel) {
-            alert('Please enable at least one notification type and select a channel.')
+// Load email server profiles into notification dropdowns
+async function loadEmailProfilesForNotifications() {
+    try {
+        if (!window.EmailService) {
+            console.warn('EmailService not available')
             return
         }
         
-        if (!testRecipients) {
-            alert('Please specify recipients for the test notification.')
-            return
-        }
+        const profiles = await window.EmailService.getAllProfiles()
+        const activeProfiles = profiles.filter(p => p.isActive)
         
-        // Find integration details
-        const integration = db.integrations.find(int => int.id === testChannel)
+        const selects = [
+            document.getElementById('notifySystemProfile'),
+            document.getElementById('notifySummaryProfile'),
+            document.getElementById('notifyHealthProfile')
+        ]
         
-        if (!integration) {
-            alert('Selected integration channel not found.')
-            return
-        }
-        
-        const btn = testNotificationBtn
-        const originalText = btn.innerHTML
-        btn.innerHTML = `
-            <div class="spinner-ring" style="width:16px; height:16px; border-width:2px; margin-right:8px;"></div>
-            Sending...
-        `
-        btn.disabled = true
-        
-        try {
-            // Call backend API to send test notification
-            const response = await fetch(`${API_BASE_URL}/api/send-notification`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    integration: integration,
-                    recipients: testRecipients,
-                    subject: 'OrbisHub Test Notification',
-                    message: 'This is a test notification from OrbisHub. If you receive this, your notification configuration is working correctly.'
-                })
+        selects.forEach(select => {
+            if (!select) return
+            
+            // Clear existing options except the first one
+            select.innerHTML = '<option value="">Select Email Profile...</option>'
+            
+            // Add active profiles
+            activeProfiles.forEach(profile => {
+                const option = document.createElement('option')
+                option.value = profile.id
+                option.textContent = `${profile.name}${profile.isDefault ? ' (Default)' : ''}`
+                select.appendChild(option)
             })
+        })
+    } catch (error) {
+        console.error('Error loading email profiles for notifications:', error)
+    }
+}
+
+// Attach event listeners for notification buttons
+function attachNotificationEventListeners() {
+    console.log('🔧 Attaching notification event listeners...')
+    
+    // Save notification settings
+    const saveNotificationsBtn = document.getElementById('saveNotificationsBtn')
+    console.log('Save button found:', saveNotificationsBtn !== null)
+    
+    if (saveNotificationsBtn && !saveNotificationsBtn.hasAttribute('data-listener-attached')) {
+        console.log('✅ Attaching save button listener')
+        saveNotificationsBtn.setAttribute('data-listener-attached', 'true')
+        saveNotificationsBtn.addEventListener('click', async () => {
+            console.log('💾 Save button clicked!')
             
-            const result = await response.json()
+            const notificationSettings = {
+                system: {
+                    enabled: document.getElementById('notifySystemEnabled').checked,
+                    level: document.getElementById('notifySystemLevel').value,
+                    profileId: document.getElementById('notifySystemProfile').value,
+                    recipients: document.getElementById('notifySystemRecipients').value
+                },
+                summary: {
+                    enabled: document.getElementById('notifySummaryEnabled').checked,
+                    time: document.getElementById('notifySummaryTime').value,
+                    profileId: document.getElementById('notifySummaryProfile').value,
+                    recipients: document.getElementById('notifySummaryRecipients').value
+                },
+                health: {
+                    enabled: document.getElementById('notifyHealthEnabled').checked,
+                    status: document.getElementById('notifyHealthStatus').value,
+                    profileId: document.getElementById('notifyHealthProfile').value,
+                    recipients: document.getElementById('notifyHealthRecipients').value
+                }
+            }
             
-            if (result.success) {
+            try {
+                // Save to database
+                const settingValue = JSON.stringify(notificationSettings)
+                const result = await window.electronAPI.dbExecute(
+                    `MERGE SystemSettings AS target
+                    USING (SELECT @param0 AS SettingKey, @param1 AS SettingValue) AS source
+                    ON target.SettingKey = source.SettingKey
+                    WHEN MATCHED THEN 
+                        UPDATE SET SettingValue = source.SettingValue
+                    WHEN NOT MATCHED THEN
+                        INSERT (SettingKey, SettingValue) VALUES (source.SettingKey, source.SettingValue);`,
+                    [
+                        { value: 'NotificationSettings' },
+                        { value: settingValue }
+                    ]
+                )
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to save settings')
+                }
+                
+                console.log('✅ Notification settings saved to database')
+                
+                // Also save to local store as backup
+                const db = store.readSync()
+                db.notificationSettings = notificationSettings
+                store.write(db)
+                
+                // Show success message
+                const btn = saveNotificationsBtn
+                const originalText = btn.innerHTML
                 btn.innerHTML = `
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
                         <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
-                    Test Sent Successfully!
+                    Saved Successfully!
                 `
                 btn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                btn.style.color = 'white'
-                btn.style.border = 'none'
                 
                 setTimeout(() => {
                     btn.innerHTML = originalText
-                    btn.style.background = ''
-                    btn.style.color = ''
-                    btn.style.border = ''
-                    btn.disabled = false
-                }, 3000)
-            } else {
-                throw new Error(result.error || 'Failed to send test notification')
+                    btn.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                }, 2000)
+            } catch (error) {
+                console.error('❌ Failed to save notification settings:', error)
+                alert(`Failed to save notification settings: ${error.message}`)
             }
-        } catch (error) {
-            btn.innerHTML = originalText
-            btn.disabled = false
-            alert(`Failed to send test notification: ${error.message}`)
-        }
-    })
+        })
+    }
+
+    // Send test notification
+    const testNotificationBtn = document.getElementById('testNotificationBtn')
+    console.log('Test button found:', testNotificationBtn !== null)
+    
+    if (testNotificationBtn && !testNotificationBtn.hasAttribute('data-listener-attached')) {
+        console.log('✅ Attaching test button listener')
+        testNotificationBtn.setAttribute('data-listener-attached', 'true')
+        testNotificationBtn.addEventListener('click', async () => {
+            console.log('📧 Test notification button clicked!')
+            const db = store.readSync()
+            
+            // Get first enabled notification channel
+            let testProfileId = null
+            let testRecipients = ''
+            let notificationType = ''
+            
+            if (document.getElementById('notifySystemEnabled').checked) {
+                testProfileId = document.getElementById('notifySystemProfile').value
+                testRecipients = document.getElementById('notifySystemRecipients').value
+                notificationType = 'System Alerts'
+            } else if (document.getElementById('notifySummaryEnabled').checked) {
+                testProfileId = document.getElementById('notifySummaryProfile').value
+                testRecipients = document.getElementById('notifySummaryRecipients').value
+                notificationType = 'Daily Summary'
+            } else if (document.getElementById('notifyHealthEnabled').checked) {
+                testProfileId = document.getElementById('notifyHealthProfile').value
+                testRecipients = document.getElementById('notifyHealthRecipients').value
+                notificationType = 'Health Monitoring'
+            }
+            
+            if (!testProfileId) {
+                alert('Please enable at least one notification type and select an Email Server Profile.')
+                return
+            }
+            
+            if (!testRecipients) {
+                alert('Please specify recipients for the test notification.')
+                return
+            }
+            
+            const btn = testNotificationBtn
+            const originalText = btn.innerHTML
+            btn.innerHTML = `
+                <div class="spinner-ring" style="width:16px; height:16px; border-width:2px; margin-right:8px;"></div>
+                Sending...
+            `
+            btn.disabled = true
+            
+            try {
+                if (!window.EmailService) {
+                    throw new Error('Email Service is not available')
+                }
+                
+                // Get the email profile
+                const profile = await window.EmailService.getProfileById(testProfileId)
+                if (!profile) {
+                    throw new Error('Selected Email Server Profile not found')
+                }
+                
+                // Split recipients
+                const recipients = testRecipients.split(',').map(r => r.trim()).filter(r => r)
+                
+                if (recipients.length === 0) {
+                    throw new Error('No valid recipients provided')
+                }
+                
+                // Send test email to first recipient
+                const toEmail = recipients[0]
+                const subject = `OrbisHub Test Notification - ${notificationType}`
+                const bodyHtml = `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #667eea;">OrbisHub Test Notification</h2>
+                        <p>This is a test notification from OrbisHub.</p>
+                        <p><strong>Notification Type:</strong> ${notificationType}</p>
+                        <p><strong>Email Profile:</strong> ${profile.name}</p>
+                        <p><strong>Recipients:</strong> ${testRecipients}</p>
+                        <hr style="border: 1px solid #e5e7eb; margin: 20px 0;">
+                        <p style="color: #6b7280; font-size: 14px;">
+                            If you received this email, your notification configuration is working correctly.
+                        </p>
+                        <p style="color: #6b7280; font-size: 12px;">
+                            Sent from OrbisHub Desktop Application
+                        </p>
+                    </div>
+                `
+                const bodyText = `OrbisHub Test Notification\n\nThis is a test notification from OrbisHub.\n\nNotification Type: ${notificationType}\nEmail Profile: ${profile.name}\nRecipients: ${testRecipients}\n\nIf you received this email, your notification configuration is working correctly.`
+                
+                // Queue the email
+                console.log('📧 Queuing test notification email...')
+                const emailId = await window.EmailService.queueEmail({
+                    emailServerProfileId: testProfileId,
+                    toEmail: toEmail,
+                    toName: toEmail,
+                    subject: subject,
+                    bodyHtml: bodyHtml,
+                    bodyText: bodyText,
+                    emailType: 'test_notification',
+                    priority: 1,
+                    createdBy: window.currentUser ? window.currentUser.username : 'system'
+                })
+                
+                console.log('✅ Email queued with ID:', emailId)
+                
+                if (emailId) {
+                    // Send the email immediately
+                    console.log('📤 Sending email immediately...')
+                    const sendResult = await window.EmailService.sendQueuedEmail(emailId)
+                    console.log('Send result:', sendResult)
+                    
+                    if (sendResult && sendResult.success) {
+                        btn.innerHTML = `
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            Test Email Sent Successfully!
+                        `
+                        btn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                        btn.style.color = 'white'
+                        btn.style.border = 'none'
+                        
+                        setTimeout(() => {
+                            btn.innerHTML = originalText
+                            btn.style.background = ''
+                            btn.style.color = ''
+                            btn.style.border = ''
+                            btn.disabled = false
+                        }, 3000)
+                    } else {
+                        throw new Error(sendResult?.error || 'Failed to send email')
+                    }
+                } else {
+                    throw new Error('Failed to queue email')
+                }
+            } catch (error) {
+                console.error('❌ Test notification failed:', error)
+                btn.innerHTML = originalText
+                btn.disabled = false
+                alert(`Failed to send test notification: ${error.message}\n\nCheck the console for more details.`)
+            }
+        })
+    }
+    
+    console.log('✅ Notification event listeners attached successfully')
 }
 
 // ============================================
 // END NOTIFICATIONS CONFIGURATION
+// ============================================
+
+// ============================================
+// NOTIFICATION HELPER FUNCTIONS
+// ============================================
+
+/**
+ * Send notification email using configured Email Server Profile
+ * @param {string} notificationType - 'system', 'summary', or 'health'
+ * @param {string} subject - Email subject
+ * @param {string} message - Notification message (plain text or HTML)
+ * @param {object} data - Additional data for the notification
+ */
+async function sendNotificationEmail(notificationType, subject, message, data = {}) {
+    try {
+        const db = store.readSync()
+        const settings = db.notificationSettings
+        
+        if (!settings || !settings[notificationType]) {
+            console.warn(`Notification settings not found for type: ${notificationType}`)
+            return false
+        }
+        
+        const config = settings[notificationType]
+        
+        // Check if notifications are enabled
+        if (!config.enabled) {
+            console.log(`Notifications disabled for type: ${notificationType}`)
+            return false
+        }
+        
+        // Check if profile and recipients are configured
+        if (!config.profileId || !config.recipients) {
+            console.warn(`Email profile or recipients not configured for: ${notificationType}`)
+            return false
+        }
+        
+        if (!window.EmailService) {
+            console.error('EmailService not available')
+            return false
+        }
+        
+        // Get the email profile
+        const profile = await window.EmailService.getProfileById(config.profileId)
+        if (!profile) {
+            console.error(`Email Server Profile not found: ${config.profileId}`)
+            return false
+        }
+        
+        // Split recipients
+        const recipients = config.recipients.split(',').map(r => r.trim()).filter(r => r)
+        
+        if (recipients.length === 0) {
+            console.warn('No valid recipients configured')
+            return false
+        }
+        
+        // Determine if message is HTML or plain text
+        const isHtml = message.includes('<') && message.includes('>')
+        
+        // Queue emails for each recipient
+        for (const recipient of recipients) {
+            await window.EmailService.queueEmail({
+                emailServerProfileId: config.profileId,
+                toEmail: recipient,
+                toName: recipient,
+                subject: subject,
+                bodyHtml: isHtml ? message : `<pre style="font-family: Arial, sans-serif;">${message}</pre>`,
+                bodyText: isHtml ? message.replace(/<[^>]*>/g, '') : message,
+                emailType: `notification_${notificationType}`,
+                priority: notificationType === 'system' ? 1 : 3,
+                relatedEntityType: data.entityType || null,
+                relatedEntityId: data.entityId || null,
+                createdBy: window.currentUser ? window.currentUser.username : 'system'
+            })
+        }
+        
+        console.log(`Notification email queued for ${recipients.length} recipient(s)`)
+        return true
+    } catch (error) {
+        console.error('Error sending notification email:', error)
+        return false
+    }
+}
+
+/**
+ * Send system alert notification
+ * @param {string} level - 'info', 'warning', or 'error'
+ * @param {string} title - Alert title
+ * @param {string} message - Alert message
+ */
+async function sendSystemAlert(level, title, message) {
+    const db = store.readSync()
+    const settings = db.notificationSettings?.system
+    
+    // Check if this alert level should be sent
+    if (settings?.level === 'warning' && level === 'info') return false
+    if (settings?.level === 'error' && (level === 'info' || level === 'warning')) return false
+    
+    const levelEmoji = {
+        'info': 'ℹ️',
+        'warning': '⚠️',
+        'error': '❌'
+    }
+    
+    const subject = `${levelEmoji[level] || '🔔'} OrbisHub ${level.toUpperCase()} Alert: ${title}`
+    const bodyHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: ${level === 'error' ? '#dc2626' : level === 'warning' ? '#f59e0b' : '#3b82f6'};">
+                ${levelEmoji[level] || '🔔'} System Alert
+            </h2>
+            <h3>${title}</h3>
+            <p>${message}</p>
+            <hr style="border: 1px solid #e5e7eb; margin: 20px 0;">
+            <p style="color: #6b7280; font-size: 12px;">
+                Timestamp: ${new Date().toLocaleString()}<br>
+                Sent from OrbisHub Desktop Application
+            </p>
+        </div>
+    `
+    
+    return await sendNotificationEmail('system', subject, bodyHtml, { entityType: 'alert' })
+}
+
+/**
+ * Send environment health change notification
+ * @param {object} environment - Environment object
+ * @param {string} oldStatus - Previous status
+ * @param {string} newStatus - New status
+ */
+async function sendHealthChangeNotification(environment, oldStatus, newStatus) {
+    const db = store.readSync()
+    const settings = db.notificationSettings?.health
+    
+    // Check if this status change should trigger notification
+    if (settings?.status === 'unhealthy' && newStatus === 'healthy') return false
+    if (settings?.status === 'critical' && newStatus !== 'critical') return false
+    
+    const statusEmoji = {
+        'healthy': '✅',
+        'unhealthy': '⚠️',
+        'critical': '🔴'
+    }
+    
+    const subject = `${statusEmoji[newStatus] || '🔔'} Environment Health Change: ${environment.name}`
+    const bodyHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: ${newStatus === 'critical' ? '#dc2626' : newStatus === 'unhealthy' ? '#f59e0b' : '#10b981'};">
+                ${statusEmoji[newStatus] || '🔔'} Environment Health Change
+            </h2>
+            <p><strong>Environment:</strong> ${environment.name}</p>
+            <p><strong>Status Change:</strong> ${oldStatus} → ${newStatus}</p>
+            <p><strong>Description:</strong> ${environment.description || 'N/A'}</p>
+            <hr style="border: 1px solid #e5e7eb; margin: 20px 0;">
+            <p style="color: #6b7280; font-size: 12px;">
+                Timestamp: ${new Date().toLocaleString()}<br>
+                Sent from OrbisHub Desktop Application
+            </p>
+        </div>
+    `
+    
+    return await sendNotificationEmail('health', subject, bodyHtml, { 
+        entityType: 'environment', 
+        entityId: environment.id 
+    })
+}
+
+// ============================================
+// END NOTIFICATION HELPER FUNCTIONS
 // ============================================
 
 // ============================================
@@ -10199,7 +10542,7 @@ showView = async function(name, updateUrl = true) {
 
 // ========== SYSTEM CONFIGURATION TAB SWITCHING ==========
 const SystemConfig = {
-    switchTab(tabName) {
+    async switchTab(tabName) {
         // Update tab buttons
         const tabs = document.querySelectorAll('.system-config-tab')
         tabs.forEach(tab => {
@@ -10229,7 +10572,7 @@ const SystemConfig = {
             document.getElementById('systemConfigNotifications')?.classList.add('active')
             // Load notification settings when tab is shown
             if (typeof loadNotificationSettings === 'function') {
-                loadNotificationSettings()
+                await loadNotificationSettings()
             }
         }
     }
