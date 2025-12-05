@@ -1326,7 +1326,24 @@ async function renderUsers() {
 function userRow(u) {
     const el = document.createElement('div')
     el.className = 'card row'
-    const lastLogin = u.lastLogin && u.lastLogin !== '—' ? new Date(u.lastLogin).toLocaleString() : '—'
+    // Handle lastLogin - ensure it's a valid date before formatting
+    let lastLogin = '—'
+    if (u.lastLogin && u.lastLogin !== '—' && u.lastLogin !== null && u.lastLogin !== undefined) {
+        try {
+            // Convert to number if it's a string that looks like a timestamp
+            let timestamp = u.lastLogin
+            if (typeof timestamp === 'string' && /^\d+$/.test(timestamp)) {
+                timestamp = parseInt(timestamp, 10)
+            }
+            
+            const loginDate = new Date(timestamp)
+            if (!isNaN(loginDate.getTime())) {
+                lastLogin = loginDate.toLocaleString()
+            }
+        } catch (e) {
+            console.error('Error parsing lastLogin for user:', u.username, e)
+        }
+    }
     const passwordStatus = u.changePasswordOnLogin ? '<span style="color:#facc15;">⚠ Must change password</span>' : ''
     const positionSquad = `${u.position || '—'} | ${u.squad || '—'}`
     
