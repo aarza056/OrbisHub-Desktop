@@ -929,15 +929,22 @@
     
     const modal = document.getElementById('deleteCategoryConfirmModal');
     const messageEl = document.getElementById('deleteCategoryMessage');
+    const optionsEl = document.getElementById('deleteCategoryOptions');
+    const countEl = document.getElementById('deleteCategoryCount');
     const warningEl = document.getElementById('deleteCategoryWarning');
-    const warningTextEl = document.getElementById('deleteCategoryWarningText');
     
     if (count > 0) {
       messageEl.textContent = `Category "${name}" contains ${count} password${count !== 1 ? 's' : ''}.`;
-      warningEl.style.display = 'block';
-      warningTextEl.textContent = `Deleting this category will move ${count} password${count !== 1 ? 's' : ''} to the "Other" category. This action cannot be undone.`;
+      optionsEl.style.display = 'block';
+      if (countEl) countEl.textContent = count;
+      warningEl.style.display = 'none';
+      
+      // Reset to default option
+      const keepRadio = document.querySelector('input[name="deleteCategoryAction"][value="keep"]');
+      if (keepRadio) keepRadio.checked = true;
     } else {
       messageEl.textContent = `Are you sure you want to delete the category "${name}"?`;
+      optionsEl.style.display = 'none';
       warningEl.style.display = 'none';
     }
     
@@ -957,9 +964,16 @@
   async function confirmDeleteCategory() {
     if (!pendingDeleteCategory) return;
 
-    const { id } = pendingDeleteCategory;
+    const { id, count } = pendingDeleteCategory;
     const modal = document.getElementById('deleteCategoryConfirmModal');
     const confirmBtn = document.getElementById('deleteCategoryConfirmBtn');
+
+    // Get user's choice for passwords (only relevant if category has passwords)
+    let deletePasswords = false;
+    if (count > 0) {
+      const actionRadio = document.querySelector('input[name="deleteCategoryAction"]:checked');
+      deletePasswords = actionRadio ? actionRadio.value === 'delete' : false;
+    }
 
     // Update button state
     if (confirmBtn) {
@@ -968,7 +982,7 @@
     }
 
     try {
-      const result = await service.deleteCategory(id);
+      const result = await service.deleteCategory(id, deletePasswords);
       
       // Reset button state
       if (confirmBtn) {
@@ -981,6 +995,9 @@
         closeDeleteCategoryModal();
         
         showToast('Category deleted successfully', 'success');
+        
+        // Reset filter to show all passwords (in case deleted category was selected)
+        currentFilter = { category: null, search: '', favorites: false };
         
         // Reload categories and passwords
         const categoriesResult = await service.getCategories();

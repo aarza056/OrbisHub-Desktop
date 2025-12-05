@@ -1859,7 +1859,24 @@
         <p id="deleteCategoryMessage" style="margin: 0 0 20px 0; color: var(--muted); font-size: 14px; line-height: 1.6;">
           This will permanently delete this category.
         </p>
-        <div id="deleteCategoryWarning" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 24px; text-align: left; display: none;">
+        <div id="deleteCategoryOptions" style="background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px; text-align: left; display: none;">
+          <div style="margin-bottom: 12px; font-size: 13px; font-weight: 600; color: var(--text);">What should happen to the passwords in this category?</div>
+          <label style="display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 6px; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">
+            <input type="radio" name="deleteCategoryAction" value="keep" checked style="margin-top: 2px;">
+            <div>
+              <div style="font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 4px;">Keep passwords</div>
+              <div style="font-size: 12px; color: var(--muted);">Move <span id="deleteCategoryCount">0</span> password(s) to "Other" category</div>
+            </div>
+          </label>
+          <label style="display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 6px; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">
+            <input type="radio" name="deleteCategoryAction" value="delete" style="margin-top: 2px;">
+            <div>
+              <div style="font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 4px;">Delete passwords</div>
+              <div style="font-size: 12px; color: var(--muted);">Permanently delete all passwords in this category</div>
+            </div>
+          </label>
+        </div>
+        <div id="deleteCategoryWarning" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 20px; text-align: left; display: none;">
           <p style="margin: 0; font-size: 13px; color: #fca5a5;">
             <strong style="display: block; margin-bottom: 8px;">⚠️ Warning</strong>
             <span id="deleteCategoryWarningText"></span>

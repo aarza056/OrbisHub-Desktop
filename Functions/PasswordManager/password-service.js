@@ -397,9 +397,47 @@
 
   /**
    * Delete a category
+   * @param {number} id - Category ID
+   * @param {boolean} deletePasswords - If true, delete passwords in this category. If false, move them to 'Other'
    */
-  async function deleteCategory(id) {
+  async function deleteCategory(id, deletePasswords = false) {
     try {
+      // First, get the category name
+      const categoryResult = await db.query(
+        'SELECT name FROM PasswordCategories WHERE id = @param0',
+        [{ value: id }]
+      );
+      
+      if (!categoryResult.success || categoryResult.data.length === 0) {
+        return { success: false, error: 'Category not found' };
+      }
+      
+      const categoryName = categoryResult.data[0].name;
+      
+      // Handle passwords in this category
+      if (deletePasswords) {
+        // Delete all passwords in this category
+        const deletePasswordsResult = await db.query(
+          'DELETE FROM PasswordEntries WHERE category = @param0',
+          [{ value: categoryName }]
+        );
+        
+        if (!deletePasswordsResult.success) {
+          return { success: false, error: 'Failed to delete passwords' };
+        }
+      } else {
+        // Move passwords to 'Other' category
+        const movePasswordsResult = await db.query(
+          `UPDATE PasswordEntries SET category = 'Other' WHERE category = @param0`,
+          [{ value: categoryName }]
+        );
+        
+        if (!movePasswordsResult.success) {
+          return { success: false, error: 'Failed to move passwords' };
+        }
+      }
+      
+      // Finally, delete the category
       const result = await db.query(
         `DELETE FROM PasswordCategories WHERE id = @param0`,
         [{ value: id }]
