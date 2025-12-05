@@ -204,6 +204,21 @@
       const newId = result.data[0].id;
       await logPasswordAccess(newId, 'create');
 
+      // Log to main audit system
+      if (window.Audit) {
+        await window.Audit.log({
+          id: `password_create_${newId}_${Date.now()}`,
+          action: 'create',
+          entityType: 'password',
+          entityName: data.name,
+          user: session.name || session.username,
+          username: session.username,
+          timestamp: new Date().toISOString(),
+          ip: window.getLocalIP ? window.getLocalIP() : '127.0.0.1',
+          details: { category: data.category || 'Other', username: data.username }
+        });
+      }
+
       return { success: true, data: { id: newId } };
     } catch (error) {
       console.error('Create password error:', error);
@@ -264,6 +279,22 @@
 
       await logPasswordAccess(id, 'edit');
 
+      // Log to main audit system
+      const session = window.getSession ? window.getSession() : null;
+      if (window.Audit && session) {
+        await window.Audit.log({
+          id: `password_update_${id}_${Date.now()}`,
+          action: 'update',
+          entityType: 'password',
+          entityName: data.name || `Password ID: ${id}`,
+          user: session.name || session.username,
+          username: session.username,
+          timestamp: new Date().toISOString(),
+          ip: window.getLocalIP ? window.getLocalIP() : '127.0.0.1',
+          details: { passwordId: id }
+        });
+      }
+
       return { success: true };
     } catch (error) {
       console.error('Update password error:', error);
@@ -276,6 +307,15 @@
    */
   async function deletePassword(id) {
     try {
+      // Get password name before deleting
+      const passwordResult = await db.query(
+        'SELECT name FROM PasswordEntries WHERE id = @param0',
+        [{ value: id }]
+      );
+      const passwordName = passwordResult.success && passwordResult.data.length > 0 
+        ? passwordResult.data[0].name 
+        : `Password ID: ${id}`;
+
       await logPasswordAccess(id, 'delete');
 
       const result = await db.query(
@@ -285,6 +325,22 @@
 
       if (!result.success) {
         return { success: false, error: result.error };
+      }
+
+      // Log to main audit system
+      const session = window.getSession ? window.getSession() : null;
+      if (window.Audit && session) {
+        await window.Audit.log({
+          id: `password_delete_${id}_${Date.now()}`,
+          action: 'delete',
+          entityType: 'password',
+          entityName: passwordName,
+          user: session.name || session.username,
+          username: session.username,
+          timestamp: new Date().toISOString(),
+          ip: window.getLocalIP ? window.getLocalIP() : '127.0.0.1',
+          details: { passwordId: id }
+        });
       }
 
       return { success: true };
@@ -367,6 +423,23 @@
           { value: icon }
         ]
       );
+
+      // Log to main audit system
+      const session = window.getSession ? window.getSession() : null;
+      if (window.Audit && session && result.success) {
+        await window.Audit.log({
+          id: `password_category_create_${Date.now()}`,
+          action: 'create',
+          entityType: 'password_category',
+          entityName: name,
+          user: session.name || session.username,
+          username: session.username,
+          timestamp: new Date().toISOString(),
+          ip: window.getLocalIP ? window.getLocalIP() : '127.0.0.1',
+          details: { icon, color }
+        });
+      }
+
       return result;
     } catch (error) {
       return { success: false, error: error.message };
@@ -389,6 +462,23 @@
           { value: id }
         ]
       );
+
+      // Log to main audit system
+      const session = window.getSession ? window.getSession() : null;
+      if (window.Audit && session && result.success) {
+        await window.Audit.log({
+          id: `password_category_update_${id}_${Date.now()}`,
+          action: 'update',
+          entityType: 'password_category',
+          entityName: name,
+          user: session.name || session.username,
+          username: session.username,
+          timestamp: new Date().toISOString(),
+          ip: window.getLocalIP ? window.getLocalIP() : '127.0.0.1',
+          details: { categoryId: id, icon, color }
+        });
+      }
+
       return result;
     } catch (error) {
       return { success: false, error: error.message };
@@ -442,6 +532,27 @@
         `DELETE FROM PasswordCategories WHERE id = @param0`,
         [{ value: id }]
       );
+
+      // Log to main audit system
+      const session = window.getSession ? window.getSession() : null;
+      if (window.Audit && session && result.success) {
+        await window.Audit.log({
+          id: `password_category_delete_${id}_${Date.now()}`,
+          action: 'delete',
+          entityType: 'password_category',
+          entityName: categoryName,
+          user: session.name || session.username,
+          username: session.username,
+          timestamp: new Date().toISOString(),
+          ip: window.getLocalIP ? window.getLocalIP() : '127.0.0.1',
+          details: { 
+            categoryId: id, 
+            action: deletePasswords ? 'deleted_passwords' : 'moved_to_other',
+            deletePasswords 
+          }
+        });
+      }
+
       return result;
     } catch (error) {
       return { success: false, error: error.message };
