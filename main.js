@@ -2497,9 +2497,20 @@ ipcMain.handle('get-local-ip', async () => {
     try {
         const networkInterfaces = os.networkInterfaces();
         for (const interfaceName in networkInterfaces) {
+            const name = interfaceName.toLowerCase();
+            
+            // Only accept exactly "Ethernet" or "Wi-Fi" (case-insensitive)
+            // This excludes "Ethernet 2", "Ethernet 3", VPN adapters, etc.
+            const isExactEthernetOrWifi = 
+                name === 'ethernet' || 
+                name === 'wi-fi' || 
+                name === 'wifi';
+            
+            if (!isExactEthernetOrWifi) continue;
+            
             const addresses = networkInterfaces[interfaceName];
             for (const address of addresses) {
-                // Skip internal (loopback) and non-IPv4 addresses
+                // Only return IPv4 addresses that are not internal (loopback)
                 if (address.family === 'IPv4' && !address.internal) {
                     return address.address;
                 }
