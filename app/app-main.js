@@ -1024,13 +1024,7 @@ let serverToConnect = null
 async function connectToServer(server) {
 	const db = store.readSync()
 	
-	// Check if credentials exist
-	if (!db.credentials || db.credentials.length === 0) {
-		alert('No credentials available. Please create a credential first in the Credentials section.')
-		return
-	}
-	
-	// Show credential selection modal
+	// Show credential selection modal (Windows Authentication is always available)
 	serverToConnect = server
 	const modal = document.getElementById('selectCredentialModal')
 	const serverNameEl = document.getElementById('selectedServerName')
@@ -1049,7 +1043,7 @@ async function connectToServer(server) {
 	
 	// Populate credential dropdown - filter by preferred machine
 	if (credentialSelect) {
-		credentialSelect.innerHTML = '<option value="">-- Select Credential --</option>'
+		credentialSelect.innerHTML = '<option value="windows-auth">Windows Authentication (Current User)</option><option value="">-- Select Saved Credential --</option>'
 		
 		// Filter credentials: show only those with no preferred machine OR matching this server
 		const filteredCredentials = db.credentials.filter(cred => {
@@ -1065,11 +1059,6 @@ async function connectToServer(server) {
 			option.textContent = `${cred.name} (${cred.username})`
 			credentialSelect.appendChild(option)
 		})
-		
-		// Show message if no credentials available
-		if (filteredCredentials.length === 0) {
-			credentialSelect.innerHTML = '<option value="">No credentials available for this server</option>'
-		}
 	}
 	
 	if (modal) {
@@ -1122,10 +1111,9 @@ async function performServerConnection(server, credential, connectionType) {
 
     // Windows → RDP
     // Generate RDP file content
+    const useWindowsAuth = credential.useWindowsAuth === true
     const rdpContent = `full address:s:${server.ipAddress}
-username:s:${credential.username}
-domain:s:${credential.domain || ''}
-screen mode id:i:2
+${useWindowsAuth ? '' : `username:s:${credential.username}\ndomain:s:${credential.domain || ''}\n`}screen mode id:i:2
 use multimon:i:0
 desktopwidth:i:1920
 desktopheight:i:1080
@@ -3297,7 +3285,7 @@ if (confirmConnectionBtn) {
         const connectionType = document.getElementById('connectionTypeSelect').value
         
         if (!credentialId) {
-            alert('Please select a credential to connect.')
+            alert('Please select an authentication method.')
             return
         }
         
@@ -3308,12 +3296,26 @@ if (confirmConnectionBtn) {
         
         if (serverToConnect) {
             const db = store.readSync()
-            const credential = (db.credentials || []).find(c => c.id === credentialId)
             
-            if (!credential) {
-                alert('Selected credential not found.')
-                closeSelectCredentialModal()
-                return
+            // Handle Windows Authentication
+            let credential
+            if (credentialId === 'windows-auth') {
+                credential = {
+                    id: 'windows-auth',
+                    name: 'Windows Authentication',
+                    username: '',
+                    password: '',
+                    domain: '',
+                    useWindowsAuth: true
+                }
+            } else {
+                credential = (db.credentials || []).find(c => c.id === credentialId)
+                
+                if (!credential) {
+                    alert('Selected credential not found.')
+                    closeSelectCredentialModal()
+                    return
+                }
             }
             
             // Store server reference and connection type before closing modal

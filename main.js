@@ -283,7 +283,45 @@ async function getDbPool() {
 // RDP Connection
 ipcMain.handle('rdp-connect', async (event, { server, credential, rdpContent }) => {
     try {
-        // Decrypt the credential password if encrypted
+        // Check if using Windows Authentication
+        const useWindowsAuth = credential.useWindowsAuth === true;
+
+        // Create temporary RDP file
+        const tempDir = os.tmpdir();
+        const fileName = `orbis_${server.displayName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.rdp`;
+        const filePath = path.join(tempDir, fileName);
+
+        // Write RDP content to temp file
+        fs.writeFileSync(filePath, rdpContent, 'utf8');
+
+        // If using Windows Authentication, skip credential manager and launch directly
+        if (useWindowsAuth) {
+            console.log('✓ Using Windows Authentication for RDP connection');
+            
+            // Launch mstsc with the RDP file
+            const mstscCommand = `mstsc "${filePath}"`;
+            
+            exec(mstscCommand, (mstscError) => {
+                if (mstscError) {
+                    console.error('MSTSC launch error:', mstscError);
+                }
+
+                // Clean up temp RDP file after delay
+                setTimeout(() => {
+                    try {
+                        if (fs.existsSync(filePath)) {
+                            fs.unlinkSync(filePath);
+                        }
+                    } catch (cleanupError) {
+                        console.error('RDP file cleanup error:', cleanupError);
+                    }
+                }, 8000);
+            });
+
+            return { success: true };
+        }
+
+        // For stored credentials, decrypt the password if encrypted
         let password = credential.password;
         if (password && password.includes(':')) {
             try {
@@ -298,14 +336,6 @@ ipcMain.handle('rdp-connect', async (event, { server, credential, rdpContent }) 
         if (!password) {
             return { success: false, error: 'No password found in credential' };
         }
-
-        // Create temporary RDP file
-        const tempDir = os.tmpdir();
-        const fileName = `orbis_${server.displayName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.rdp`;
-        const filePath = path.join(tempDir, fileName);
-
-        // Write RDP content to temp file
-        fs.writeFileSync(filePath, rdpContent, 'utf8');
 
         // Build target name for Windows Credential Manager
         // Format: TERMSRV/hostname or TERMSRV/ipaddress
