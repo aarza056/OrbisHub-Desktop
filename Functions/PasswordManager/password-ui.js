@@ -549,6 +549,10 @@
     if (result.success) {
       showToast(id ? 'Password updated successfully' : 'Password created successfully', 'success');
       closePasswordModal();
+      
+      // Reset filter to show all passwords so the new/updated password is visible
+      currentFilter = { category: null, search: '', favorites: false };
+      
       await loadPasswords();
       if (id) {
         loadPasswordDetail(id);
@@ -907,6 +911,7 @@
           categories = categoriesResult.data;
           await loadPasswords();
           renderCategoryList();
+          renderCategories(); // Update main UI category sidebar
         }
       } else {
         showError(result.error || 'Failed to save category');
@@ -983,6 +988,7 @@
           categories = categoriesResult.data;
           await loadPasswords();
           renderCategoryList();
+          renderCategories(); // Update main UI category sidebar
         }
       } else {
         showError(result.error || 'Failed to delete category');
