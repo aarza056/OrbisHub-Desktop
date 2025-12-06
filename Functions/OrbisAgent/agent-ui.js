@@ -362,7 +362,42 @@ const AgentUI = {
             
             if (nameEl) nameEl.textContent = agent.machineName
             if (osEl) osEl.textContent = agent.os || 'Unknown'
-            if (ipEl) ipEl.textContent = agent.ipAddress || '—'
+            if (ipEl) {
+                // Filter IP addresses to show only Ethernet and WiFi adapters
+                let ipDisplay = agent.ipAddress || '—'
+                
+                if (ipDisplay !== '—') {
+                    // Split by comma to get individual addresses
+                    const ipEntries = ipDisplay.split(',').map(entry => entry.trim())
+                    
+                    // Filter to keep only primary Ethernet and WiFi entries (not Ethernet 2, Ethernet 3, etc.)
+                    const filteredEntries = ipEntries.filter(entry => {
+                        // Check if entry has adapter name (new format: "Ethernet: 192.168.1.1")
+                        if (entry.includes(':')) {
+                            const parts = entry.split(':')
+                            const adapterName = parts[0].trim()
+                            const ipAddr = parts[1].trim()
+                            
+                            // Only match exact "Ethernet", "Wi-Fi", "WiFi", or "WLAN" (not numbered variants)
+                            // Also exclude link-local addresses (169.254.x.x)
+                            return adapterName.match(/^(Ethernet|Wi-Fi|WiFi|WLAN)$/i) && !ipAddr.startsWith('169.254.')
+                        }
+                        // For old format (plain IP), only keep private IPs (not link-local)
+                        return entry.match(/^192\.168\.|^10\.|^172\.(1[6-9]|2[0-9]|3[0-1])\./)
+                    })
+                    
+                    ipDisplay = filteredEntries.length > 0 ? filteredEntries.join(', ') : '—'
+                    
+                    // Format with line breaks if adapter names are present
+                    if (ipDisplay.includes(':')) {
+                        ipEl.textContent = ipDisplay.replace(/, /g, '\n')
+                    } else {
+                        ipEl.textContent = ipDisplay
+                    }
+                } else {
+                    ipEl.textContent = ipDisplay
+                }
+            }
             if (statusEl) statusEl.textContent = agent.status
             if (versionEl) versionEl.textContent = agent.version || '1.0.0'
             if (lastSeenEl) lastSeenEl.textContent = new Date(agent.lastHeartbeat).toLocaleString()
@@ -706,27 +741,28 @@ const AgentUI = {
      * @param {string} machineName - Machine name for confirmation
      */
     async deleteAgent(agentId, machineName) {
-        if (!confirm(`Are you sure you want to delete agent "${machineName}"? This will remove all associated jobs and metrics.`)) {
+        const modal = document.getElementById('deleteAgentModal')
+        if (!modal) {
+            console.error('Delete agent modal not found')
             return
         }
 
+        // Set the agent name in the modal
+        const nameSpan = document.getElementById('deleteAgentName')
+        if (nameSpan) {
+            nameSpan.textContent = machineName
+        }
+
+        // Store the agent details for deletion
+        modal.dataset.agentId = agentId
+        modal.dataset.machineName = machineName
+
+        // Show the modal
         try {
-            const result = await window.AgentAPI.deleteAgent(agentId)
-            
-            if (result.success) {
-                window.ToastManager?.success('Agent Deleted', `Agent ${machineName} has been removed`, 3000)
-                this.renderAgentsDashboard()
-                
-                // Log audit
-                if (window.logAudit) {
-                    window.logAudit('delete', 'agent', machineName, { agentId })
-                }
-            } else {
-                throw new Error(result.error || 'Failed to delete agent')
-            }
-        } catch (error) {
-            console.error('Failed to delete agent:', error)
-            alert(`Failed to delete agent: ${error.message}`)
+            modal.showModal()
+            modal.querySelector('button[value="confirm"]')?.focus()
+        } catch (e) {
+            modal.setAttribute('open', '')
         }
     },
 
@@ -878,8 +914,144 @@ const AgentUI = {
                 this.renderAgentsDashboard()
             }
         }, 30000)
+        
         // Pre-bind if modal already present
         this.attachDeploymentCopyHandlers()
+        
+        // Setup delete agent modal event listener
+        const deleteAgentModal = document.getElementById('deleteAgentModal')
+        const confirmDeleteBtn = document.getElementById('confirmDeleteAgentBtn')
+        const deleteAgentRestart = document.getElementById('deleteAgentRestart')
+        
+        // Update restart option visibility when checkbox changes
+        if (deleteAgentRestart) {
+            deleteAgentRestart.addEventListener('change', () => {
+                const restartOption = document.getElementById('deleteRestartOption')
+                if (restartOption) {
+                    if (deleteAgentRestart.checked) {
+                        restartOption.style.textDecoration = 'none'
+                        restartOption.style.opacity = '1'
+                    } else {
+                        restartOption.style.textDecoration = 'line-through'
+                        restartOption.style.opacity = '0.5'
+                    }
+                }
+            })
+        }
+        
+        if (deleteAgentModal && confirmDeleteBtn) {
+            confirmDeleteBtn.addEventListener('click', async (e) => {
+                e.preventDefault()
+                
+                const agentId = deleteAgentModal.dataset.agentId
+                const machineName = deleteAgentModal.dataset.machineName
+                const shouldRestart = deleteAgentRestart ? deleteAgentRestart.checked : true
+                
+                if (agentId && machineName) {
+                    try {
+                        // Send single combined job
+                        if (shouldRestart) {
+                            const combinedScript = `
+# Uninstall OrbisAgent and restart - using schtasks.exe for reliability
+$taskName = "OrbisAgent"
+$installDir = "C:\\Program Files\\OrbisAgent"
+
+# Step 1: Schedule immediate restart FIRST (before doing anything else)
+Write-Output "Scheduling system restart..."
+shutdown -r -f -t 10
+
+# Step 2: Remove scheduled task using schtasks.exe (more reliable than PowerShell)
+Write-Output "Removing scheduled task..."
+schtasks.exe /Delete /TN "$taskName" /F
+if ($LASTEXITCODE -eq 0) {
+    Write-Output "Scheduled task removed successfully"
+} else {
+    Write-Output "Failed to remove scheduled task - exit code: $LASTEXITCODE"
+}
+
+# Step 3: Remove service if exists
+$service = Get-Service -Name $taskName -ErrorAction SilentlyContinue
+if ($service) {
+    Stop-Service -Name $taskName -Force -ErrorAction SilentlyContinue
+    sc.exe delete $taskName
+    Write-Output "Windows Service removed"
+}
+
+# Step 4: Delete files LAST (except agent-id.txt and the currently running script)
+Get-ChildItem "$installDir" -File | Where-Object { 
+    $_.Name -ne "agent-id.txt" -and $_.Name -ne "OrbisAgent.ps1" 
+} | Remove-Item -Force -ErrorAction SilentlyContinue
+
+# Step 5: Try to delete OrbisAgent.ps1 (might fail if script is running from it)
+Remove-Item "$installDir\\OrbisAgent.ps1" -Force -ErrorAction SilentlyContinue
+
+Write-Output "Agent files removed"
+Write-Output "Restart initiated - system will reboot in 10 seconds"
+`
+                            await window.AgentAPI.createJob({
+                                agentId: agentId,
+                                type: 'PowerShell',
+                                script: combinedScript
+                            })
+                            
+                            window.ToastManager?.success('Uninstall & Restart', `Command sent to ${machineName} - will restart in 10 seconds`, 4000)
+                            if (window.logAudit) {
+                                window.logAudit('uninstall-restart', 'agent', machineName, { agentId, restarted: true })
+                            }
+                        } else {
+                            const combinedScript = `
+# Uninstall OrbisAgent
+$taskName = "OrbisAgent"
+$installDir = "C:\\Program Files\\OrbisAgent"
+
+Get-ChildItem "$installDir" -File | Where-Object { $_.Name -ne "agent-id.txt" } | Remove-Item -Force
+Write-Output "Agent files removed"
+
+$task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+if ($task) {
+    Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+    Write-Output "Scheduled task removed"
+}
+
+$service = Get-Service -Name $taskName -ErrorAction SilentlyContinue
+if ($service) {
+    Stop-Service -Name $taskName -Force -ErrorAction SilentlyContinue
+    sc.exe delete $taskName
+    Write-Output "Windows Service removed"
+}
+
+Write-Output "Uninstall complete"
+`
+                            await window.AgentAPI.createJob({
+                                agentId: agentId,
+                                type: 'PowerShell',
+                                script: combinedScript
+                            })
+                            
+                            window.ToastManager?.success('Uninstall Initiated', `Command sent to ${machineName}`, 3000)
+                            if (window.logAudit) {
+                                window.logAudit('uninstall', 'agent', machineName, { agentId, restarted: false })
+                            }
+                        }
+                        deleteAgentModal.close()
+                    } catch (error) {
+                        console.error('Failed to send commands:', error)
+                        window.ToastManager?.error('Command Failed', error.message || 'Failed to send commands', 5000)
+                        
+                        // Close modal on error
+                        deleteAgentModal.close()
+                    } finally {
+                        // Reset restart checkbox
+                        if (deleteAgentRestart) deleteAgentRestart.checked = true
+                        
+                        // Clear dataset
+                        delete deleteAgentModal.dataset.agentId
+                        delete deleteAgentModal.dataset.machineName
+                    }
+                }
+            })
+        }
     }
 }
 

@@ -79,8 +79,15 @@ function Write-Log {
 function Get-MachineInfo {
     $ipAddresses = @()
     try {
-        $adapters = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike "127.*" }
-        $ipAddresses = $adapters | ForEach-Object { $_.IPAddress }
+        # Get only primary Ethernet and WiFi adapters with IPv4 addresses
+        $adapters = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { 
+            $_.IPAddress -notlike "127.*" -and 
+            $_.IPAddress -notlike "169.254.*" -and
+            $_.InterfaceAlias -match "^(Ethernet|Wi-Fi|WiFi|WLAN)$"
+        }
+        $ipAddresses = $adapters | ForEach-Object { 
+            "$($_.InterfaceAlias): $($_.IPAddress)"
+        }
     } catch {
         Write-Log "Failed to get IP addresses: $_" "WARN"
     }
@@ -120,30 +127,60 @@ function Get-SystemMetrics {
 }
 
 function Register-Agent {
+    param([int]$MaxRetries = -1, [int]$RetryIntervalSeconds = 10)
+    
     Write-Log "Registering agent with Core Service..."
     Write-Log "Agent ID: $script:AgentId"
     
     $machineInfo = Get-MachineInfo
+    
+    # Ensure ipAddresses is always an array (even if empty)
+    $ipArray = @()
+    if ($machineInfo.IpAddresses) {
+        $ipArray = @($machineInfo.IpAddresses)
+    }
+    
     $body = @{
         agentId = $script:AgentId
         machineName = $machineInfo.MachineName
-        ipAddresses = $machineInfo.IpAddresses
+        ipAddresses = $ipArray
         osVersion = $machineInfo.OsVersion
         agentVersion = $machineInfo.AgentVersion
-    } | ConvertTo-Json
+    } | ConvertTo-Json -Depth 10
     
-    try {
-        $response = Invoke-RestMethod -Uri "$script:CoreServiceUrl/api/agents/register" `
-            -Method Post `
-            -Body $body `
-            -ContentType "application/json"
+    $attempt = 0
+    while ($MaxRetries -lt 0 -or $attempt -lt $MaxRetries) {
+        $attempt++
         
-        Write-Log "Agent registered successfully. Status: $($response.status)" "SUCCESS"
-        return $true
-    } catch {
-        Write-Log "Failed to register agent: $_" "ERROR"
-        return $false
+        try {
+            $response = Invoke-RestMethod -Uri "$script:CoreServiceUrl/api/agents/register" `
+                -Method Post `
+                -Body $body `
+                -ContentType "application/json" `
+                -TimeoutSec 10
+            
+            Write-Log "Agent registered successfully. Status: $($response.status)" "SUCCESS"
+            return $true
+        } catch {
+            $errorDetails = $_.Exception.Message
+            if ($_.Exception.Response) {
+                $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+                $errorBody = $reader.ReadToEnd()
+                $errorDetails += " | Response: $errorBody"
+            }
+            Write-Log "Failed to register agent (attempt $attempt): $errorDetails" "WARN"
+            
+            if ($MaxRetries -ge 0 -and $attempt -ge $MaxRetries) {
+                Write-Log "Max registration attempts reached. Giving up." "ERROR"
+                return $false
+            }
+            
+            Write-Log "Retrying in $RetryIntervalSeconds seconds..." "INFO"
+            Start-Sleep -Seconds $RetryIntervalSeconds
+        }
     }
+    
+    return $false
 }
 
 function Send-Heartbeat {
@@ -321,8 +358,9 @@ function Start-AgentLoop {
     Write-Log "Starting OrbisAgent..."
     Write-Log "Core Service URL: $script:CoreServiceUrl"
     
-    # Register agent
-    $registered = Register-Agent
+    # Register agent with unlimited retries on startup
+    Write-Log "Attempting to register with Core Service (will retry until successful)..."
+    $registered = Register-Agent -MaxRetries -1 -RetryIntervalSeconds 60
     if (-not $registered) {
         Write-Log "Failed to register agent. Exiting..." "ERROR"
         return

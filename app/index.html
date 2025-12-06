@@ -4658,6 +4658,33 @@ Channels
     </div>
 </dialog>
 
+<!-- Delete Agent Confirmation Modal -->
+<dialog id="deleteAgentModal" class="modal">
+    <form method="dialog" class="card card--compact">
+        <h2>Uninstall Agent</h2>
+        <p class="muted">Uninstall OrbisAgent from "<span id="deleteAgentName"></span>"?</p>
+        <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 12px; margin: 16px 0; font-size: 13px;">
+            <strong style="color: #f87171; display: block; margin-bottom: 8px;">⚠️ This action will:</strong>
+            <ul style="margin: 0; padding-left: 20px; color: var(--muted);">
+                <li>Stop and remove OrbisAgent scheduled task/service</li>
+                <li>Delete agent files (except agent-id.txt)</li>
+                <li id="deleteRestartOption"><strong>Restart the target machine immediately</strong></li>
+            </ul>
+        </div>
+        
+        <!-- Restart Option -->
+        <label class="label" style="margin: 16px 0; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="deleteAgentRestart" checked style="width: 18px; height: 18px; cursor: pointer;">
+            <span style="font-size: 14px; user-select: none;">Restart machine after uninstall</span>
+        </label>
+        
+        <menu class="row end" id="deleteAgentButtons">
+            <button value="cancel" class="btn btn-ghost">Cancel</button>
+            <button value="confirm" id="confirmDeleteAgentBtn" class="btn btn-danger">Uninstall Agent</button>
+        </menu>
+    </form>
+</dialog>
+
 <!-- Socket.IO removed for desktop app -->
 <script src="services/db.js"></script>
 <script src="services/messages.js"></script>

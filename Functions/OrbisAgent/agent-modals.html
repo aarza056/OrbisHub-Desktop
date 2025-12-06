@@ -21,9 +21,9 @@
                     <div class="agent-detail-item__label">Operating System</div>
                     <div class="agent-detail-item__value" id="agentDetailOS">—</div>
                 </div>
-                <div class="agent-detail-item">
-                    <div class="agent-detail-item__label">IP Address</div>
-                    <div class="agent-detail-item__value agent-detail-item__value--mono" id="agentDetailIP">—</div>
+                <div class="agent-detail-item" style="grid-column: 1 / -1;">
+                    <div class="agent-detail-item__label">Network Adapters</div>
+                    <div class="agent-detail-item__value" id="agentDetailIP" style="font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap;">—</div>
                 </div>
                 <div class="agent-detail-item">
                     <div class="agent-detail-item__label">Status</div>
@@ -242,3 +242,16 @@
         </div>
     </div>
 </dialog>
+
+<!-- Delete Agent Confirmation Modal -->
+<dialog id="deleteAgentModal" class="modal">
+    <form method="dialog" class="card card--compact">
+        <h2>Delete Agent</h2>
+        <p class="muted">Are you sure you want to delete agent "<span id="deleteAgentName"></span>"? This will remove all associated jobs and metrics.</p>
+        <menu class="row end">
+            <button value="cancel" class="btn btn-ghost">Cancel</button>
+            <button value="confirm" id="confirmDeleteAgentBtn" class="btn btn-danger">Delete Agent</button>
+        </menu>
+    </form>
+</dialog>
+
