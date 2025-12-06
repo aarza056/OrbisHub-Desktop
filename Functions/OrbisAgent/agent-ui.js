@@ -68,6 +68,12 @@ const AgentUI = {
                 const cardId = card.dataset.agentId
                 const agent = agentMap.get(cardId)
                 
+                // Skip updating cards that are being deleted (have overlay)
+                if (card.querySelector('.agent-deleting-overlay')) {
+                    agentMap.delete(cardId) // Don't add duplicate
+                    return
+                }
+                
                 if (agent) {
                     // Update existing card
                     this.updateAgentCard(card, agent)
@@ -261,6 +267,9 @@ const AgentUI = {
                 </button>
             </div>
         `
+        
+        // Restore data-agent-id AFTER innerHTML (innerHTML clears all attributes)
+        card.dataset.agentId = agent.id
     },
 
 
@@ -948,7 +957,32 @@ const AgentUI = {
                 const shouldRestart = deleteAgentRestart ? deleteAgentRestart.checked : true
                 
                 if (agentId && machineName) {
+                    // Close modal immediately so overlay is visible
+                    deleteAgentModal.close()
+                    
                     try {
+                        // Mark the agent card as deleting - use .agent-card class to avoid selecting the modal
+                        const agentCard = document.querySelector(`.agent-card[data-agent-id="${agentId}"]`)
+                        console.log('Looking for agent card:', agentId, 'Found:', agentCard)
+                        console.log('Agent card classes:', agentCard?.className)
+                        console.log('Agent card styles:', window.getComputedStyle(agentCard))
+                        if (agentCard) {
+                            agentCard.style.pointerEvents = 'none'
+                            agentCard.style.opacity = '1' // Keep at full opacity
+                            const overlay = document.createElement('div')
+                            overlay.className = 'agent-deleting-overlay'
+                            overlay.style.cssText = 'position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; border-radius: 16px;'
+                            overlay.innerHTML = `
+                                <div class="agent-deleting-spinner" style="width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                                <div class="agent-deleting-text" style="color: white; margin-top: 12px; font-weight: 500;">Deleting agent...</div>
+                            `
+                            agentCard.appendChild(overlay)
+                            console.log('Overlay added to card:', overlay)
+                            console.log('Overlay computed styles:', window.getComputedStyle(overlay))
+                        } else {
+                            console.error('Agent card not found for ID:', agentId)
+                        }
+                        
                         // Send single combined job
                         if (shouldRestart) {
                             const combinedScript = `
@@ -988,7 +1022,7 @@ Remove-Item "$installDir\\OrbisAgent.ps1" -Force -ErrorAction SilentlyContinue
 Write-Output "Agent files removed"
 Write-Output "Restart initiated - system will reboot in 10 seconds"
 `
-                            await window.AgentAPI.createJob({
+                            const jobResult = await window.AgentAPI.createJob({
                                 agentId: agentId,
                                 type: 'PowerShell',
                                 script: combinedScript
@@ -997,6 +1031,51 @@ Write-Output "Restart initiated - system will reboot in 10 seconds"
                             window.ToastManager?.success('Uninstall & Restart', `Command sent to ${machineName} - will restart in 10 seconds`, 4000)
                             if (window.logAudit) {
                                 window.logAudit('uninstall-restart', 'agent', machineName, { agentId, restarted: true })
+                            }
+                            
+                            // Poll for job completion, with timeout fallback
+                            if (jobResult.success && jobResult.jobId) {
+                                let pollCount = 0
+                                const maxPolls = 10 // 30 seconds total
+                                const pollInterval = setInterval(async () => {
+                                    pollCount++
+                                    const jobStatus = await window.AgentAPI.getJobStatus(jobResult.jobId)
+                                    console.log('Job status:', jobStatus)
+                                    
+                                    // Delete if completed successfully
+                                    if (jobStatus && jobStatus.status === 'Completed') {
+                                        clearInterval(pollInterval)
+                                        await window.AgentAPI.deleteAgent(agentId)
+                                        
+                                        // Remove the card from DOM with fade out animation
+                                        const cardToRemove = document.querySelector(`.agent-card[data-agent-id="${agentId}"]`)
+                                        if (cardToRemove) {
+                                            cardToRemove.style.transition = 'opacity 0.3s ease, transform 0.3s ease'
+                                            cardToRemove.style.opacity = '0'
+                                            cardToRemove.style.transform = 'scale(0.95)'
+                                            setTimeout(() => cardToRemove.remove(), 300)
+                                        }
+                                        
+                                        window.ToastManager?.success('Agent Deleted', `${machineName} removed from database`, 3000)
+                                    }
+                                    // Stop polling after timeout (agent likely shut down before reporting)
+                                    else if (pollCount >= maxPolls) {
+                                        clearInterval(pollInterval)
+                                        // Assume success after timeout for shutdown jobs
+                                        await window.AgentAPI.deleteAgent(agentId)
+                                        
+                                        // Remove the card from DOM with fade out animation
+                                        const cardToRemove = document.querySelector(`.agent-card[data-agent-id="${agentId}"]`)
+                                        if (cardToRemove) {
+                                            cardToRemove.style.transition = 'opacity 0.3s ease, transform 0.3s ease'
+                                            cardToRemove.style.opacity = '0'
+                                            cardToRemove.style.transform = 'scale(0.95)'
+                                            setTimeout(() => cardToRemove.remove(), 300)
+                                        }
+                                        
+                                        window.ToastManager?.success('Agent Deleted', `${machineName} removed from database`, 3000)
+                                    }
+                                }, 3000)
                             }
                         } else {
                             const combinedScript = `
@@ -1023,7 +1102,7 @@ if ($service) {
 
 Write-Output "Uninstall complete"
 `
-                            await window.AgentAPI.createJob({
+                            const jobResult = await window.AgentAPI.createJob({
                                 agentId: agentId,
                                 type: 'PowerShell',
                                 script: combinedScript
@@ -1033,14 +1112,55 @@ Write-Output "Uninstall complete"
                             if (window.logAudit) {
                                 window.logAudit('uninstall', 'agent', machineName, { agentId, restarted: false })
                             }
+                            
+                            // Poll for job completion, with timeout fallback
+                            if (jobResult.success && jobResult.jobId) {
+                                let pollCount = 0
+                                const maxPolls = 5 // 15 seconds total
+                                const pollInterval = setInterval(async () => {
+                                    pollCount++
+                                    const jobStatus = await window.AgentAPI.getJobStatus(jobResult.jobId)
+                                    console.log('Job status:', jobStatus)
+                                    
+                                    // Delete if completed successfully
+                                    if (jobStatus && jobStatus.status === 'Completed') {
+                                        clearInterval(pollInterval)
+                                        await window.AgentAPI.deleteAgent(agentId)
+                                        
+                                        // Remove the card from DOM with fade out animation
+                                        const cardToRemove = document.querySelector(`.agent-card[data-agent-id="${agentId}"]`)
+                                        if (cardToRemove) {
+                                            cardToRemove.style.transition = 'opacity 0.3s ease, transform 0.3s ease'
+                                            cardToRemove.style.opacity = '0'
+                                            cardToRemove.style.transform = 'scale(0.95)'
+                                            setTimeout(() => cardToRemove.remove(), 300)
+                                        }
+                                        
+                                        window.ToastManager?.success('Agent Deleted', `${machineName} removed from database`, 3000)
+                                    }
+                                    // Stop polling after timeout (agent likely shut down before reporting)
+                                    else if (pollCount >= maxPolls) {
+                                        clearInterval(pollInterval)
+                                        // Assume success after timeout for shutdown jobs
+                                        await window.AgentAPI.deleteAgent(agentId)
+                                        
+                                        // Remove the card from DOM with fade out animation
+                                        const cardToRemove = document.querySelector(`.agent-card[data-agent-id="${agentId}"]`)
+                                        if (cardToRemove) {
+                                            cardToRemove.style.transition = 'opacity 0.3s ease, transform 0.3s ease'
+                                            cardToRemove.style.opacity = '0'
+                                            cardToRemove.style.transform = 'scale(0.95)'
+                                            setTimeout(() => cardToRemove.remove(), 300)
+                                        }
+                                        
+                                        window.ToastManager?.success('Agent Deleted', `${machineName} removed from database`, 3000)
+                                    }
+                                }, 3000)
+                            }
                         }
-                        deleteAgentModal.close()
                     } catch (error) {
                         console.error('Failed to send commands:', error)
                         window.ToastManager?.error('Command Failed', error.message || 'Failed to send commands', 5000)
-                        
-                        // Close modal on error
-                        deleteAgentModal.close()
                     } finally {
                         // Reset restart checkbox
                         if (deleteAgentRestart) deleteAgentRestart.checked = true
