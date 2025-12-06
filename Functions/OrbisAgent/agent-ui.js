@@ -9,6 +9,86 @@
  */
 
 const AgentUI = {
+    // Store all agents for filtering
+    allAgents: [],
+    currentFilter: '',
+
+    /**
+     * Filter agents based on search query
+     * @param {string} query - Search query
+     */
+    filterAgents(query) {
+        this.currentFilter = query.toLowerCase().trim()
+        
+        // Show/hide clear button
+        const clearBtn = document.getElementById('agentSearchClear')
+        if (clearBtn) {
+            clearBtn.style.display = this.currentFilter ? 'flex' : 'none'
+        }
+        
+        const agentsList = document.getElementById('agentsList')
+        const noResults = document.getElementById('agentsNoResults')
+        if (!agentsList) return
+        
+        const cards = agentsList.querySelectorAll('.agent-card')
+        let visibleCount = 0
+        
+        cards.forEach(card => {
+            const agentId = card.dataset.agentId
+            const agent = this.allAgents.find(a => a.id === agentId)
+            
+            if (!agent) {
+                card.style.display = 'none'
+                return
+            }
+            
+            // Search in multiple fields
+            const searchFields = [
+                agent.machineName || '',
+                agent.ipAddress || '',
+                this.getFriendlyOSName(agent.os) || '',
+                agent.loggedInUser || '',
+                agent.version || ''
+            ].map(field => field.toLowerCase())
+            
+            const matches = !this.currentFilter || searchFields.some(field => field.includes(this.currentFilter))
+            
+            card.style.display = matches ? '' : 'none'
+            if (matches) visibleCount++
+        })
+        
+        // Show/hide no results message
+        if (noResults) {
+            noResults.style.display = (visibleCount === 0 && cards.length > 0) ? 'flex' : 'none'
+        }
+        
+        // Update status counters to reflect filtered agents
+        const visibleAgents = this.allAgents.filter(agent => {
+            if (!this.currentFilter) return true
+            const searchFields = [
+                agent.machineName || '',
+                agent.ipAddress || '',
+                this.getFriendlyOSName(agent.os) || '',
+                agent.loggedInUser || '',
+                agent.version || ''
+            ].map(field => field.toLowerCase())
+            return searchFields.some(field => field.includes(this.currentFilter))
+        })
+        
+        this.updateStatusCounters(visibleAgents)
+    },
+
+    /**
+     * Clear search filter
+     */
+    clearSearch() {
+        const searchInput = document.getElementById('agentSearchInput')
+        if (searchInput) {
+            searchInput.value = ''
+            this.filterAgents('')
+        }
+    },
+
     /**
      * Render agents dashboard
      */
@@ -28,6 +108,9 @@ const AgentUI = {
 
         try {
             const agents = await window.AgentAPI.getAllAgents()
+            
+            // Store agents for filtering
+            this.allAgents = agents
 
             if (agents.length === 0) {
                 agentsList.innerHTML = `
@@ -89,6 +172,11 @@ const AgentUI = {
                 const agentCard = this.createAgentCard(agent)
                 agentsList.appendChild(agentCard)
             })
+            
+            // Apply current filter if active
+            if (this.currentFilter) {
+                this.filterAgents(this.currentFilter)
+            }
             
             // Dispatch custom event to notify other components that agents were updated
             window.dispatchEvent(new CustomEvent('agentsUpdated', { detail: { agents } }))
