@@ -44,7 +44,44 @@ public class AgentDownloadController : ControllerBase
     [HttpGet("download/bootstrap")]
     public IActionResult DownloadBootstrap()
     {
-        return DownloadAgentFile("OrbisAgent-Bootstrap.ps1");
+        try
+        {
+            var agentPath = Path.Combine(_environment.ContentRootPath, "OrbisAgent");
+            var filePath = Path.Combine(agentPath, "OrbisAgent-Bootstrap.ps1");
+
+            if (!System.IO.File.Exists(filePath))
+            {
+                _logger.LogWarning("Bootstrap file not found: {FilePath}", filePath);
+                return NotFound(new { error = "Bootstrap script not found" });
+            }
+
+            // Read the script and inject the Core Service URL after the param block
+            var scriptContent = System.IO.File.ReadAllText(filePath);
+            var serverUrl = $"{Request.Scheme}://{Request.Host}";
+            
+            // Find the param block and inject after it
+            var paramEndPattern = @"(\)\s*\n)";
+            var match = System.Text.RegularExpressions.Regex.Match(scriptContent, paramEndPattern);
+            
+            if (match.Success)
+            {
+                var insertPosition = match.Index + match.Length;
+                var injectedScript = scriptContent.Insert(insertPosition, 
+                    $"\n# Auto-injected Core Service URL from download source\nif (-not $CoreServiceUrl) {{\n    $CoreServiceUrl = '{serverUrl}'\n}}\n");
+                return Content(injectedScript, "text/plain");
+            }
+            else
+            {
+                // Fallback: just prepend if no param block found
+                var injectedScript = $"# Auto-injected Core Service URL\n$CoreServiceUrl = '{serverUrl}'\n\n{scriptContent}";
+                return Content(injectedScript, "text/plain");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error serving bootstrap script");
+            return StatusCode(500, new { error = "Failed to serve bootstrap script" });
+        }
     }
 
     /// <summary>

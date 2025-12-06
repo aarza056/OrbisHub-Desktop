@@ -19,19 +19,32 @@ $ErrorActionPreference = 'Stop'
 if (-not $CoreServiceUrl) {
     # Try to detect from the download URL
     try {
-        $stackTrace = Get-PSCallStack
-        $invocationInfo = $stackTrace | Where-Object { $_.InvocationInfo.MyCommand.Name -eq '<ScriptBlock>' } | Select-Object -First 1
-        
-        # Default to asking user if we can't detect
         Write-Host "Auto-detecting server from download source..." -ForegroundColor Yellow
         
-        # Common patterns for bootstrap download
         $detectedUrl = $null
         
-        # Check if running from irm/iwr pipeline
-        if ($MyInvocation.Line -match 'irm\s+([^\s|]+)' -or $MyInvocation.Line -match 'iwr\s+([^\s|]+)') {
-            $downloadUrl = $matches[1]
-            if ($downloadUrl -match '^(https?://[^/]+)') {
+        # Method 1: Check PSScriptRoot if downloaded to temp
+        if ($PSScriptRoot -and (Test-Path "$PSScriptRoot\..\CoreServiceUrl.txt")) {
+            $detectedUrl = Get-Content "$PSScriptRoot\..\CoreServiceUrl.txt" -ErrorAction SilentlyContinue
+        }
+        
+        # Method 2: Parse from invocation command line (when run via irm/iwr)
+        if (-not $detectedUrl) {
+            # Get the parent process command line
+            $parentPid = (Get-WmiObject Win32_Process -Filter "ProcessId='$PID'").ParentProcessId
+            if ($parentPid) {
+                $parentCmd = (Get-WmiObject Win32_Process -Filter "ProcessId='$parentPid'").CommandLine
+                if ($parentCmd -match 'https?://([^/:\s]+):?(\d+)?') {
+                    $server = $matches[1]
+                    $port = if ($matches[2]) { $matches[2] } else { "5000" }
+                    $detectedUrl = "http://${server}:${port}"
+                }
+            }
+        }
+        
+        # Method 3: Try to extract from MyInvocation
+        if (-not $detectedUrl -and $MyInvocation.Line) {
+            if ($MyInvocation.Line -match '(https?://[^/\s]+)') {
                 $detectedUrl = $matches[1]
             }
         }
@@ -40,23 +53,12 @@ if (-not $CoreServiceUrl) {
             $CoreServiceUrl = $detectedUrl
             Write-Host "Detected Core Service URL: $CoreServiceUrl" -ForegroundColor Green
         } else {
-            # Fallback: try common IPs
-            $testUrls = @("http://192.168.11.56:5000", "http://127.0.0.1:5000")
-            foreach ($url in $testUrls) {
-                try {
-                    $null = Invoke-RestMethod -Uri "$url/api/agent/version" -TimeoutSec 2 -ErrorAction Stop
-                    $CoreServiceUrl = $url
-                    Write-Host "Found Core Service at: $CoreServiceUrl" -ForegroundColor Green
-                    break
-                } catch { }
-            }
-            
-            if (-not $CoreServiceUrl) {
-                $CoreServiceUrl = Read-Host "Enter Core Service URL (e.g., http://192.168.11.56:5000)"
-            }
+            Write-Host "Could not auto-detect Core Service URL." -ForegroundColor Yellow
+            $CoreServiceUrl = Read-Host "Enter Core Service URL (e.g., http://192.168.11.65:5000)"
         }
     } catch {
-        $CoreServiceUrl = Read-Host "Enter Core Service URL (e.g., http://192.168.11.56:5000)"
+        Write-Host "Auto-detection failed: $($_.Exception.Message)" -ForegroundColor Yellow
+        $CoreServiceUrl = Read-Host "Enter Core Service URL (e.g., http://192.168.11.65:5000)"
     }
 }
 

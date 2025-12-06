@@ -1,4 +1,6 @@
 C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\OrbisHub.CoreService.exe
+C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\web.config
+C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\web.config
 C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\web.config
 C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\web.config
 C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\web.config
@@ -79,6 +81,16 @@ C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish
 C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\OrbisHub.CoreService.deps.json
 C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\OrbisHub.CoreService.runtimeconfig.json
 C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\OrbisHub.CoreService.staticwebassets.endpoints.json
+C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\appsettings.Development.json
+C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\appsettings.json
+C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\OrbisHub.CoreService.deps.json
+C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\OrbisHub.CoreService.runtimeconfig.json
+C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\OrbisHub.CoreService.staticwebassets.endpoints.json
+C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\appsettings.Development.json
+C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\appsettings.json
+C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\OrbisHub.CoreService.deps.json
+C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\OrbisHub.CoreService.runtimeconfig.json
+C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\publish\OrbisHub.CoreService.staticwebassets.endpoints.json
 C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\OrbisAgent\Install-OrbisAgent.ps1
 C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\OrbisAgent\OrbisAgent-Bootstrap.ps1
 C:\OrbisHub-Desktop\OrbisHub.CoreService\publish\OrbisAgent\OrbisAgent.ps1
