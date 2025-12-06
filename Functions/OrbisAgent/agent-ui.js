@@ -328,7 +328,7 @@ const AgentUI = {
                     <span class="agent-card__detail-value">${this.formatTimeAgo(agent.lastHeartbeat)}</span>
                 </div>
                 <div class="agent-card__detail-row">
-                    <span class="agent-card__detail-label">Logged In:</span>
+                    <span class="agent-card__detail-label">Active User:</span>
                     <span class="agent-card__detail-value">${agent.loggedInUser || 'Unknown'}</span>
                 </div>
                 <div class="agent-card__detail-row">
