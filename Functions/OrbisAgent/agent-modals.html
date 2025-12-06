@@ -93,18 +93,47 @@
             </p>
             
             <div>
+                <label for="commandTemplate">Command Template</label>
+                <select id="commandTemplate" onchange="AgentUI.loadCommandTemplate()">
+                    <option value="">-- Select a template or write your own --</option>
+                    <optgroup label="System Control">
+                        <option value="restart">Restart Computer</option>
+                        <option value="shutdown">Shutdown Computer</option>
+                        <option value="logoff">Log Off Current User</option>
+                    </optgroup>
+                    <optgroup label="System Information">
+                        <option value="systeminfo">Get System Information</option>
+                        <option value="diskspace">Check Disk Space</option>
+                        <option value="network">Network Configuration</option>
+                        <option value="processes">Running Processes (Top CPU)</option>
+                        <option value="services">Windows Services Status</option>
+                        <option value="updates">Check Windows Updates</option>
+                    </optgroup>
+                    <optgroup label="Maintenance">
+                        <option value="cleartmp">Clear Temp Files</option>
+                        <option value="eventlogs">Get Recent Event Logs</option>
+                        <option value="installedapps">List Installed Applications</option>
+                        <option value="gpupdate">Force Group Policy Update</option>
+                    </optgroup>
+                    <optgroup label="Diagnostics">
+                        <option value="ping">Ping Test (Google DNS)</option>
+                        <option value="tracert">Trace Route (Google DNS)</option>
+                        <option value="memory">Memory Usage Details</option>
+                        <option value="cpu">CPU Usage Details</option>
+                    </optgroup>
+                </select>
+            </div>
+            
+            <div>
                 <label for="jobType">Job Type</label>
                 <select id="jobType">
                     <option value="PowerShell">PowerShell Script</option>
-                    <option value="RunScript">Run Script (PS/CMD)</option>
-                    <option value="GetSystemInfo">Get System Info</option>
-                    <option value="GetProcessList">Get Process List</option>
                 </select>
             </div>
             
             <div>
                 <label for="jobScript">Script / Command</label>
-                <textarea id="jobScript" rows="10" placeholder="Enter PowerShell script or command here...&#10;&#10;Example:&#10;Get-Process | Where-Object {$_.CPU -gt 100}"></textarea>
+                <textarea id="jobScript" rows="10" placeholder="Enter PowerShell script or command here...&#10;&#10;Or select a template above to get started!"></textarea>
             </div>
             
             <div class="modal-info-box">

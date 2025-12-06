@@ -821,6 +821,175 @@ const AgentUI = {
     },
 
     /**
+     * Command templates for common operations
+     */
+    commandTemplates: {
+        restart: {
+            type: 'PowerShell',
+            script: '# Restart computer with 30 second delay\nRestart-Computer -Force -Delay 30'
+        },
+        shutdown: {
+            type: 'PowerShell',
+            script: '# Shutdown computer with 30 second delay\nStop-Computer -Force -Delay 30'
+        },
+        logoff: {
+            type: 'PowerShell',
+            script: '# Log off current user\nlogoff'
+        },
+        systeminfo: {
+            type: 'PowerShell',
+            script: `# Get comprehensive system information
+Get-ComputerInfo | Select-Object @(
+    'CsName',
+    'WindowsVersion',
+    'OsArchitecture',
+    'CsManufacturer',
+    'CsModel',
+    'CsProcessors',
+    'CsTotalPhysicalMemory',
+    'OsLastBootUpTime',
+    'TimeZone'
+) | Format-List`
+        },
+        diskspace: {
+            type: 'PowerShell',
+            script: `# Check disk space on all drives
+Get-PSDrive -PSProvider FileSystem | Select-Object Name, 
+    @{Name='Used(GB)';Expression={[math]::Round($_.Used/1GB,2)}},
+    @{Name='Free(GB)';Expression={[math]::Round($_.Free/1GB,2)}},
+    @{Name='Total(GB)';Expression={[math]::Round(($_.Used+$_.Free)/1GB,2)}},
+    @{Name='PercentFree';Expression={[math]::Round(($_.Free/($_.Used+$_.Free))*100,2)}}
+| Format-Table -AutoSize`
+        },
+        network: {
+            type: 'PowerShell',
+            script: `# Get network configuration
+Get-NetIPAddress | Where-Object {$_.AddressFamily -eq 'IPv4' -and $_.IPAddress -ne '127.0.0.1'} |
+Select-Object InterfaceAlias, IPAddress, PrefixLength |
+Format-Table -AutoSize
+
+Write-Host "\nDefault Gateway:"
+Get-NetRoute -DestinationPrefix '0.0.0.0/0' | Select-Object NextHop, InterfaceAlias`
+        },
+        processes: {
+            type: 'PowerShell',
+            script: `# Get top CPU consuming processes
+Get-Process | Sort-Object CPU -Descending | Select-Object -First 10 |
+Select-Object ProcessName, Id, 
+    @{Name='CPU(s)';Expression={[math]::Round($_.CPU,2)}},
+    @{Name='Memory(MB)';Expression={[math]::Round($_.WorkingSet/1MB,2)}}
+| Format-Table -AutoSize`
+        },
+        services: {
+            type: 'PowerShell',
+            script: `# Get status of important Windows services
+Get-Service | Where-Object {$_.StartType -eq 'Automatic'} |
+Sort-Object Status, DisplayName |
+Select-Object Status, Name, DisplayName |
+Format-Table -AutoSize`
+        },
+        updates: {
+            type: 'PowerShell',
+            script: `# Check for pending Windows Updates
+$Session = New-Object -ComObject Microsoft.Update.Session
+$Searcher = $Session.CreateUpdateSearcher()
+$Updates = $Searcher.Search("IsInstalled=0 and Type='Software'")
+
+if ($Updates.Updates.Count -eq 0) {
+    Write-Host "No pending updates found."
+} else {
+    Write-Host "Pending Updates: $($Updates.Updates.Count)"
+    $Updates.Updates | Select-Object Title, @{Name='Size(MB)';Expression={[math]::Round($_.MaxDownloadSize/1MB,2)}}
+}`
+        },
+        cleartmp: {
+            type: 'PowerShell',
+            script: `# Clear temporary files
+$tempFolders = @(
+    $env:TEMP,
+    "C:\\Windows\\Temp",
+    "C:\\Windows\\Prefetch"
+)
+
+foreach ($folder in $tempFolders) {
+    if (Test-Path $folder) {
+        Write-Host "Cleaning: $folder"
+        Get-ChildItem -Path $folder -Recurse -Force -ErrorAction SilentlyContinue |
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+Write-Host "Temp files cleared."`
+        },
+        eventlogs: {
+            type: 'PowerShell',
+            script: `# Get recent critical and error events
+Get-EventLog -LogName System -EntryType Error,Warning -Newest 20 |
+Select-Object TimeGenerated, EntryType, Source, Message |
+Format-Table -AutoSize -Wrap`
+        },
+        installedapps: {
+            type: 'PowerShell',
+            script: `# List installed applications
+Get-ItemProperty HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* |
+Where-Object {$_.DisplayName} |
+Select-Object DisplayName, DisplayVersion, Publisher, InstallDate |
+Sort-Object DisplayName |
+Format-Table -AutoSize`
+        },
+        gpupdate: {
+            type: 'PowerShell',
+            script: '# Force Group Policy update\ngpupdate /force'
+        },
+        ping: {
+            type: 'PowerShell',
+            script: '# Ping test to Google DNS\nTest-Connection -ComputerName 8.8.8.8 -Count 4'
+        },
+        tracert: {
+            type: 'PowerShell',
+            script: '# Trace route to Google DNS\nTest-NetConnection -ComputerName 8.8.8.8 -TraceRoute'
+        },
+        memory: {
+            type: 'PowerShell',
+            script: `# Memory usage details
+$OS = Get-CimInstance Win32_OperatingSystem
+$TotalMem = [math]::Round($OS.TotalVisibleMemorySize/1MB,2)
+$FreeMem = [math]::Round($OS.FreePhysicalMemory/1MB,2)
+$UsedMem = [math]::Round($TotalMem - $FreeMem,2)
+$PercentUsed = [math]::Round(($UsedMem/$TotalMem)*100,2)
+
+Write-Host "Total Memory: $TotalMem GB"
+Write-Host "Used Memory: $UsedMem GB"
+Write-Host "Free Memory: $FreeMem GB"
+Write-Host "Percent Used: $PercentUsed%"`
+        },
+        cpu: {
+            type: 'PowerShell',
+            script: `# CPU usage details
+Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors,
+    @{Name='LoadPercentage';Expression={"$($_.LoadPercentage)%"}}
+| Format-List`
+        }
+    },
+
+    /**
+     * Load a command template into the form
+     */
+    loadCommandTemplate() {
+        const templateSelect = document.getElementById('commandTemplate')
+        const templateKey = templateSelect.value
+        
+        if (!templateKey) {
+            return
+        }
+        
+        const template = this.commandTemplates[templateKey]
+        if (template) {
+            document.getElementById('jobType').value = template.type
+            document.getElementById('jobScript').value = template.script
+        }
+    },
+
+    /**
      * Show run job modal
      * @param {string} agentId - Agent ID
      */
@@ -838,6 +1007,7 @@ const AgentUI = {
         }
 
         // Clear form
+        document.getElementById('commandTemplate').value = ''
         document.getElementById('jobType').value = 'PowerShell'
         document.getElementById('jobScript').value = ''
 
