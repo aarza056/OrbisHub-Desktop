@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="../Functions/BugReporting/bug-ui.css" />
 <link rel="stylesheet" href="../Functions/EmailServerProfile/email-ui.css" />
 <link rel="stylesheet" href="../Functions/UserRecovery/recovery-ui.css" />
+<link rel="stylesheet" href="../Functions/DBMaintenance/db-maintenance-ui.css" />
 </head>
 <body>
 
@@ -1945,6 +1946,15 @@
       </svg>
       Notifications
     </button>
+    <button class="system-config-tab" data-tab="dbmaintenance" onclick="SystemConfig.switchTab('dbmaintenance')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+        <polyline points="12 2 12 12"/>
+        <polyline points="12 12 7.5 9.5"/>
+        <polyline points="12 12 16.5 9.5"/>
+      </svg>
+      DB Maintenance
+    </button>
   </div>
   
   <!-- Core Service Tab Content -->
@@ -2372,6 +2382,194 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
         </button>
       </div>
     </div>
+    </div>
+  </div>
+
+  <!-- DB Maintenance Tab Content -->
+  <div id="systemConfigDbMaintenance" class="system-config-content">
+    <div class="documentation-container">
+      <div class="stack">
+        
+        <!-- Database Statistics Section -->
+        <div class="maintenance-section">
+          <h3>📊 Database Statistics</h3>
+          <p class="muted">View comprehensive statistics about your database size, tables, and records.</p>
+          
+          <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
+            <button id="refreshDbStatsBtn" class="btn btn-ghost">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+              Refresh
+            </button>
+          </div>
+          
+          <div id="dbStatsContainer">
+            <div style="text-align: center; padding: 40px;">
+              <div class="spinner-ring" style="margin: 0 auto;"></div>
+              <p class="muted" style="margin-top: 12px;">Loading database statistics...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Database Optimization Section -->
+        <div class="maintenance-section">
+          <h3>⚡ Database Optimization</h3>
+          <p class="muted">Optimize database performance by rebuilding indexes and updating statistics.</p>
+          
+          <div class="maintenance-actions">
+            <div class="maintenance-action">
+              <h4>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                Rebuild Indexes
+              </h4>
+              <p>Rebuild all database indexes to improve query performance and reduce fragmentation.</p>
+              <button id="rebuildIndexesBtn" class="btn" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; border: none;">
+                Rebuild All Indexes
+              </button>
+            </div>
+
+            <div class="maintenance-action">
+              <h4>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 3v18h18"/>
+                  <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>
+                </svg>
+                Update Statistics
+              </h4>
+              <p>Update database statistics to help the query optimizer make better decisions.</p>
+              <button id="updateStatisticsBtn" class="btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none;">
+                Update Statistics
+              </button>
+            </div>
+
+            <div class="maintenance-action">
+              <h4>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                </svg>
+                Shrink Database
+              </h4>
+              <p>Reclaim unused space in the database. Use sparingly as it can cause fragmentation.</p>
+              <button id="shrinkDatabaseBtn" class="btn btn-ghost">
+                Shrink Database
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Database Backup Section -->
+        <div class="maintenance-section">
+          <h3>💾 Database Backup</h3>
+          <p class="muted">Create a full backup of your database to protect against data loss.</p>
+          
+          <div class="warning-box">
+            <div class="warning-icon">⚠️</div>
+            <div class="warning-content">
+              <h4>Important: Regular Backups</h4>
+              <p>Always maintain regular database backups. Schedule automated backups through SQL Server Management Studio or SQL Server Agent for production environments.</p>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <input 
+              type="text" 
+              id="backupPathInput" 
+              class="input" 
+              placeholder="C:\Temp\OrbisHub_Backup.bak"
+              style="flex: 1;"
+            />
+            <button id="backupDatabaseBtn" class="btn" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Create Backup
+            </button>
+          </div>
+          <span style="font-size: 11px; color: var(--muted); margin-top: 8px; display: block;">
+            Specify the full path on the SQL Server machine (e.g., C:\Temp\OrbisHub.bak). The directory must exist and the SQL Server service account must have write permissions.
+          </span>
+        </div>
+
+        <!-- Data Cleanup Section -->
+        <div class="maintenance-section">
+          <h3>🧹 Data Cleanup</h3>
+          <p class="muted">Remove old and orphaned data to keep your database clean and efficient.</p>
+          
+          <div class="maintenance-actions">
+            <div class="maintenance-action">
+              <h4>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+                Cleanup Audit Logs
+              </h4>
+              <p>Remove audit log entries older than the specified retention period.</p>
+              <div class="input-group" style="margin-bottom: 8px;">
+                <input 
+                  type="number" 
+                  id="auditRetentionDays" 
+                  class="input" 
+                  value="90" 
+                  min="1"
+                  style="width: 100px;"
+                />
+                <span style="color: var(--muted); font-size: 13px;">days</span>
+              </div>
+              <button id="cleanupAuditBtn" class="btn" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none;">
+                Cleanup Old Logs
+              </button>
+            </div>
+
+            <div class="maintenance-action">
+              <h4>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+                Remove Orphaned Records
+              </h4>
+              <p>Identify and remove records that reference non-existent parent records.</p>
+              <button id="cleanupOrphansBtn" class="btn" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none;">
+                Cleanup Orphaned Data
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Database Health Check Section -->
+        <div class="maintenance-section">
+          <h3>🏥 Database Health Check</h3>
+          <p class="muted">Run comprehensive health checks to identify potential issues and get recommendations.</p>
+          
+          <div class="info-box">
+            <div class="info-icon">ℹ️</div>
+            <div class="info-content">
+              <h4>Health Check Overview</h4>
+              <p>This tool performs various checks including database integrity, index fragmentation, space usage, missing indexes, and backup status. Use this regularly to maintain optimal database health.</p>
+            </div>
+          </div>
+
+          <button id="checkDbHealthBtn" class="btn" style="background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); color: white; border: none; width: 100%;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+            Run Health Check
+          </button>
+
+          <div id="healthCheckResults" style="margin-top: 24px;">
+            <!-- Health check results will be displayed here -->
+          </div>
+        </div>
+
+      </div>
     </div>
   </div>
 </section>
@@ -4765,6 +4963,9 @@ Channels
 <!-- User Recovery Module -->
 <script src="../Functions/UserRecovery/recovery-service.js"></script>
 <script src="../Functions/UserRecovery/recovery-ui.js"></script>
+<!-- DB Maintenance Module -->
+<script src="../Functions/DBMaintenance/db-maintenance-service.js"></script>
+<script src="../Functions/DBMaintenance/db-maintenance-ui.js"></script>
 <!-- Core -->
 <script src="app-main.js"></script>
 </body>

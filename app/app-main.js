@@ -10593,6 +10593,12 @@ const SystemConfig = {
             if (typeof loadNotificationSettings === 'function') {
                 await loadNotificationSettings()
             }
+        } else if (tabName === 'dbmaintenance') {
+            document.getElementById('systemConfigDbMaintenance')?.classList.add('active')
+            // Initialize DB Maintenance when tab is shown
+            if (window.DBMaintenanceUI && typeof window.DBMaintenanceUI.init === 'function') {
+                await window.DBMaintenanceUI.init()
+            }
         }
     }
 }

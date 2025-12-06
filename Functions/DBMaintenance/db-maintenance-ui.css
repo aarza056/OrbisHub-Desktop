@@ -1,0 +1,308 @@
+/* DB Maintenance UI Styles */
+
+.stat-card {
+    background: linear-gradient(135deg, var(--panel) 0%, color-mix(in oklab, var(--panel) 95%, white) 100%);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: var(--panel);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.data-table thead {
+    background: linear-gradient(135deg, var(--primary) 0%, color-mix(in oklab, var(--primary) 80%, #000) 100%);
+    color: white;
+}
+
+.data-table thead th {
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+
+.data-table tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.2s ease;
+}
+
+.data-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.data-table tbody tr:hover {
+    background: color-mix(in oklab, var(--primary) 5%, transparent);
+}
+
+.data-table tbody td {
+    padding: 12px 16px;
+    color: var(--text);
+}
+
+.table-responsive {
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.maintenance-section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.maintenance-section h3 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.maintenance-section .muted {
+    margin: 0 0 20px 0;
+    font-size: 13px;
+}
+
+.maintenance-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.maintenance-action {
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, color-mix(in oklab, var(--bg-secondary) 95%, white) 100%);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.maintenance-action h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.maintenance-action p {
+    margin: 0;
+    font-size: 12px;
+    color: var(--muted);
+    flex: 1;
+}
+
+.maintenance-action .btn {
+    width: 100%;
+}
+
+.health-checks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.health-check-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.health-check-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.health-check-item.pass {
+    border-left: 4px solid #10b981;
+    background: linear-gradient(135deg, color-mix(in oklab, #10b981 5%, transparent) 0%, var(--panel) 100%);
+}
+
+.health-check-item.warn {
+    border-left: 4px solid #f59e0b;
+    background: linear-gradient(135deg, color-mix(in oklab, #f59e0b 5%, transparent) 0%, var(--panel) 100%);
+}
+
+.health-check-item.fail {
+    border-left: 4px solid #ef4444;
+    background: linear-gradient(135deg, color-mix(in oklab, #ef4444 5%, transparent) 0%, var(--panel) 100%);
+}
+
+.health-check-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.health-check-item.pass .health-check-icon {
+    background: #10b981;
+    color: white;
+}
+
+.health-check-item.warn .health-check-icon {
+    background: #f59e0b;
+    color: white;
+}
+
+.health-check-item.fail .health-check-icon {
+    background: #ef4444;
+    color: white;
+}
+
+.health-check-content {
+    flex: 1;
+}
+
+.health-check-content h4 {
+    margin: 0 0 4px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.health-check-content p {
+    margin: 0;
+    font-size: 13px;
+}
+
+.input-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.input-group .input {
+    flex: 1;
+}
+
+.input-group .btn {
+    flex-shrink: 0;
+}
+
+/* Warning box */
+.warning-box {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 1px solid #f59e0b;
+    border-left: 4px solid #f59e0b;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 12px;
+}
+
+.warning-box .warning-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.warning-box .warning-content h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #92400e;
+}
+
+.warning-box .warning-content p {
+    margin: 0;
+    font-size: 13px;
+    color: #78350f;
+    line-height: 1.5;
+}
+
+/* Info box */
+.info-box {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    border: 1px solid #3b82f6;
+    border-left: 4px solid #3b82f6;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 12px;
+}
+
+.info-box .info-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.info-box .info-content h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e40af;
+}
+
+.info-box .info-content p {
+    margin: 0;
+    font-size: 13px;
+    color: #1e3a8a;
+    line-height: 1.5;
+}
