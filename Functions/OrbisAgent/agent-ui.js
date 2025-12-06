@@ -205,7 +205,7 @@ const AgentUI = {
                     <div class="agent-card__status-indicator agent-card__status-indicator--${statusClass}"></div>
                     <div>
                         <div class="agent-card__name">${agent.machineName}</div>
-                        <div class="agent-card__os">${agent.os || 'Unknown OS'}</div>
+                        <div class="agent-card__os">${this.getFriendlyOSName(agent.os)}</div>
                     </div>
                 </div>
                 <span class="agent-card__status-badge agent-card__status-badge--${statusClass}">${status}</span>
@@ -291,6 +291,55 @@ const AgentUI = {
     },
 
     /**
+     * Get friendly OS name from version string
+     * @param {string} osVersion - OS version string (e.g., "Microsoft Windows NT 10.0.26100.0")
+     * @returns {string} - Friendly OS name
+     */
+    getFriendlyOSName(osVersion) {
+        if (!osVersion) return 'Unknown OS'
+        
+        // Windows version mapping
+        if (osVersion.includes('Windows NT')) {
+            const match = osVersion.match(/Windows NT ([\d.]+)/)
+            if (match) {
+                const version = match[1]
+                const build = osVersion.match(/([\d]+)\.[\d]+$/)?.[1]
+                
+                // Windows 11 (NT 10.0, build >= 22000)
+                if (version.startsWith('10.0') && build && parseInt(build) >= 22000) {
+                    return 'Windows 11'
+                }
+                // Windows 10 (NT 10.0, build < 22000)
+                if (version.startsWith('10.0')) {
+                    return 'Windows 10'
+                }
+                // Windows 8.1 (NT 6.3)
+                if (version.startsWith('6.3')) {
+                    return 'Windows 8.1'
+                }
+                // Windows 8 (NT 6.2)
+                if (version.startsWith('6.2')) {
+                    return 'Windows 8'
+                }
+                // Windows 7 (NT 6.1)
+                if (version.startsWith('6.1')) {
+                    return 'Windows 7'
+                }
+                // Windows Server versions
+                if (osVersion.includes('Server')) {
+                    if (version.startsWith('10.0')) {
+                        return 'Windows Server 2016+'
+                    }
+                    return 'Windows Server'
+                }
+            }
+        }
+        
+        // Fallback to original string
+        return osVersion
+    },
+
+    /**
      * Extract primary IP address from comma-separated list
      * Filters out link-local addresses (169.254.x.x) and returns the first valid IP
      * @param {string} ipAddresses - Comma-separated IP addresses
@@ -370,7 +419,7 @@ const AgentUI = {
             const lastSeenEl = document.getElementById('agentDetailLastSeen')
             
             if (nameEl) nameEl.textContent = agent.machineName
-            if (osEl) osEl.textContent = agent.os || 'Unknown'
+            if (osEl) osEl.textContent = this.getFriendlyOSName(agent.os)
             if (ipEl) {
                 // Filter IP addresses to show only Ethernet and WiFi adapters
                 let ipDisplay = agent.ipAddress || '—'
