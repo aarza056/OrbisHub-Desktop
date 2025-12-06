@@ -217,9 +217,38 @@ function Send-Heartbeat {
     if (-not $script:AgentId) { return $false }
     
     $metrics = Get-SystemMetrics
+    
+    # Get current logged-in user
+    $loggedInUser = "No active session"
+    try {
+        $users = query user 2>$null | Select-Object -Skip 1
+        if ($users) {
+            # Parse query user output to get active session
+            $activeUser = $users | Where-Object { $_ -match 'Active' } | Select-Object -First 1
+            if ($activeUser) {
+                # Extract username (first field)
+                $userName = ($activeUser -split '\s+')[1]
+                if ($userName -and $userName -ne '') {
+                    $loggedInUser = $userName
+                }
+            } else {
+                # No active session, try to get any logged-in user
+                $anyUser = $users | Select-Object -First 1
+                if ($anyUser) {
+                    $userName = ($anyUser -split '\s+')[1]
+                    if ($userName -and $userName -ne '') {
+                        $loggedInUser = "$userName (disconnected)"
+                    }
+                }
+            }
+        }
+    } catch {
+        # Silently fail, keep default value
+    }
+    
     $body = @{
         agentVersion = $script:AgentVersion
-        currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+        currentUser = $loggedInUser
         metadata = ($metrics | ConvertTo-Json -Compress)
     } | ConvertTo-Json
     
