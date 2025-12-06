@@ -11,7 +11,7 @@
 const AgentAPI = {
     // Core Service URL - should point to YOUR local machine, not remote PCs
     // Remote PCs run OrbisAgent only, which connects to this CoreService
-    coreServiceUrl: 'http://localhost:5000',
+    coreServiceUrl: 'http://192.168.11.65:5000',
     
     // Connection state tracking
     _lastConnectionState: null,
