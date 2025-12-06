@@ -17,6 +17,9 @@ public class AgentRegistrationRequest
 
     [StringLength(50)]
     public string? AgentVersion { get; set; }
+    
+    [StringLength(100)]
+    public string? LoggedInUser { get; set; }
 }
 
 public class AgentRegistrationResponse

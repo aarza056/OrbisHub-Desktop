@@ -22,4 +22,12 @@
     </None>
   </ItemGroup>
 
+  <!-- Copy Database scripts to output directory -->
+  <ItemGroup>
+    <None Include="Database\*.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>Database\%(Filename)%(Extension)</Link>
+    </None>
+  </ItemGroup>
+
 </Project>

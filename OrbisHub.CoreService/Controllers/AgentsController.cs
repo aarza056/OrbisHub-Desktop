@@ -44,6 +44,7 @@ public class AgentsController : ControllerBase
                 existingAgent.IPAddress = request.IpAddresses != null ? string.Join(", ", request.IpAddresses) : null;
                 existingAgent.OSVersion = request.OsVersion;
                 existingAgent.AgentVersion = request.AgentVersion;
+                existingAgent.LoggedInUser = request.LoggedInUser;
                 existingAgent.LastSeenUtc = DateTime.UtcNow;
                 
                 await _agentRepository.UpdateAsync(existingAgent);
@@ -65,7 +66,8 @@ public class AgentsController : ControllerBase
                 MachineName = request.MachineName,
                 IPAddress = request.IpAddresses != null ? string.Join(", ", request.IpAddresses) : null,
                 OSVersion = request.OsVersion,
-                AgentVersion = request.AgentVersion
+                AgentVersion = request.AgentVersion,
+                LoggedInUser = request.LoggedInUser
             };
 
             await _agentRepository.CreateAsync(agent);

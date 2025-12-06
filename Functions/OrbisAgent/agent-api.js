@@ -146,6 +146,7 @@ const AgentAPI = {
                 ipAddress: agent.ipAddress,
                 os: agent.osVersion,
                 version: agent.agentVersion,
+                loggedInUser: agent.loggedInUser,
                 status: agent.status,
                 metadata: agent.metadata ? JSON.parse(agent.metadata) : {},
                 lastHeartbeat: agent.lastSeenUtc,

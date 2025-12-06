@@ -1,1 +1,11 @@
-{"Version":1,"Hash":"7GU7L9D3M2EDaLZ/vBtNz5rgzVl4xI04hxe3xzclq5U=","Source":"OrbisHub.CoreService","BasePath":"_content/OrbisHub.CoreService","Mode":"Default","ManifestType":"Publish","ReferencedProjectsConfiguration":[],"DiscoveryPatterns":[],"Assets":[],"Endpoints":[]}
+{
+  "Version": 1,
+  "Hash": "wSPNAuCEgvNeM7nXg9mFoSWCyFbfjqpMSegPMEYkbvI=",
+  "Source": "OrbisHub.CoreService",
+  "BasePath": "_content/OrbisHub.CoreService",
+  "Mode": "Default",
+  "ManifestType": "Publish",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

@@ -7,6 +7,7 @@ public class Agent
     public string? IPAddress { get; set; }
     public string? OSVersion { get; set; }
     public string? AgentVersion { get; set; }
+    public string? LoggedInUser { get; set; }
     public string? Status { get; set; }
     public string? Metadata { get; set; }
     public DateTime LastSeenUtc { get; set; }

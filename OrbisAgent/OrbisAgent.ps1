@@ -92,11 +92,40 @@ function Get-MachineInfo {
         Write-Log "Failed to get IP addresses: $_" "WARN"
     }
     
+    # Get currently logged-in user
+    $loggedInUser = "No active session"
+    try {
+        $users = query user 2>$null | Select-Object -Skip 1
+        if ($users) {
+            # Parse query user output to get active session
+            $activeUser = $users | Where-Object { $_ -match 'Active' } | Select-Object -First 1
+            if ($activeUser) {
+                # Extract username (first field)
+                $userName = ($activeUser -split '\s+')[1]
+                if ($userName -and $userName -ne '') {
+                    $loggedInUser = $userName
+                }
+            } else {
+                # No active session, try to get any logged-in user
+                $anyUser = $users | Select-Object -First 1
+                if ($anyUser) {
+                    $userName = ($anyUser -split '\s+')[1]
+                    if ($userName -and $userName -ne '') {
+                        $loggedInUser = "$userName (disconnected)"
+                    }
+                }
+            }
+        }
+    } catch {
+        Write-Log "Failed to get logged-in user: $_" "WARN"
+    }
+    
     return @{
         MachineName = $env:COMPUTERNAME
         IpAddresses = $ipAddresses
         OsVersion = [System.Environment]::OSVersion.VersionString
         AgentVersion = $script:AgentVersion
+        LoggedInUser = $loggedInUser
     }
 }
 
@@ -146,6 +175,7 @@ function Register-Agent {
         ipAddresses = $ipArray
         osVersion = $machineInfo.OsVersion
         agentVersion = $machineInfo.AgentVersion
+        loggedInUser = $machineInfo.LoggedInUser
     } | ConvertTo-Json -Depth 10
     
     $attempt = 0

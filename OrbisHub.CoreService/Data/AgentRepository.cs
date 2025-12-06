@@ -144,6 +144,7 @@ public class AgentRepository : IAgentRepository
                 UPDATE Agents 
                 SET LastSeenUtc = @LastSeenUtc,
                     AgentVersion = COALESCE(@AgentVersion, AgentVersion),
+                    LoggedInUser = COALESCE(@CurrentUser, LoggedInUser),
                     Metadata = COALESCE(@Metadata, Metadata)
                 WHERE AgentId = @AgentId";
 
@@ -152,6 +153,7 @@ public class AgentRepository : IAgentRepository
                 AgentId = agentId,
                 LastSeenUtc = DateTime.UtcNow,
                 AgentVersion = agentVersion,
+                CurrentUser = currentUser,
                 Metadata = metadata
             });
 

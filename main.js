@@ -1468,6 +1468,7 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
                     [IPAddress] NVARCHAR(500) NULL,
                     [OSVersion] NVARCHAR(255) NULL,
                     [AgentVersion] NVARCHAR(50) NULL,
+                    [LoggedInUser] NVARCHAR(100) NULL,
                     [Status] NVARCHAR(50) NULL,
                     [Metadata] NVARCHAR(MAX) NULL,
                     [LastSeenUtc] DATETIME NOT NULL DEFAULT GETUTCDATE(),
