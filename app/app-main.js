@@ -36,6 +36,12 @@ function setSession(user) {
 function clearSession() {
     currentUser = null
     stopSessionTimeout()
+    
+    // Clear permissions cache on logout
+    if (typeof PermissionsService !== 'undefined' && PermissionsService.clear) {
+        PermissionsService.clear()
+        console.log('[Session] Permissions cache cleared')
+    }
 }
 
 function isAuthenticated() {
@@ -870,13 +876,13 @@ function renderServers(filters = {}) {
                 </td>
 				<td style="padding:12px 16px; text-align:right;">
 					<div style="display:inline-flex; gap:6px;">
-						${locked ? `<button class="btn btn-sm" data-action="unlock" data-id="${server.id}" style="padding:4px 10px; font-size:12px;">
+						${locked ? `<button class="btn btn-sm" data-action="unlock" data-id="${server.id}" style="padding:4px 10px; font-size:12px;" data-permissions-any="servers:edit,*:*">
 							<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 								<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
 								<path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
 							</svg>
 						</button>` : ''}
-						<button class="btn btn-sm" data-action="server-connect" data-id="${server.id}" style="padding:4px 12px; font-size:12px; background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none;">
+						<button class="btn btn-sm" data-action="server-connect" data-id="${server.id}" style="padding:4px 12px; font-size:12px; background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none;" data-permissions-any="servers:execute,*:*">
 							<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;">
 								<rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
 								<line x1="8" y1="21" x2="16" y2="21"></line>
@@ -884,8 +890,8 @@ function renderServers(filters = {}) {
 							</svg>
 							Connect
 						</button>
-						<button class="btn btn-sm btn-ghost" data-action="server-edit" data-id="${server.id}" style="padding:4px 12px; font-size:12px;">Edit</button>
-						<button class="btn btn-sm btn-ghost" data-action="server-delete" data-id="${server.id}" style="padding:4px 12px; font-size:12px; color:#ef4444; border-color:#ef4444;">Delete</button>
+						<button class="btn btn-sm btn-ghost" data-action="server-edit" data-id="${server.id}" style="padding:4px 12px; font-size:12px;" data-permissions-any="servers:edit,*:*">Edit</button>
+						<button class="btn btn-sm btn-ghost" data-action="server-delete" data-id="${server.id}" style="padding:4px 12px; font-size:12px; color:#ef4444; border-color:#ef4444;" data-permissions-any="servers:delete,*:*">Delete</button>
 					</div>
 				</td>
 			`
@@ -915,6 +921,11 @@ function renderServers(filters = {}) {
 		groupContainer.appendChild(table)
 		serversList.appendChild(groupContainer)
 	})
+
+	// Apply permission checks to dynamically rendered buttons
+	if (window.PermissionUI) {
+		window.PermissionUI.applyPermissions();
+	}
 }
 
 let serverToDelete = null
@@ -1453,8 +1464,8 @@ function renderCredentialsFromLocal(filter = '') {
                     Password: ${'•'.repeat(12)}
                 </div>
                 <div class="actions row" style="margin-top:12px;">
-                    <button class="btn" data-action="edit" data-id="${credential.id}">Edit</button>
-                    <button class="btn btn-ghost" data-action="delete" data-id="${credential.id}">Delete</button>
+                    <button class="btn" data-action="edit" data-id="${credential.id}" data-permissions-any="credentials:edit,*:*">Edit</button>
+                    <button class="btn btn-ghost" data-action="delete" data-id="${credential.id}" data-permissions-any="credentials:delete,*:*">Delete</button>
                 </div>
             `
             
@@ -1468,6 +1479,8 @@ function renderCredentialsFromLocal(filter = '') {
             
             credListEl.appendChild(el)
         })
+    
+    PermissionUI.applyPermissions()
 }
 
 async function renderCredentials(filter = '') {
@@ -1517,8 +1530,8 @@ async function renderCredentials(filter = '') {
                     Password: ${'•'.repeat(12)}
                 </div>
                 <div class="actions row" style="margin-top:12px;">
-                    <button class="btn" data-action="edit" data-id="${credential.id}">Edit</button>
-                    <button class="btn btn-ghost" data-action="delete" data-id="${credential.id}">Delete</button>
+                    <button class="btn" data-action="edit" data-id="${credential.id}" data-permissions-any="credentials:edit,*:*">Edit</button>
+                    <button class="btn btn-ghost" data-action="delete" data-id="${credential.id}" data-permissions-any="credentials:delete,*:*">Delete</button>
                 </div>
             `
             
@@ -1532,6 +1545,8 @@ async function renderCredentials(filter = '') {
             
             credListEl.appendChild(el)
         })
+    
+    PermissionUI.applyPermissions()
 }
 
 function onCredentialAction(credential, action) {
@@ -3598,6 +3613,12 @@ async function renderAllViews() {
         // Still show the app even if some data fails to load
     }
     
+    // Apply permissions after all views are rendered
+    if (window.PermissionUI && window.PermissionUI.initialized) {
+        await window.PermissionUI.applyPermissions();
+        console.log('[RenderAllViews] Permissions applied after rendering');
+    }
+    
     // Restore last active view or default to summary (after data is loaded)
     try {
         const lastView = null 
@@ -5043,6 +5064,11 @@ async function showView(name, updateUrl = true) {
         // Continue anyway - use cached data
     }
     
+    // Apply permissions after view is shown and data is rendered
+    if (window.PermissionUI && window.PermissionUI.initialized) {
+        window.PermissionUI.applyPermissions();
+    }
+    
     // [View persistence removed]
     try {  } catch (e) { /* ignore */ }
 }
@@ -5745,16 +5771,28 @@ if (loginForm) {
             }
             
             // Set session and show app
-            setTimeout(() => {
+            setTimeout(async () => {
                 setSession(user)
-                showApp()
                 
-                // Initialize Permissions UI after successful login
+                // Initialize Permissions UI FIRST before showing app
                 if (typeof PermissionUI !== 'undefined' && PermissionUI.init) {
-                    PermissionUI.init().catch(err => {
+                    try {
+                        console.log('[Login] Initializing PermissionUI for user:', user.id, user.username);
+                        
+                        // Initialize PermissionsService explicitly with user ID
+                        if (window.PermissionsService && !window.PermissionsService.initialized) {
+                            await window.PermissionsService.init(user.id);
+                        }
+                        
+                        await PermissionUI.init();
+                        console.log('[Login] PermissionUI initialized successfully');
+                    } catch (err) {
                         console.error('[Login] Failed to initialize PermissionUI:', err);
-                    });
+                    }
                 }
+                
+                // Now show app with permissions already loaded
+                await showApp()
                 
                 // Clear form
                 loginForm.reset()

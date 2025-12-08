@@ -251,7 +251,7 @@
                                         ${userRoles.length === 0 ? '<span class="muted" style="font-size: 11px;">No roles</span>' : ''}
                                     </div>
                                 </div>
-                                <button class="btn btn-ghost btn-sm assign-role-btn" data-user-id="${user.id}" data-user-name="${user.name || user.username}" data-permission="roles:assign">
+                                <button class="btn btn-ghost btn-sm assign-role-btn" data-user-id="${user.id}" data-user-name="${user.name || user.username}" data-permissions-any="roles:assign,*:*">
                                     Manage Roles
                                 </button>
                             </div>
@@ -261,6 +261,11 @@
 
                 container.innerHTML = userRolesHtml.join('');
                 console.log('[PermissionsManagerUI] User roles rendered');
+                
+                // Apply permissions to newly rendered buttons
+                if (window.PermissionUI && window.PermissionUI.initialized) {
+                    await window.PermissionUI.applyPermissions();
+                }
             } catch (error) {
                 console.error('[PermissionsManagerUI] Failed to render user roles:', error);
                 container.innerHTML = '<p class="muted">Failed to load user roles</p>';
@@ -486,9 +491,9 @@
                     <input type="checkbox" value="${role.id}" ${userRoleIds.has(role.id) ? 'checked' : ''} 
                            data-role-id="${role.id}" class="user-role-checkbox">
                     <div style="flex: 1;">
-                        <div style="font-weight: 600; font-size: 14px;">${role.displayName || role.name}</div>
-                        <div class="muted" style="font-size: 12px;">${role.description || ''}</div>
-                        <div class="muted" style="font-size: 11px; margin-top: 4px;">Level ${role.level}</div>
+                        <div style="font-weight: 600; font-size: 14px; color: var(--text);">${role.displayName || role.name}</div>
+                        <div class="muted" style="font-size: 12px; color: var(--muted);">${role.description || ''}</div>
+                        <div class="muted" style="font-size: 11px; margin-top: 4px; color: var(--muted);">Level ${role.level}</div>
                     </div>
                     ${role.isSystem ? '<span class="badge" style="background: rgba(100, 116, 139, 0.15); color: #64748b; font-size: 10px; padding: 2px 8px;">SYSTEM</span>' : ''}
                 </label>

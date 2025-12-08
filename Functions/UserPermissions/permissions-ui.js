@@ -54,54 +54,64 @@
          * Apply permissions to all elements with permission attributes
          */
         async applyPermissions() {
-            // Handle single permission requirement
-            const singlePermElements = document.querySelectorAll('[data-permission]');
-            for (const element of singlePermElements) {
-                const permission = element.getAttribute('data-permission');
-                const hasPermission = await global.PermissionsService.hasPermission(permission);
-                this.toggleElement(element, hasPermission);
+            // Check if user is logged in
+            if (!global.PermissionsService || !global.PermissionsService.currentUserId) {
+                console.log('[PermissionUI] No user logged in, skipping permission application');
+                return;
             }
 
-            // Handle multiple permissions (all required)
-            const allPermElements = document.querySelectorAll('[data-permissions-all]');
-            for (const element of allPermElements) {
-                const permissions = element.getAttribute('data-permissions-all').split(',').map(p => p.trim());
-                const hasPermission = await global.PermissionsService.hasAllPermissions(permissions);
-                this.toggleElement(element, hasPermission);
-            }
+            try {
+                // Handle single permission requirement
+                const singlePermElements = document.querySelectorAll('[data-permission]');
+                for (const element of singlePermElements) {
+                    const permission = element.getAttribute('data-permission');
+                    const hasPermission = await global.PermissionsService.hasPermission(permission);
+                    this.toggleElement(element, hasPermission);
+                }
 
-            // Handle multiple permissions (any required)
-            const anyPermElements = document.querySelectorAll('[data-permissions-any]');
-            for (const element of anyPermElements) {
-                const permissions = element.getAttribute('data-permissions-any').split(',').map(p => p.trim());
-                const hasPermission = await global.PermissionsService.hasAnyPermission(permissions);
-                this.toggleElement(element, hasPermission);
-            }
+                // Handle multiple permissions (all required)
+                const allPermElements = document.querySelectorAll('[data-permissions-all]');
+                for (const element of allPermElements) {
+                    const permissions = element.getAttribute('data-permissions-all').split(',').map(p => p.trim());
+                    const hasPermission = await global.PermissionsService.hasAllPermissions(permissions);
+                    this.toggleElement(element, hasPermission);
+                }
 
-            // Handle role-based visibility
-            const roleElements = document.querySelectorAll('[data-role]');
-            for (const element of roleElements) {
-                const requiredRole = element.getAttribute('data-role');
-                const userRoles = await global.PermissionsService.getUserRoles();
-                const hasRole = userRoles.some(r => r.name === requiredRole);
-                this.toggleElement(element, hasRole);
-            }
+                // Handle multiple permissions (any required)
+                const anyPermElements = document.querySelectorAll('[data-permissions-any]');
+                for (const element of anyPermElements) {
+                    const permissions = element.getAttribute('data-permissions-any').split(',').map(p => p.trim());
+                    const hasPermission = await global.PermissionsService.hasAnyPermission(permissions);
+                    this.toggleElement(element, hasPermission);
+                }
 
-            // Handle admin-only elements
-            const adminElements = document.querySelectorAll('[data-admin-only]');
-            for (const element of adminElements) {
-                const isAdmin = await global.PermissionsService.isAdmin();
-                this.toggleElement(element, isAdmin);
-            }
+                // Handle role-based visibility
+                const roleElements = document.querySelectorAll('[data-role]');
+                for (const element of roleElements) {
+                    const requiredRole = element.getAttribute('data-role');
+                    const userRoles = await global.PermissionsService.getUserRoles();
+                    const hasRole = userRoles.some(r => r.name === requiredRole);
+                    this.toggleElement(element, hasRole);
+                }
 
-            // Handle super-admin-only elements
-            const superAdminElements = document.querySelectorAll('[data-super-admin-only]');
-            for (const element of superAdminElements) {
-                const isSuperAdmin = await global.PermissionsService.isSuperAdmin();
-                this.toggleElement(element, isSuperAdmin);
-            }
+                // Handle admin-only elements
+                const adminElements = document.querySelectorAll('[data-admin-only]');
+                for (const element of adminElements) {
+                    const isAdmin = await global.PermissionsService.isAdmin();
+                    this.toggleElement(element, isAdmin);
+                }
 
-            console.log('[PermissionUI] Permissions applied to UI elements');
+                // Handle super-admin-only elements
+                const superAdminElements = document.querySelectorAll('[data-super-admin-only]');
+                for (const element of superAdminElements) {
+                    const isSuperAdmin = await global.PermissionsService.isSuperAdmin();
+                    this.toggleElement(element, isSuperAdmin);
+                }
+
+                console.log('[PermissionUI] Permissions applied to UI elements');
+            } catch (error) {
+                console.error('[PermissionUI] Error applying permissions:', error);
+            }
         }
 
         /**

@@ -440,9 +440,9 @@
 </button>
 <h2>Environment Details</h2>
 <menu class="row" style="margin: 16px 0 24px 0; gap: 8px; padding: 0;">
-<button type="button" id="envDetailsDeployBtn" class="btn" style="background: linear-gradient(135deg, #5a4fcf 0%, #5e2a84 100%); color: white; border: none;">Deploy</button>
+<button type="button" id="envDetailsDeployBtn" class="btn" style="background: linear-gradient(135deg, #5a4fcf 0%, #5e2a84 100%); color: white; border: none;" data-permissions-any="environments:execute,*:*">Deploy</button>
 <button type="button" id="envDetailsSolutionsBtn" class="btn" style="background: linear-gradient(135deg, #d946a6 0%, #c21e56 100%); color: white; border: none;">Show Solutions</button>
-<button type="button" id="envDetailsMapServersBtn" class="btn" style="background: linear-gradient(135deg, #0ea770 0%, #0c8599 100%); color: white; border: none;">Map Agent</button>
+<button type="button" id="envDetailsMapServersBtn" class="btn" style="background: linear-gradient(135deg, #0ea770 0%, #0c8599 100%); color: white; border: none;" data-permissions-any="environments:edit,*:*">Map Agent</button>
 </menu>
 <div id="envDetailsContent" style="margin: 24px 0;">
   <!-- Details will be populated by JavaScript -->
@@ -531,7 +531,7 @@
     </svg>
     Ticket Management
   </button>
-  <button class="nav__btn" data-view="passwords">
+  <button class="nav__btn" data-view="passwords" data-permissions-any="passwords:view,*:*">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
       <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
@@ -1049,7 +1049,7 @@
     <button class="tab-btn active" data-tab="users-tab" style="padding: 12px 24px; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-weight: 600; color: var(--muted); transition: all 0.2s;">
       Users
     </button>
-    <button class="tab-btn" data-tab="permissions-tab" style="padding: 12px 24px; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-weight: 600; color: var(--muted); transition: all 0.2s;">
+    <button class="tab-btn" data-tab="permissions-tab" data-permissions-any="roles:view,*:*" style="padding: 12px 24px; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-weight: 600; color: var(--muted); transition: all 0.2s;">
       Permissions
     </button>
   </div>
@@ -1247,7 +1247,7 @@
       <option value="server">Servers</option>
     </select>
     <div style="flex:1"></div>
-    <button id="clearAuditBtn" class="btn btn-ghost" style="color:#ef4444;">
+    <button id="clearAuditBtn" class="btn btn-ghost" style="color:#ef4444;" data-permissions-any="audit:delete,*:*">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="3 6 5 6 21 6"></polyline>
         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -1578,7 +1578,7 @@
       <div class="password-filters">
         <div class="password-filter-header">
           <div class="password-filter-label">Categories</div>
-          <button class="btn-icon btn-icon-sm" id="manageCategoriesBtn" title="Manage Categories">
+          <button class="btn-icon btn-icon-sm" id="manageCategoriesBtn" title="Manage Categories" data-permissions-any="passwords:edit,*:*">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"></path>
@@ -1602,7 +1602,7 @@
             </svg>
             Favorites
           </button>
-          <button class="btn btn-primary" id="addPasswordBtn">
+          <button class="btn btn-primary" id="addPasswordBtn" data-permissions-any="passwords:create,*:*">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -2292,7 +2292,7 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
                 Rebuild Indexes
               </h4>
               <p>Rebuild all database indexes to improve query performance and reduce fragmentation.</p>
-              <button id="rebuildIndexesBtn" class="btn" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; border: none;">
+              <button id="rebuildIndexesBtn" class="btn" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; border: none;" data-permissions-any="databases:execute,*:*">
                 Rebuild All Indexes
               </button>
             </div>
@@ -2306,7 +2306,7 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
                 Update Statistics
               </h4>
               <p>Update database statistics to help the query optimizer make better decisions.</p>
-              <button id="updateStatisticsBtn" class="btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none;">
+              <button id="updateStatisticsBtn" class="btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none;" data-permissions-any="databases:execute,*:*">
                 Update Statistics
               </button>
             </div>
@@ -2319,7 +2319,7 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
                 Shrink Database
               </h4>
               <p>Reclaim unused space in the database. Use sparingly as it can cause fragmentation.</p>
-              <button id="shrinkDatabaseBtn" class="btn btn-ghost">
+              <button id="shrinkDatabaseBtn" class="btn btn-ghost" data-permissions-any="databases:execute,*:*">
                 Shrink Database
               </button>
             </div>
@@ -2347,7 +2347,7 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
               placeholder="C:\Temp\OrbisHub_Backup.bak"
               style="flex: 1;"
             />
-            <button id="backupDatabaseBtn" class="btn" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none;">
+            <button id="backupDatabaseBtn" class="btn" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none;" data-permissions-any="databases:execute,*:*">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="7 10 12 15 17 10"/>
@@ -2386,7 +2386,7 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
                 />
                 <span style="color: var(--muted); font-size: 13px;">days</span>
               </div>
-              <button id="cleanupAuditBtn" class="btn" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none;">
+              <button id="cleanupAuditBtn" class="btn" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none;" data-permissions-any="databases:execute,*:*">
                 Cleanup Old Logs
               </button>
             </div>
@@ -2400,7 +2400,7 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
                 Remove Orphaned Records
               </h4>
               <p>Identify and remove records that reference non-existent parent records.</p>
-              <button id="cleanupOrphansBtn" class="btn" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none;">
+              <button id="cleanupOrphansBtn" class="btn" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none;" data-permissions-any="databases:execute,*:*">
                 Cleanup Orphaned Data
               </button>
             </div>
@@ -3471,7 +3471,7 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
             <p>Reset OrbisHub to factory defaults (cannot be undone)</p>
           </div>
           <div class="settings-row-control">
-            <button class="btn" id="clearAllDataBtn" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; display: flex; align-items: center; gap: 8px;">
+            <button class="btn" id="clearAllDataBtn" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; display: flex; align-items: center; gap: 8px;" data-permissions-any="settings:delete,*:*">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -3778,8 +3778,8 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
 
 <dialog id="deleteUserModal" class="modal">
 <form method="dialog" class="card">
-<h2>Delete User</h2>
-<p>Are you sure you want to delete <strong><span id="deleteUserName"></span></strong>?</p>
+<h2 style="color: var(--text);">Delete User</h2>
+<p style="color: var(--text);">Are you sure you want to delete <strong><span id="deleteUserName"></span></strong>?</p>
 <menu class="row end">
 <button value="cancel" class="btn btn-ghost">Cancel</button>
 <button id="confirmDeleteUserBtn" type="submit" value="confirm" class="btn btn-danger">Delete</button>

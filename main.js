@@ -2452,100 +2452,150 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
         await pool.request().query(`
             IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions])
             BEGIN
-                -- User Management Permissions
+                -- Users
                 INSERT INTO [dbo].[Permissions] (id, resource, action, permission, description, category, isActive) VALUES
-                (NEWID(), 'users', 'view', 'users:view', 'View users list', 'User Management', 1),
+                (NEWID(), 'users', 'view', 'users:view', 'View user list and details', 'User Management', 1),
                 (NEWID(), 'users', 'create', 'users:create', 'Create new users', 'User Management', 1),
-                (NEWID(), 'users', 'edit', 'users:edit', 'Edit user details', 'User Management', 1),
-                (NEWID(), 'users', 'delete', 'users:delete', 'Delete users', 'User Management', 1),
-                (NEWID(), 'users', 'manage', 'users:manage', 'Full user management', 'User Management', 1),
+                (NEWID(), 'users', 'edit', 'users:edit', 'Edit user details and settings', 'User Management', 1),
+                (NEWID(), 'users', 'delete', 'users:delete', 'Delete users from system', 'User Management', 1),
+                (NEWID(), 'users', 'reset_password', 'users:reset_password', 'Reset user passwords', 'User Management', 1),
+                (NEWID(), 'users', 'manage', 'users:manage', 'Full user management access', 'User Management', 1),
                 
-                -- Server Management
-                (NEWID(), 'servers', 'view', 'servers:view', 'View servers', 'Server Management', 1),
-                (NEWID(), 'servers', 'create', 'servers:create', 'Add servers', 'Server Management', 1),
-                (NEWID(), 'servers', 'edit', 'servers:edit', 'Edit servers', 'Server Management', 1),
-                (NEWID(), 'servers', 'delete', 'servers:delete', 'Delete servers', 'Server Management', 1),
-                
-                -- Environment Management
+                -- Environments
                 (NEWID(), 'environments', 'view', 'environments:view', 'View environments', 'Environment Management', 1),
-                (NEWID(), 'environments', 'create', 'environments:create', 'Create environments', 'Environment Management', 1),
-                (NEWID(), 'environments', 'edit', 'environments:edit', 'Edit environments', 'Environment Management', 1),
+                (NEWID(), 'environments', 'create', 'environments:create', 'Create new environments', 'Environment Management', 1),
+                (NEWID(), 'environments', 'edit', 'environments:edit', 'Edit environment configurations', 'Environment Management', 1),
                 (NEWID(), 'environments', 'delete', 'environments:delete', 'Delete environments', 'Environment Management', 1),
+                (NEWID(), 'environments', 'execute', 'environments:execute', 'Deploy and execute environment actions', 'Environment Management', 1),
                 
-                -- Credentials Management
-                (NEWID(), 'credentials', 'view', 'credentials:view', 'View credentials', 'Credentials Management', 1),
-                (NEWID(), 'credentials', 'create', 'credentials:create', 'Create credentials', 'Credentials Management', 1),
-                (NEWID(), 'credentials', 'edit', 'credentials:edit', 'Edit credentials', 'Credentials Management', 1),
+                -- Servers
+                (NEWID(), 'servers', 'view', 'servers:view', 'View server configurations', 'Server Management', 1),
+                (NEWID(), 'servers', 'create', 'servers:create', 'Add new servers', 'Server Management', 1),
+                (NEWID(), 'servers', 'edit', 'servers:edit', 'Edit server details', 'Server Management', 1),
+                (NEWID(), 'servers', 'delete', 'servers:delete', 'Delete servers', 'Server Management', 1),
+                (NEWID(), 'servers', 'execute', 'servers:execute', 'Connect and execute server actions', 'Server Management', 1),
+                
+                -- Databases
+                (NEWID(), 'databases', 'view', 'databases:view', 'View database configurations', 'Data Management', 1),
+                (NEWID(), 'databases', 'create', 'databases:create', 'Add new database connections', 'Data Management', 1),
+                (NEWID(), 'databases', 'edit', 'databases:edit', 'Edit database configurations', 'Data Management', 1),
+                (NEWID(), 'databases', 'delete', 'databases:delete', 'Delete database connections', 'Data Management', 1),
+                (NEWID(), 'databases', 'execute', 'databases:execute', 'Run database maintenance operations', 'Data Management', 1),
+                
+                -- Credentials
+                (NEWID(), 'credentials', 'view', 'credentials:view', 'View stored credentials', 'Credentials Management', 1),
+                (NEWID(), 'credentials', 'create', 'credentials:create', 'Create new credentials', 'Credentials Management', 1),
+                (NEWID(), 'credentials', 'edit', 'credentials:edit', 'Edit credential details', 'Credentials Management', 1),
                 (NEWID(), 'credentials', 'delete', 'credentials:delete', 'Delete credentials', 'Credentials Management', 1),
+                (NEWID(), 'credentials', 'reveal', 'credentials:reveal', 'View decrypted passwords', 'Security', 1),
                 
-                -- Role & Permission Management
-                (NEWID(), 'roles', 'view', 'roles:view', 'View roles', 'Role Management', 1),
-                (NEWID(), 'roles', 'create', 'roles:create', 'Create roles', 'Role Management', 1),
-                (NEWID(), 'roles', 'edit', 'roles:edit', 'Edit roles', 'Role Management', 1),
-                (NEWID(), 'roles', 'delete', 'roles:delete', 'Delete roles', 'Role Management', 1),
-                (NEWID(), 'roles', 'assign', 'roles:assign', 'Assign roles to users', 'Role Management', 1),
+                -- Password Manager (ADMIN ONLY)
+                (NEWID(), 'passwords', 'view', 'passwords:view', 'View Password Manager and stored passwords', 'Security', 1),
+                (NEWID(), 'passwords', 'create', 'passwords:create', 'Create new passwords in Password Manager', 'Security', 1),
+                (NEWID(), 'passwords', 'edit', 'passwords:edit', 'Edit passwords and manage categories', 'Security', 1),
+                (NEWID(), 'passwords', 'delete', 'passwords:delete', 'Delete passwords from Password Manager', 'Security', 1),
                 
-                -- Audit & Logs
+                -- Messages
+                (NEWID(), 'messages', 'view', 'messages:view', 'View messages', 'Communication', 1),
+                (NEWID(), 'messages', 'create', 'messages:create', 'Create and send messages', 'Communication', 1),
+                (NEWID(), 'messages', 'delete', 'messages:delete', 'Delete messages', 'Communication', 1),
+                
+                -- Files
+                (NEWID(), 'files', 'view', 'files:view', 'View file attachments', 'File Management', 1),
+                (NEWID(), 'files', 'upload', 'files:upload', 'Upload file attachments', 'File Management', 1),
+                (NEWID(), 'files', 'download', 'files:download', 'Download file attachments', 'File Management', 1),
+                (NEWID(), 'files', 'delete', 'files:delete', 'Delete file attachments', 'File Management', 1),
+                
+                -- Audit
                 (NEWID(), 'audit', 'view', 'audit:view', 'View audit logs', 'Audit', 1),
                 (NEWID(), 'audit', 'export', 'audit:export', 'Export audit logs', 'Audit', 1),
+                (NEWID(), 'audit', 'delete', 'audit:delete', 'Clear audit logs', 'Audit', 1),
                 
-                -- System Configuration
-                (NEWID(), 'system', 'view', 'system:view', 'View system settings', 'System', 1),
-                (NEWID(), 'system', 'edit', 'system:edit', 'Edit system settings', 'System', 1),
+                -- Roles
+                (NEWID(), 'roles', 'view', 'roles:view', 'View roles and permissions', 'Role Management', 1),
+                (NEWID(), 'roles', 'create', 'roles:create', 'Create new roles', 'Role Management', 1),
+                (NEWID(), 'roles', 'edit', 'roles:edit', 'Edit role permissions', 'Role Management', 1),
+                (NEWID(), 'roles', 'delete', 'roles:delete', 'Delete custom roles', 'Role Management', 1),
+                (NEWID(), 'roles', 'assign', 'roles:assign', 'Assign roles to users', 'Role Management', 1),
                 
-                -- Wildcard permissions
-                (NEWID(), '*', '*', '*:*', 'Full system access', 'System', 1)
+                -- Settings
+                (NEWID(), 'settings', 'view', 'settings:view', 'View system settings', 'System', 1),
+                (NEWID(), 'settings', 'edit', 'settings:edit', 'Edit system settings', 'System', 1),
+                (NEWID(), 'settings', 'delete', 'settings:delete', 'Delete system data (Clear All Data)', 'System', 1),
+                
+                -- System/Infrastructure
+                (NEWID(), 'system', 'view', 'system:view', 'View system information', 'System', 1),
+                (NEWID(), 'system', 'edit', 'system:edit', 'Edit system configuration', 'System', 1),
+                (NEWID(), 'agents', 'view', 'agents:view', 'View OrbisAgent status', 'Infrastructure', 1),
+                (NEWID(), 'agents', 'manage', 'agents:manage', 'Manage OrbisAgent deployments', 'Infrastructure', 1),
+                
+                -- Wildcard (Super Admin only)
+                (NEWID(), '*', '*', '*:*', 'Full system access (Super Admin)', 'System', 1)
             END
         `);
-        migrations.push('Default permissions seeded');
+        migrations.push('Default permissions seeded (50+ permissions including Password Manager)');
         
-        // Seed default roles (only if table is empty)
+        // Seed default roles with FIXED IDs (only if table is empty)
         await pool.request().query(`
             IF NOT EXISTS (SELECT 1 FROM [dbo].[Roles])
             BEGIN
-                DECLARE @superAdminId NVARCHAR(50) = NEWID()
-                DECLARE @adminId NVARCHAR(50) = NEWID()
-                DECLARE @managerId NVARCHAR(50) = NEWID()
-                DECLARE @operatorId NVARCHAR(50) = NEWID()
-                DECLARE @viewerId NVARCHAR(50) = NEWID()
+                DECLARE @superAdminId NVARCHAR(50) = '39AB95FD-D70F-420B-A241-27F0F7EB58FC'
+                DECLARE @adminId NVARCHAR(50) = 'F7C8A9E3-5B2D-4F6E-8A1C-3D9E7B4F2A8C'
+                DECLARE @managerId NVARCHAR(50) = 'E4D6B8F2-9A3C-4E7D-B1A5-8C2F9E3D7B6A'
+                DECLARE @operatorId NVARCHAR(50) = 'C3A7E5D9-2B4F-4A8E-9C1D-7E3B8F2A5C9D'
+                DECLARE @viewerId NVARCHAR(50) = 'B2F8D4A6-7C3E-4D9B-8A2F-5E1C9D3B7F4A'
                 
-                INSERT INTO [dbo].[Roles] (id, name, displayName, description, level, isSystem, isActive) VALUES
-                (@superAdminId, 'super_admin', 'Super Administrator', 'Full system access with all permissions', 100, 1, 1),
-                (@adminId, 'admin', 'Administrator', 'Administrative access to manage users and system', 90, 1, 1),
-                (@managerId, 'manager', 'Manager', 'Can manage environments and servers', 70, 1, 1),
-                (@operatorId, 'operator', 'Operator', 'Can view and operate environments', 50, 1, 1),
-                (@viewerId, 'viewer', 'Viewer', 'Read-only access to view resources', 10, 1, 1)
+                INSERT INTO [dbo].[Roles] (id, name, displayName, description, color, icon, level, isSystem, isActive) VALUES
+                (@superAdminId, 'super_admin', 'Super Administrator', 'Full system access with all permissions', '#dc2626', '👑', 100, 1, 1),
+                (@adminId, 'admin', 'Administrator', 'Administrative access (cannot manage roles)', '#f97316', '🔑', 90, 1, 1),
+                (@managerId, 'manager', 'Manager', 'Can manage environments, servers, and databases', '#3b82f6', '📊', 70, 1, 1),
+                (@operatorId, 'operator', 'Operator', 'Can execute operations on environments and servers', '#10b981', '⚙️', 50, 1, 1),
+                (@viewerId, 'viewer', 'Viewer', 'Read-only access to view resources', '#6b7280', '👁️', 10, 1, 1)
                 
-                -- Assign all permissions to Super Admin
+                -- Super Admin: ALL permissions including wildcard
                 INSERT INTO [dbo].[RolePermissions] (id, roleId, permissionId)
                 SELECT NEWID(), @superAdminId, id FROM [dbo].[Permissions]
                 
-                -- Assign most permissions to Admin (exclude role management)
+                -- Admin: All permissions EXCEPT roles management and wildcard (includes Password Manager)
                 INSERT INTO [dbo].[RolePermissions] (id, roleId, permissionId)
                 SELECT NEWID(), @adminId, id FROM [dbo].[Permissions]
-                WHERE permission NOT IN ('roles:delete', '*:*')
+                WHERE resource NOT IN ('roles', '*')
                 
-                -- Manager permissions
+                -- Admin can VIEW roles but not modify
+                INSERT INTO [dbo].[RolePermissions] (id, roleId, permissionId)
+                SELECT NEWID(), @adminId, id FROM [dbo].[Permissions]
+                WHERE permission = 'roles:view'
+                
+                -- Manager: View all + manage envs/servers/databases (NO passwords)
                 INSERT INTO [dbo].[RolePermissions] (id, roleId, permissionId)
                 SELECT NEWID(), @managerId, id FROM [dbo].[Permissions]
-                WHERE permission IN ('environments:view', 'environments:create', 'environments:edit', 
-                                   'servers:view', 'servers:create', 'servers:edit',
-                                   'credentials:view', 'audit:view')
+                WHERE (
+                    action = 'view' OR
+                    permission IN (
+                        'environments:create', 'environments:edit', 'environments:delete', 'environments:execute',
+                        'servers:create', 'servers:edit', 'servers:delete', 'servers:execute',
+                        'databases:create', 'databases:edit', 'databases:delete', 'databases:execute',
+                        'credentials:create', 'credentials:edit'
+                    )
+                ) AND resource != 'passwords'
                 
-                -- Operator permissions
+                -- Operator: Execute on envs/servers/databases + manage files/messages (NO passwords)
                 INSERT INTO [dbo].[RolePermissions] (id, roleId, permissionId)
                 SELECT NEWID(), @operatorId, id FROM [dbo].[Permissions]
-                WHERE permission IN ('environments:view', 'servers:view', 'credentials:view', 'audit:view')
+                WHERE (
+                    resource IN ('environments', 'servers', 'databases', 'credentials', 'files', 'messages', 'agents') AND
+                    action IN ('view', 'create', 'edit', 'execute', 'upload', 'download')
+                ) AND resource != 'passwords'
                 
-                -- Viewer permissions
+                -- Viewer: View-only (NO roles, settings, or passwords)
                 INSERT INTO [dbo].[RolePermissions] (id, roleId, permissionId)
                 SELECT NEWID(), @viewerId, id FROM [dbo].[Permissions]
-                WHERE permission IN ('environments:view', 'servers:view', 'audit:view')
+                WHERE action = 'view' AND resource NOT IN ('roles', 'settings', 'passwords', '*')
             END
         `);
-        migrations.push('Default roles and role-permission mappings seeded');
+        migrations.push('Default roles and role-permission mappings seeded (Password Manager is ADMIN-ONLY)');
         
-        // Create UserPermissions View
+        // Create UserPermissions View with FIXED column names
         await pool.request().query(`
             IF EXISTS (SELECT * FROM sys.views WHERE name = 'vw_UserPermissions')
                 DROP VIEW [dbo].[vw_UserPermissions]
@@ -2555,8 +2605,8 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
             CREATE VIEW [dbo].[vw_UserPermissions] AS
             SELECT 
                 u.id AS userId,
-                u.username AS userLoginName,
-                u.name AS userDisplayName,
+                u.username AS username,
+                u.name AS userFullName,
                 r.name AS roleName,
                 r.displayName AS roleDisplayName,
                 p.permission AS permission,
@@ -2571,7 +2621,32 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
             INNER JOIN [dbo].[Permissions] p ON rp.permissionId = p.id
             WHERE u.isActive = 1 AND r.isActive = 1 AND p.isActive = 1
         `);
-        migrations.push('vw_UserPermissions view created');
+        migrations.push('vw_UserPermissions view created (fixed column names)');
+        
+        // Create vw_RoleSummary view
+        await pool.request().query(`
+            IF EXISTS (SELECT * FROM sys.views WHERE name = 'vw_RoleSummary')
+                DROP VIEW [dbo].[vw_RoleSummary]
+        `);
+        
+        await pool.request().query(`
+            CREATE VIEW [dbo].[vw_RoleSummary] AS
+            SELECT 
+                r.id AS roleId,
+                r.name AS roleName,
+                r.displayName,
+                r.description,
+                r.color,
+                r.level,
+                COUNT(DISTINCT rp.permissionId) AS permissionCount,
+                COUNT(DISTINCT ur.userId) AS userCount
+            FROM [dbo].[Roles] r
+            LEFT JOIN [dbo].[RolePermissions] rp ON r.id = rp.roleId
+            LEFT JOIN [dbo].[UserRoles] ur ON r.id = ur.roleId
+            WHERE r.isActive = 1
+            GROUP BY r.id, r.name, r.displayName, r.description, r.color, r.level
+        `);
+        migrations.push('vw_RoleSummary view created');
         
         // Create stored procedure for checking permissions
         await pool.request().query(`
@@ -2607,7 +2682,7 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
                     RETURN
                 END
                 
-                -- Check for resource wildcard
+                -- Check for resource wildcard (e.g., users:* matches users:create)
                 DECLARE @resource NVARCHAR(50) = LEFT(@permission, CHARINDEX(':', @permission) - 1)
                 DECLARE @resourceWildcard NVARCHAR(100) = @resource + ':*'
                 

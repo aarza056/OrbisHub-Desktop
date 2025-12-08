@@ -92,6 +92,18 @@
         }
 
         /**
+         * Clear all cached permissions and reset the service
+         * Should be called on logout
+         */
+        clear() {
+            this.cache.clear();
+            this.cacheExpiry.clear();
+            this.currentUserId = null;
+            this.initialized = false;
+            console.log('[Permissions] Service cleared');
+        }
+
+        /**
          * Check if user has a specific permission
          * Supports wildcards: *:* and resource:*
          */

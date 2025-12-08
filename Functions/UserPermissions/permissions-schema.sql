@@ -285,6 +285,27 @@ SELECT NEWID(), 'credentials', 'reveal', 'credentials:reveal', 'View decrypted p
 WHERE NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE permission = 'credentials:reveal')
 SET @PermissionCount = @PermissionCount + @@ROWCOUNT
 
+-- Password Manager permissions
+INSERT INTO [dbo].[Permissions] (id, resource, action, permission, description, category)
+SELECT NEWID(), 'passwords', 'view', 'passwords:view', 'View Password Manager and stored passwords', 'Security'
+WHERE NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE permission = 'passwords:view')
+SET @PermissionCount = @PermissionCount + @@ROWCOUNT
+
+INSERT INTO [dbo].[Permissions] (id, resource, action, permission, description, category)
+SELECT NEWID(), 'passwords', 'create', 'passwords:create', 'Create new passwords in Password Manager', 'Security'
+WHERE NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE permission = 'passwords:create')
+SET @PermissionCount = @PermissionCount + @@ROWCOUNT
+
+INSERT INTO [dbo].[Permissions] (id, resource, action, permission, description, category)
+SELECT NEWID(), 'passwords', 'edit', 'passwords:edit', 'Edit passwords and manage categories', 'Security'
+WHERE NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE permission = 'passwords:edit')
+SET @PermissionCount = @PermissionCount + @@ROWCOUNT
+
+INSERT INTO [dbo].[Permissions] (id, resource, action, permission, description, category)
+SELECT NEWID(), 'passwords', 'delete', 'passwords:delete', 'Delete passwords from Password Manager', 'Security'
+WHERE NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE permission = 'passwords:delete')
+SET @PermissionCount = @PermissionCount + @@ROWCOUNT
+
 -- Messages permissions
 INSERT INTO [dbo].[Permissions] (id, resource, action, permission, description, category)
 SELECT NEWID(), 'messages', 'view', 'messages:view', 'View messages', 'Communication'
@@ -485,7 +506,7 @@ WHERE r.name = 'admin'
   )
 SET @AssignCount = @AssignCount + @@ROWCOUNT
 
--- Manager: View all, manage environments and servers
+-- Manager: View all, manage environments and servers (excluding Password Manager)
 INSERT INTO [dbo].[RolePermissions] (id, roleId, permissionId)
 SELECT NEWID(), r.id, p.id
 FROM [dbo].[Roles] r
@@ -499,13 +520,14 @@ WHERE r.name = 'manager'
           'databases:create', 'databases:edit', 'databases:delete', 'databases:execute'
       )
   )
+  AND p.resource != 'passwords'
   AND NOT EXISTS (
       SELECT 1 FROM [dbo].[RolePermissions] 
       WHERE roleId = r.id AND permissionId = p.id
   )
 SET @AssignCount = @AssignCount + @@ROWCOUNT
 
--- Operator: Create, edit, and execute on environments, servers, databases, and credentials
+-- Operator: Create, edit, and execute on environments, servers, databases, and credentials (excluding Password Manager)
 INSERT INTO [dbo].[RolePermissions] (id, roleId, permissionId)
 SELECT NEWID(), r.id, p.id
 FROM [dbo].[Roles] r
@@ -528,7 +550,7 @@ FROM [dbo].[Roles] r
 CROSS JOIN [dbo].[Permissions] p
 WHERE r.name = 'viewer' 
   AND p.action = 'view'
-  AND p.resource NOT IN ('roles', 'settings', '*')
+  AND p.resource NOT IN ('roles', 'settings', 'passwords', '*')
   AND NOT EXISTS (
       SELECT 1 FROM [dbo].[RolePermissions] 
       WHERE roleId = r.id AND permissionId = p.id
@@ -612,7 +634,7 @@ CREATE VIEW [dbo].[vw_UserPermissions] AS
 SELECT 
     u.id AS userId,
     u.username AS username,
-    u.name AS userName,
+    u.name AS userFullName,
     r.name AS roleName,
     r.displayName AS roleDisplayName,
     p.permission AS permission,

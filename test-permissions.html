@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test User Permissions</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a1a; color: #fff; }
+        button { padding: 10px 20px; margin: 10px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #2563eb; }
+        pre { background: #2a2a2a; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        .error { color: #ef4444; }
+        .success { color: #10b981; }
+        input { padding: 8px; margin: 5px; background: #2a2a2a; color: #fff; border: 1px solid #444; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Test User Permissions</h1>
+    
+    <div>
+        <label>User ID: <input type="text" id="userId" placeholder="Enter user ID" style="width: 300px;"></label>
+        <button onclick="testPermissions()">Test Permissions</button>
+        <button onclick="listUsers()">List All Users</button>
+        <button onclick="testView()">Test View</button>
+        <button onclick="testStoredProc()">Test Stored Proc</button>
+    </div>
+    
+    <div id="output"></div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        
+        async function dbQuery(query, params = []) {
+            return await ipcRenderer.invoke('db-query', query, params);
+        }
+
+        async function listUsers() {
+            const output = document.getElementById('output');
+            try {
+                output.innerHTML = '<p>Loading users...</p>';
+                
+                const result = await dbQuery(`
+                    SELECT 
+                        u.id, 
+                        u.username, 
+                        u.name,
+                        u.role,
+                        COUNT(DISTINCT p.permission) AS PermissionCount
+                    FROM Users u
+                    LEFT JOIN UserRoles ur ON u.id = ur.userId
+                    LEFT JOIN Roles r ON ur.roleId = r.id
+                    LEFT JOIN RolePermissions rp ON r.id = rp.roleId
+                    LEFT JOIN Permissions p ON rp.permissionId = p.id
+                    WHERE u.isActive = 1
+                    GROUP BY u.id, u.username, u.name, u.role
+                    ORDER BY u.username
+                `);
+                
+                if (result.success && result.data) {
+                    output.innerHTML = `<h3 class="success">Users (${result.data.length}):</h3><pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+                } else {
+                    output.innerHTML = `<p class="error">Error: ${result.error || 'No data'}</p>`;
+                }
+            } catch (error) {
+                output.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function testView() {
+            const output = document.getElementById('output');
+            const userId = document.getElementById('userId').value;
+            
+            if (!userId) {
+                output.innerHTML = '<p class="error">Please enter a user ID</p>';
+                return;
+            }
+            
+            try {
+                output.innerHTML = '<p>Testing vw_UserPermissions view...</p>';
+                
+                const result = await dbQuery(`
+                    SELECT * FROM vw_UserPermissions 
+                    WHERE userId = @param0
+                    ORDER BY category, resource, action
+                `, [{ value: userId }]);
+                
+                if (result.success && result.data) {
+                    output.innerHTML = `<h3 class="success">View Results (${result.data.length} permissions):</h3><pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+                } else {
+                    output.innerHTML = `<p class="error">Error: ${result.error || 'No data'}</p>`;
+                }
+            } catch (error) {
+                output.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function testStoredProc() {
+            const output = document.getElementById('output');
+            const userId = document.getElementById('userId').value;
+            
+            if (!userId) {
+                output.innerHTML = '<p class="error">Please enter a user ID</p>';
+                return;
+            }
+            
+            try {
+                output.innerHTML = '<p>Testing sp_GetUserPermissions stored procedure...</p>';
+                
+                const result = await dbQuery('EXEC sp_GetUserPermissions @param0', [{ value: userId }]);
+                
+                if (result.success && result.data) {
+                    output.innerHTML = `<h3 class="success">Stored Proc Results (${result.data.length} permissions):</h3><pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+                } else {
+                    output.innerHTML = `<p class="error">Error: ${result.error || 'No data'}</p>`;
+                }
+            } catch (error) {
+                output.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function testPermissions() {
+            const output = document.getElementById('output');
+            const userId = document.getElementById('userId').value;
+            
+            if (!userId) {
+                output.innerHTML = '<p class="error">Please enter a user ID</p>';
+                return;
+            }
+            
+            try {
+                output.innerHTML = '<p>Testing permissions for user: ' + userId + '</p>';
+                
+                // Test 1: Check UserRoles
+                const rolesResult = await dbQuery(`
+                    SELECT ur.*, r.name, r.displayName 
+                    FROM UserRoles ur
+                    JOIN Roles r ON ur.roleId = r.id
+                    WHERE ur.userId = @param0
+                `, [{ value: userId }]);
+                
+                // Test 2: Check RolePermissions
+                const permResult = await dbQuery(`
+                    SELECT p.permission, p.resource, p.action, p.description
+                    FROM UserRoles ur
+                    JOIN Roles r ON ur.roleId = r.id
+                    JOIN RolePermissions rp ON r.id = rp.roleId
+                    JOIN Permissions p ON rp.permissionId = p.id
+                    WHERE ur.userId = @param0
+                    ORDER BY p.category, p.resource, p.action
+                `, [{ value: userId }]);
+                
+                output.innerHTML = `
+                    <h3 class="success">Test Results:</h3>
+                    <h4>1. User Roles (${rolesResult.data?.length || 0}):</h4>
+                    <pre>${JSON.stringify(rolesResult.data, null, 2)}</pre>
+                    <h4>2. Permissions (${permResult.data?.length || 0}):</h4>
+                    <pre>${JSON.stringify(permResult.data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                output.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
