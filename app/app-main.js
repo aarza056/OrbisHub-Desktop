@@ -1043,7 +1043,7 @@ async function connectToServer(server) {
 	
 	// Populate credential dropdown - filter by preferred machine
 	if (credentialSelect) {
-		credentialSelect.innerHTML = '<option value="windows-auth">Windows Authentication (Current User)</option><option value="">-- Select Saved Credential --</option>'
+		credentialSelect.innerHTML = '<option value="">-- Select Credential --</option><option value="windows-auth">Windows Authentication (Current User)</option>'
 		
 		// Filter credentials: show only those with no preferred machine OR matching this server
 		const filteredCredentials = db.credentials.filter(cred => {
@@ -1305,6 +1305,11 @@ async function renderUsers() {
         
         userListEl.innerHTML = ''
         users.forEach(u => userListEl.appendChild(userRow(u)))
+        
+        // Apply permissions to newly rendered buttons
+        if (window.PermissionUI && window.PermissionUI.initialized) {
+            await window.PermissionUI.applyPermissions()
+        }
     } catch (error) {
         console.error('Error loading users:', error)
         userListEl.innerHTML = '<div style="padding:20px; text-align:center; color:#ef4444;">Failed to load users</div>'
@@ -1365,9 +1370,9 @@ function userRow(u) {
         </div>
         <div class="badge">${u.role}</div>
         <div style="flex:1"></div>
-        ${isLocked ? `<button class="btn" data-id="${u.id}" data-action="unlock" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none;">Unlock Account</button>` : ''}
-        <button class="btn btn-ghost" data-id="${u.id}" data-action="edit">Edit</button>
-        <button class="btn btn-ghost" data-id="${u.id}" data-action="delete">Delete</button>
+        ${isLocked ? `<button class="btn" data-id="${u.id}" data-action="unlock" data-permissions-any="users:edit,*:*" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:white; border:none;">Unlock Account</button>` : ''}
+        <button class="btn btn-ghost" data-id="${u.id}" data-action="edit" data-permissions-any="users:edit,*:*">Edit</button>
+        <button class="btn btn-ghost" data-id="${u.id}" data-action="delete" data-permissions-any="users:delete,*:*">Delete</button>
     `
     const del = el.querySelector('button[data-action="delete"]')
     del.addEventListener('click', () => {
@@ -2218,6 +2223,52 @@ if (addUserBtn && createUserModal) {
                 console.error('Failed to sync user to database:', error)
             }
             
+            // Auto-assign role based on the selected role field
+            try {
+                // Map old role names to new role system
+                const roleMapping = {
+                    'Super Admin': 'super_admin',
+                    'Admin': 'admin',
+                    'Manager': 'manager',
+                    'Operator': 'operator',
+                    'Viewer': 'viewer'
+                }
+                
+                const newRoleName = roleMapping[role]
+                if (newRoleName) {
+                    const roleResult = await DB.query(
+                        'SELECT id FROM Roles WHERE name = @param0',
+                        [{ value: newRoleName }]
+                    )
+                    
+                    if (roleResult?.data?.[0]?.id) {
+                        const roleId = roleResult.data[0].id
+                        
+                        // Check if role already assigned
+                        const existingAssignment = await DB.query(
+                            'SELECT id FROM UserRoles WHERE userId = @param0 AND roleId = @param1',
+                            [{ value: newUser.id }, { value: roleId }]
+                        )
+                        
+                        if (!existingAssignment?.data?.[0]) {
+                            // Assign the role
+                            await DB.execute(
+                                'INSERT INTO UserRoles (id, userId, roleId, assigned_by, assigned_at) VALUES (@param0, @param1, @param2, @param3, GETDATE())',
+                                [
+                                    { value: uid() },
+                                    { value: newUser.id },
+                                    { value: roleId },
+                                    { value: window.sessionUser?.id || newUser.id }
+                                ]
+                            )
+                            console.log('[User Creation] Auto-assigned role', newRoleName, 'to:', username)
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('[User Creation] Failed to auto-assign role:', error)
+            }
+            
             // Audit log for user creation
             logAudit('create', 'user', name, { username, email, role })
             
@@ -2249,6 +2300,13 @@ if (addUserBtn && createUserModal) {
             
             // Refresh user list and close modal
             await renderUsers()
+            
+            // Refresh permissions manager UI if initialized
+            if (typeof PermissionsManagerUI !== 'undefined' && PermissionsManagerUI.initialized) {
+                await PermissionsManagerUI.loadData()
+                await PermissionsManagerUI.renderUserRoles()
+            }
+            
             closeCreateUserModal()
         })
     }
@@ -2371,6 +2429,52 @@ if (saveEditUserBtn) {
                     return
                 }
                 
+                // Update role assignment if role changed
+                if (oldValues.role !== role) {
+                    try {
+                        const roleMapping = {
+                            'Super Admin': 'super_admin',
+                            'Admin': 'admin',
+                            'Manager': 'manager',
+                            'Operator': 'operator',
+                            'Viewer': 'viewer'
+                        }
+                        
+                        const newRoleName = roleMapping[role]
+                        if (newRoleName) {
+                            // Get the new role ID
+                            const roleResult = await DB.query(
+                                'SELECT id FROM Roles WHERE name = @param0',
+                                [{ value: newRoleName }]
+                            )
+                            
+                            if (roleResult?.data?.[0]?.id) {
+                                const roleId = roleResult.data[0].id
+                                
+                                // Remove all existing roles for this user
+                                await DB.execute(
+                                    'DELETE FROM UserRoles WHERE userId = @param0',
+                                    [{ value: id }]
+                                )
+                                
+                                // Assign the new role
+                                await DB.execute(
+                                    'INSERT INTO UserRoles (id, userId, roleId, assigned_by, assigned_at) VALUES (@param0, @param1, @param2, @param3, GETDATE())',
+                                    [
+                                        { value: uid() },
+                                        { value: id },
+                                        { value: roleId },
+                                        { value: window.sessionUser?.id || id }
+                                    ]
+                                )
+                                console.log('[User Update] Updated role to', newRoleName, 'for:', username)
+                            }
+                        }
+                    } catch (error) {
+                        console.error('[User Update] Failed to update role assignment:', error)
+                    }
+                }
+                
                 // Audit log with old and new values
                 logAudit('update', 'user', name, { 
                     old: oldValues,
@@ -2379,6 +2483,12 @@ if (saveEditUserBtn) {
                 
                 ToastManager.success('User Updated', `${name} has been updated successfully`, 3000)
                 renderUsers()
+                
+                // Refresh permissions manager UI if initialized
+                if (typeof PermissionsManagerUI !== 'undefined' && PermissionsManagerUI.initialized) {
+                    await PermissionsManagerUI.loadData()
+                    await PermissionsManagerUI.renderUserRoles()
+                }
             }
             try { editUserModal.close() } catch (e) { editUserModal.removeAttribute('open') }
         })
@@ -2438,6 +2548,12 @@ if (confirmDeleteUserBtn) {
                 ToastManager.success('User Deleted', `${deleted.name} has been deleted successfully`, 3000)
                 
                 renderUsers()
+                
+                // Refresh permissions manager UI if initialized
+                if (typeof PermissionsManagerUI !== 'undefined' && PermissionsManagerUI.initialized) {
+                    await PermissionsManagerUI.loadData()
+                    await PermissionsManagerUI.renderUserRoles()
+                }
             }
         }
         closeDeleteUserModal()
@@ -5632,6 +5748,13 @@ if (loginForm) {
             setTimeout(() => {
                 setSession(user)
                 showApp()
+                
+                // Initialize Permissions UI after successful login
+                if (typeof PermissionUI !== 'undefined' && PermissionUI.init) {
+                    PermissionUI.init().catch(err => {
+                        console.error('[Login] Failed to initialize PermissionUI:', err);
+                    });
+                }
                 
                 // Clear form
                 loginForm.reset()
@@ -10098,6 +10221,40 @@ async function createDefaultAdmin() {
         }
         
         console.log('✅ Admin user created successfully with ID:', adminId)
+        
+        // Assign Super Admin role to the default admin user
+        try {
+            // Get the Super Admin role ID
+            const roleResult = await window.electronAPI.dbExecuteWithConfig(
+                wizardConfig,
+                `SELECT id FROM Roles WHERE name = 'super_admin'`,
+                []
+            )
+            
+            if (roleResult?.success && roleResult.data?.length > 0) {
+                const superAdminRoleId = roleResult.data[0].id
+                
+                // Assign the role
+                await window.electronAPI.dbExecuteWithConfig(
+                    wizardConfig,
+                    `INSERT INTO UserRoles (id, userId, roleId, assigned_by) VALUES (@param0, @param1, @param2, @param3)`,
+                    [
+                        { value: uid() },
+                        { value: adminId },
+                        { value: superAdminRoleId },
+                        { value: adminId } // Self-assigned
+                    ]
+                )
+                
+                console.log('✅ Super Admin role assigned to admin user')
+            } else {
+                console.warn('⚠️ Super Admin role not found in database')
+            }
+        } catch (roleError) {
+            console.warn('⚠️ Failed to assign Super Admin role:', roleError.message)
+            // Don't throw - user creation succeeded, role assignment is optional
+        }
+        
         return result
 
     } catch (error) {

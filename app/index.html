@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="../Functions/EmailServerProfile/email-ui.css" />
 <link rel="stylesheet" href="../Functions/UserRecovery/recovery-ui.css" />
 <link rel="stylesheet" href="../Functions/DBMaintenance/db-maintenance-ui.css" />
+<link rel="stylesheet" href="../Functions/UserPermissions/permissions-ui.css" />
 </head>
 <body>
 
@@ -951,7 +952,7 @@
     </svg>
     Refresh
   </button>
-  <button id="addEnvBtn" class="btn">+ Add Farm System</button>
+  <button id="addEnvBtn" class="btn" data-permissions-any="environments:create,*:*">+ Add Farm System</button>
   
 </div>
 <div class="view__toolbar">
@@ -1040,7 +1041,7 @@
     <h1>User Management & Permissions</h1>
     <div style="flex:1"></div>
     <!-- <button id="backToAdminBtn" class="btn btn-ghost">← Back to Admin</button> -->
-    <button id="addUserBtn" class="btn">+ Create User</button>
+    <button id="addUserBtn" class="btn" data-permissions-any="users:create,*:*">+ Create User</button>
   </div>
   
   <!-- Tab Navigation -->
@@ -1069,146 +1070,9 @@
     </div>
   </div>
 
-  <!-- Permissions Tab Content -->
+  <!-- Permissions Tab Content - Dynamic UI rendered by permissions-manager-ui.js -->
   <div id="permissions-tab" class="tab-content" style="display: none;">
-    <div class="card">
-      <h3>Roles & Permissions</h3>
-      <p class="muted" style="margin: 8px 0 16px 0;">Define what each role can access and modify</p>
-      
-      <div class="stack" style="gap: 16px;">
-        <!-- Admin Role -->
-        <div class="permission-role-card">
-          <div class="permission-role-header">
-            <div>
-              <h4 style="margin: 0; font-size: 16px; color: var(--primary);">Administrator</h4>
-              <p class="muted" style="margin: 4px 0 0 0; font-size: 13px;">Full system access and control</p>
-            </div>
-            <span class="badge" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">ADMIN</span>
-          </div>
-          <div class="permission-grid">
-            <label class="permission-item">
-              <input type="checkbox" checked disabled>
-              <span>Manage Users</span>
-            </label>
-            <label class="permission-item">
-              <input type="checkbox" checked disabled>
-              <span>Manage Farm Systems</span>
-            </label>
-            <label class="permission-item">
-              <input type="checkbox" checked disabled>
-              <span>Manage Servers</span>
-            </label>
-            <label class="permission-item">
-              <input type="checkbox" checked disabled>
-              <span>Manage Databases</span>
-            </label>
-            <label class="permission-item">
-              <input type="checkbox" checked disabled>
-              <span>Manage Credentials</span>
-            </label>
-            
-            <label class="permission-item">
-              <input type="checkbox" checked disabled>
-              <span>View Audit Logs</span>
-            </label>
-            <label class="permission-item">
-              <input type="checkbox" checked disabled>
-              <span>System Settings</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Operator Role -->
-        <div class="permission-role-card">
-          <div class="permission-role-header">
-            <div>
-              <h4 style="margin: 0; font-size: 16px; color: #10b981;">Operator</h4>
-              <p class="muted" style="margin: 4px 0 0 0; font-size: 13px;">Can deploy and manage infrastructure</p>
-            </div>
-            <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">OPERATOR</span>
-          </div>
-          <div class="permission-grid">
-            <label class="permission-item">
-              <input type="checkbox" id="opManageUsers">
-              <span>Manage Users</span>
-            </label>
-            <label class="permission-item">
-              <input type="checkbox" id="opManageEnvs" checked>
-              <span>Manage Farm Systems</span>
-            </label>
-            <label class="permission-item">
-              <input type="checkbox" id="opManageServers" checked>
-              <span>Manage Servers</span>
-            </label>
-            <label class="permission-item">
-              <input type="checkbox" id="opManageDbs" checked>
-              <span>Manage Databases</span>
-            </label>
-            <label class="permission-item">
-              <input type="checkbox" id="opManageCredentials">
-              <span>Manage Credentials</span>
-            </label>
-            
-            <label class="permission-item">
-              <input type="checkbox" id="opViewAudit" checked>
-              <span>View Audit Logs</span>
-            </label>
-            <label class="permission-item">
-              <input type="checkbox" id="opSystemSettings">
-              <span>System Settings</span>
-            </label>
-          </div>
-          <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
-            <button class="btn btn-ghost" id="saveOperatorPerms">Save Changes</button>
-          </div>
-        </div>
-
-        <!-- Viewer Role -->
-        <div class="permission-role-card">
-          <div class="permission-role-header">
-            <div>
-              <h4 style="margin: 0; font-size: 16px; color: #f59e0b;">Viewer</h4>
-              <p class="muted" style="margin: 4px 0 0 0; font-size: 13px;">Read-only access to system resources</p>
-            </div>
-            <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">VIEWER</span>
-          </div>
-          <div class="permission-grid">
-            <label class="permission-item">
-              <input type="checkbox" id="viewManageUsers">
-              <span>Manage Users</span>
-            </label>
-            <label class="permission-item">
-              <input type="checkbox" id="viewManageEnvs">
-              <span>Manage Farm Systems</span>
-            </label>
-            <label class="permission-item">
-              <input type="checkbox" id="viewManageServers">
-              <span>Manage Servers</span>
-            </label>
-            <label class="permission-item">
-              <input type="checkbox" id="viewManageDbs">
-              <span>Manage Databases</span>
-            </label>
-            <label class="permission-item">
-              <input type="checkbox" id="viewManageCredentials">
-              <span>Manage Credentials</span>
-            </label>
-            
-            <label class="permission-item">
-              <input type="checkbox" id="viewViewAudit" checked>
-              <span>View Audit Logs</span>
-            </label>
-            <label class="permission-item">
-              <input type="checkbox" id="viewSystemSettings">
-              <span>System Settings</span>
-            </label>
-          </div>
-          <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
-            <button class="btn btn-ghost" id="saveViewerPerms">Save Changes</button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Permissions Manager will render here dynamically -->
   </div>
 </section>
 
@@ -1225,7 +1089,7 @@
     </svg>
     Check Health
   </button>
-  <button id="addServerBtn" class="btn">+ Add Server</button>
+  <button id="addServerBtn" class="btn" data-permissions-any="servers:create,*:*">+ Add Server</button>
 </div>
 <div class="view__toolbar">
   <input id="serverSearchInput" class="input" placeholder="Search servers by name, host, or environment..." style="flex: 1; max-width: 600px;" />
@@ -1241,7 +1105,7 @@
   <div class="view__header">
     <h1>Credentials Management</h1>
     <div style="flex:1"></div>
-    <button id="addCredentialBtn" class="btn">+ Add Credential</button>
+    <button id="addCredentialBtn" class="btn" data-permissions-any="credentials:create,*:*">+ Add Credential</button>
   </div>
   <div class="view__toolbar">
     <input id="credentialSearchInput" class="input" placeholder="Search credentials..." />
@@ -4182,7 +4046,75 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
 </form>
 </dialog>
 
+<!-- Permissions Management Modals -->
+<dialog id="editRoleModal" class="modal">
+<form method="dialog" class="card" style="max-width:700px; max-height:80vh; overflow-y:auto;">
+<h2 style="margin:0 0 20px 0;">Edit Role Permissions</h2>
+<div id="editRoleContent">
+  <div class="spinner"></div>
+</div>
+<menu class="row end" style="margin-top:24px;">
+<button value="cancel" class="btn btn-ghost">Cancel</button>
+<button id="saveRolePermissionsBtn" type="submit" value="default" class="btn btn-primary">Save Changes</button>
+</menu>
+</form>
+</dialog>
 
+<dialog id="assignRoleModal" class="modal">
+<form method="dialog" class="card" style="max-width:500px;">
+<h2 style="margin:0 0 8px 0;">Manage User Roles</h2>
+<p id="assignRoleUserName" class="muted" style="margin:0 0 20px 0;"></p>
+<div id="assignRoleContent" style="max-height:400px; overflow-y:auto;">
+  <div class="spinner"></div>
+</div>
+<menu class="row end" style="margin-top:24px;">
+<button value="cancel" class="btn btn-ghost">Cancel</button>
+<button id="saveUserRolesBtn" type="submit" value="default" class="btn btn-primary">Save Changes</button>
+</menu>
+</form>
+</dialog>
+
+<dialog id="createRoleModal" class="modal">
+<form method="dialog" class="card" style="max-width:700px; max-height:80vh; overflow-y:auto;">
+<h2 style="margin:0 0 20px 0;">Create Custom Role</h2>
+<div style="margin-bottom:24px;">
+  <div style="margin-bottom:16px;">
+    <label class="form-label" style="display:block; margin-bottom:4px; font-weight:600;">Role Name *</label>
+    <input type="text" id="newRoleName" class="form-control" placeholder="e.g., Technician, Support Staff" required style="width:100%;">
+  </div>
+  <div style="margin-bottom:16px;">
+    <label class="form-label" style="display:block; margin-bottom:4px; font-weight:600;">Display Name</label>
+    <input type="text" id="newRoleDisplayName" class="form-control" placeholder="e.g., Support Technician" style="width:100%;">
+  </div>
+  <div style="margin-bottom:16px;">
+    <label class="form-label" style="display:block; margin-bottom:4px; font-weight:600;">Description</label>
+    <textarea id="newRoleDescription" class="form-control" rows="2" placeholder="Describe the role's purpose and responsibilities..." style="width:100%; resize:vertical;"></textarea>
+  </div>
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+    <div>
+      <label class="form-label" style="display:block; margin-bottom:4px; font-weight:600;">Level *</label>
+      <input type="number" id="newRoleLevel" class="form-control" min="1" max="100" value="10" required style="width:100%;">
+      <p class="muted" style="font-size:11px; margin:4px 0 0 0;">Higher levels have more authority (1-100)</p>
+    </div>
+    <div>
+      <label class="form-label" style="display:block; margin-bottom:4px; font-weight:600;">Color</label>
+      <input type="color" id="newRoleColor" class="form-control" value="#6366f1" style="width:100%; height:38px;">
+    </div>
+  </div>
+</div>
+<div style="margin-bottom:16px;">
+  <h4 style="margin:0 0 12px 0; font-size:15px;">Assign Permissions</h4>
+  <p class="muted" style="font-size:12px; margin:0 0 16px 0;">Select the permissions for this role. You can modify these later.</p>
+  <div id="createRolePermissions">
+    <div class="spinner"></div>
+  </div>
+</div>
+<menu class="row end" style="margin-top:24px;">
+<button value="cancel" class="btn btn-ghost">Cancel</button>
+<button id="saveNewRoleBtn" type="submit" value="default" class="btn btn-primary">Create Role</button>
+</menu>
+</form>
+</dialog>
 
 
 
@@ -4966,6 +4898,10 @@ Channels
 <!-- DB Maintenance Module -->
 <script src="../Functions/DBMaintenance/db-maintenance-service.js"></script>
 <script src="../Functions/DBMaintenance/db-maintenance-ui.js"></script>
+<!-- Permissions Module -->
+<script src="../Functions/UserPermissions/permissions-service.js"></script>
+<script src="../Functions/UserPermissions/permissions-ui.js"></script>
+<script src="../Functions/UserPermissions/permissions-manager-ui.js"></script>
 <!-- Core -->
 <script src="app-main.js"></script>
 </body>

@@ -2328,6 +2328,331 @@ ipcMain.handle('db-run-migrations', async (event, config) => {
         `);
         migrations.push('sp_GetUserForRecovery stored procedure created');
         
+        // ============ USER PERMISSIONS SYSTEM (RBAC) ============
+        
+        // Permissions Table - Master list of all available permissions
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Permissions')
+            BEGIN
+                CREATE TABLE [dbo].[Permissions] (
+                    [id] NVARCHAR(50) PRIMARY KEY,
+                    [resource] NVARCHAR(50) NOT NULL,
+                    [action] NVARCHAR(50) NOT NULL,
+                    [permission] NVARCHAR(100) NOT NULL UNIQUE,
+                    [description] NVARCHAR(255),
+                    [category] NVARCHAR(50),
+                    [isActive] BIT DEFAULT 1,
+                    [created_at] DATETIME DEFAULT GETDATE()
+                )
+                
+                CREATE INDEX IX_Permissions_Resource ON [dbo].[Permissions]([resource])
+                CREATE INDEX IX_Permissions_Action ON [dbo].[Permissions]([action])
+                CREATE INDEX IX_Permissions_Permission ON [dbo].[Permissions]([permission])
+            END
+        `);
+        migrations.push('Permissions table created');
+        
+        // Roles Table - Define system roles
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Roles')
+            BEGIN
+                CREATE TABLE [dbo].[Roles] (
+                    [id] NVARCHAR(50) PRIMARY KEY,
+                    [name] NVARCHAR(100) NOT NULL UNIQUE,
+                    [displayName] NVARCHAR(100),
+                    [description] NVARCHAR(500),
+                    [color] NVARCHAR(20),
+                    [icon] NVARCHAR(50),
+                    [level] INT DEFAULT 0,
+                    [isSystem] BIT DEFAULT 0,
+                    [isActive] BIT DEFAULT 1,
+                    [created_at] DATETIME DEFAULT GETDATE(),
+                    [updated_at] DATETIME DEFAULT GETDATE()
+                )
+                
+                CREATE INDEX IX_Roles_Name ON [dbo].[Roles]([name])
+                CREATE INDEX IX_Roles_Level ON [dbo].[Roles]([level])
+            END
+        `);
+        migrations.push('Roles table created');
+        
+        // RolePermissions Table - Many-to-many mapping
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'RolePermissions')
+            BEGIN
+                CREATE TABLE [dbo].[RolePermissions] (
+                    [id] NVARCHAR(50) PRIMARY KEY,
+                    [roleId] NVARCHAR(50) NOT NULL,
+                    [permissionId] NVARCHAR(50) NOT NULL,
+                    [granted_by] NVARCHAR(50),
+                    [granted_at] DATETIME DEFAULT GETDATE(),
+                    
+                    CONSTRAINT FK_RolePermissions_Role FOREIGN KEY ([roleId]) 
+                        REFERENCES [dbo].[Roles]([id]) ON DELETE CASCADE,
+                    CONSTRAINT FK_RolePermissions_Permission FOREIGN KEY ([permissionId]) 
+                        REFERENCES [dbo].[Permissions]([id]) ON DELETE CASCADE,
+                    CONSTRAINT UQ_RolePermission UNIQUE ([roleId], [permissionId])
+                )
+                
+                CREATE INDEX IX_RolePermissions_RoleId ON [dbo].[RolePermissions]([roleId])
+                CREATE INDEX IX_RolePermissions_PermissionId ON [dbo].[RolePermissions]([permissionId])
+            END
+        `);
+        migrations.push('RolePermissions table created');
+        
+        // UserRoles Table - Many-to-many mapping between Users and Roles
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'UserRoles')
+            BEGIN
+                CREATE TABLE [dbo].[UserRoles] (
+                    [id] NVARCHAR(50) PRIMARY KEY,
+                    [userId] NVARCHAR(50) NOT NULL,
+                    [roleId] NVARCHAR(50) NOT NULL,
+                    [assigned_by] NVARCHAR(50),
+                    [assigned_at] DATETIME DEFAULT GETDATE(),
+                    [expires_at] DATETIME NULL,
+                    
+                    CONSTRAINT FK_UserRoles_User FOREIGN KEY ([userId]) 
+                        REFERENCES [dbo].[Users]([id]) ON DELETE CASCADE,
+                    CONSTRAINT FK_UserRoles_Role FOREIGN KEY ([roleId]) 
+                        REFERENCES [dbo].[Roles]([id]) ON DELETE CASCADE,
+                    CONSTRAINT UQ_UserRole UNIQUE ([userId], [roleId])
+                )
+                
+                CREATE INDEX IX_UserRoles_UserId ON [dbo].[UserRoles]([userId])
+                CREATE INDEX IX_UserRoles_RoleId ON [dbo].[UserRoles]([roleId])
+            END
+        `);
+        migrations.push('UserRoles table created');
+        
+        // PermissionAuditLog Table - Track permission changes
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PermissionAuditLog')
+            BEGIN
+                CREATE TABLE [dbo].[PermissionAuditLog] (
+                    [id] NVARCHAR(50) PRIMARY KEY,
+                    [action] NVARCHAR(50) NOT NULL,
+                    [entityType] NVARCHAR(50) NOT NULL,
+                    [entityId] NVARCHAR(50) NOT NULL,
+                    [targetId] NVARCHAR(50),
+                    [performedBy] NVARCHAR(50) NOT NULL,
+                    [details] NVARCHAR(MAX),
+                    [ipAddress] NVARCHAR(50),
+                    [created_at] DATETIME DEFAULT GETDATE()
+                )
+                
+                CREATE INDEX IX_PermissionAudit_Action ON [dbo].[PermissionAuditLog]([action])
+                CREATE INDEX IX_PermissionAudit_PerformedBy ON [dbo].[PermissionAuditLog]([performedBy])
+                CREATE INDEX IX_PermissionAudit_CreatedAt ON [dbo].[PermissionAuditLog]([created_at])
+            END
+        `);
+        migrations.push('PermissionAuditLog table created');
+        
+        // Seed default permissions (only if table is empty)
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions])
+            BEGIN
+                -- User Management Permissions
+                INSERT INTO [dbo].[Permissions] (id, resource, action, permission, description, category, isActive) VALUES
+                (NEWID(), 'users', 'view', 'users:view', 'View users list', 'User Management', 1),
+                (NEWID(), 'users', 'create', 'users:create', 'Create new users', 'User Management', 1),
+                (NEWID(), 'users', 'edit', 'users:edit', 'Edit user details', 'User Management', 1),
+                (NEWID(), 'users', 'delete', 'users:delete', 'Delete users', 'User Management', 1),
+                (NEWID(), 'users', 'manage', 'users:manage', 'Full user management', 'User Management', 1),
+                
+                -- Server Management
+                (NEWID(), 'servers', 'view', 'servers:view', 'View servers', 'Server Management', 1),
+                (NEWID(), 'servers', 'create', 'servers:create', 'Add servers', 'Server Management', 1),
+                (NEWID(), 'servers', 'edit', 'servers:edit', 'Edit servers', 'Server Management', 1),
+                (NEWID(), 'servers', 'delete', 'servers:delete', 'Delete servers', 'Server Management', 1),
+                
+                -- Environment Management
+                (NEWID(), 'environments', 'view', 'environments:view', 'View environments', 'Environment Management', 1),
+                (NEWID(), 'environments', 'create', 'environments:create', 'Create environments', 'Environment Management', 1),
+                (NEWID(), 'environments', 'edit', 'environments:edit', 'Edit environments', 'Environment Management', 1),
+                (NEWID(), 'environments', 'delete', 'environments:delete', 'Delete environments', 'Environment Management', 1),
+                
+                -- Credentials Management
+                (NEWID(), 'credentials', 'view', 'credentials:view', 'View credentials', 'Credentials Management', 1),
+                (NEWID(), 'credentials', 'create', 'credentials:create', 'Create credentials', 'Credentials Management', 1),
+                (NEWID(), 'credentials', 'edit', 'credentials:edit', 'Edit credentials', 'Credentials Management', 1),
+                (NEWID(), 'credentials', 'delete', 'credentials:delete', 'Delete credentials', 'Credentials Management', 1),
+                
+                -- Role & Permission Management
+                (NEWID(), 'roles', 'view', 'roles:view', 'View roles', 'Role Management', 1),
+                (NEWID(), 'roles', 'create', 'roles:create', 'Create roles', 'Role Management', 1),
+                (NEWID(), 'roles', 'edit', 'roles:edit', 'Edit roles', 'Role Management', 1),
+                (NEWID(), 'roles', 'delete', 'roles:delete', 'Delete roles', 'Role Management', 1),
+                (NEWID(), 'roles', 'assign', 'roles:assign', 'Assign roles to users', 'Role Management', 1),
+                
+                -- Audit & Logs
+                (NEWID(), 'audit', 'view', 'audit:view', 'View audit logs', 'Audit', 1),
+                (NEWID(), 'audit', 'export', 'audit:export', 'Export audit logs', 'Audit', 1),
+                
+                -- System Configuration
+                (NEWID(), 'system', 'view', 'system:view', 'View system settings', 'System', 1),
+                (NEWID(), 'system', 'edit', 'system:edit', 'Edit system settings', 'System', 1),
+                
+                -- Wildcard permissions
+                (NEWID(), '*', '*', '*:*', 'Full system access', 'System', 1)
+            END
+        `);
+        migrations.push('Default permissions seeded');
+        
+        // Seed default roles (only if table is empty)
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT 1 FROM [dbo].[Roles])
+            BEGIN
+                DECLARE @superAdminId NVARCHAR(50) = NEWID()
+                DECLARE @adminId NVARCHAR(50) = NEWID()
+                DECLARE @managerId NVARCHAR(50) = NEWID()
+                DECLARE @operatorId NVARCHAR(50) = NEWID()
+                DECLARE @viewerId NVARCHAR(50) = NEWID()
+                
+                INSERT INTO [dbo].[Roles] (id, name, displayName, description, level, isSystem, isActive) VALUES
+                (@superAdminId, 'super_admin', 'Super Administrator', 'Full system access with all permissions', 100, 1, 1),
+                (@adminId, 'admin', 'Administrator', 'Administrative access to manage users and system', 90, 1, 1),
+                (@managerId, 'manager', 'Manager', 'Can manage environments and servers', 70, 1, 1),
+                (@operatorId, 'operator', 'Operator', 'Can view and operate environments', 50, 1, 1),
+                (@viewerId, 'viewer', 'Viewer', 'Read-only access to view resources', 10, 1, 1)
+                
+                -- Assign all permissions to Super Admin
+                INSERT INTO [dbo].[RolePermissions] (id, roleId, permissionId)
+                SELECT NEWID(), @superAdminId, id FROM [dbo].[Permissions]
+                
+                -- Assign most permissions to Admin (exclude role management)
+                INSERT INTO [dbo].[RolePermissions] (id, roleId, permissionId)
+                SELECT NEWID(), @adminId, id FROM [dbo].[Permissions]
+                WHERE permission NOT IN ('roles:delete', '*:*')
+                
+                -- Manager permissions
+                INSERT INTO [dbo].[RolePermissions] (id, roleId, permissionId)
+                SELECT NEWID(), @managerId, id FROM [dbo].[Permissions]
+                WHERE permission IN ('environments:view', 'environments:create', 'environments:edit', 
+                                   'servers:view', 'servers:create', 'servers:edit',
+                                   'credentials:view', 'audit:view')
+                
+                -- Operator permissions
+                INSERT INTO [dbo].[RolePermissions] (id, roleId, permissionId)
+                SELECT NEWID(), @operatorId, id FROM [dbo].[Permissions]
+                WHERE permission IN ('environments:view', 'servers:view', 'credentials:view', 'audit:view')
+                
+                -- Viewer permissions
+                INSERT INTO [dbo].[RolePermissions] (id, roleId, permissionId)
+                SELECT NEWID(), @viewerId, id FROM [dbo].[Permissions]
+                WHERE permission IN ('environments:view', 'servers:view', 'audit:view')
+            END
+        `);
+        migrations.push('Default roles and role-permission mappings seeded');
+        
+        // Create UserPermissions View
+        await pool.request().query(`
+            IF EXISTS (SELECT * FROM sys.views WHERE name = 'vw_UserPermissions')
+                DROP VIEW [dbo].[vw_UserPermissions]
+        `);
+        
+        await pool.request().query(`
+            CREATE VIEW [dbo].[vw_UserPermissions] AS
+            SELECT 
+                u.id AS userId,
+                u.username AS userLoginName,
+                u.name AS userDisplayName,
+                r.name AS roleName,
+                r.displayName AS roleDisplayName,
+                p.permission AS permission,
+                p.resource AS resource,
+                p.action AS [action],
+                p.description AS permissionDescription,
+                p.category AS category
+            FROM [dbo].[Users] u
+            INNER JOIN [dbo].[UserRoles] ur ON u.id = ur.userId
+            INNER JOIN [dbo].[Roles] r ON ur.roleId = r.id
+            INNER JOIN [dbo].[RolePermissions] rp ON r.id = rp.roleId
+            INNER JOIN [dbo].[Permissions] p ON rp.permissionId = p.id
+            WHERE u.isActive = 1 AND r.isActive = 1 AND p.isActive = 1
+        `);
+        migrations.push('vw_UserPermissions view created');
+        
+        // Create stored procedure for checking permissions
+        await pool.request().query(`
+            IF OBJECT_ID('sp_CheckUserPermission', 'P') IS NOT NULL
+                DROP PROCEDURE sp_CheckUserPermission
+        `);
+        
+        await pool.request().query(`
+            CREATE PROCEDURE sp_CheckUserPermission
+                @userId NVARCHAR(50),
+                @permission NVARCHAR(100)
+            AS
+            BEGIN
+                SET NOCOUNT ON;
+                
+                -- Check for wildcard permission
+                IF EXISTS (
+                    SELECT 1 FROM [dbo].[vw_UserPermissions]
+                    WHERE userId = @userId AND permission = '*:*'
+                )
+                BEGIN
+                    SELECT 1 AS hasPermission
+                    RETURN
+                END
+                
+                -- Check for exact permission
+                IF EXISTS (
+                    SELECT 1 FROM [dbo].[vw_UserPermissions]
+                    WHERE userId = @userId AND permission = @permission
+                )
+                BEGIN
+                    SELECT 1 AS hasPermission
+                    RETURN
+                END
+                
+                -- Check for resource wildcard
+                DECLARE @resource NVARCHAR(50) = LEFT(@permission, CHARINDEX(':', @permission) - 1)
+                DECLARE @resourceWildcard NVARCHAR(100) = @resource + ':*'
+                
+                IF EXISTS (
+                    SELECT 1 FROM [dbo].[vw_UserPermissions]
+                    WHERE userId = @userId AND permission = @resourceWildcard
+                )
+                BEGIN
+                    SELECT 1 AS hasPermission
+                    RETURN
+                END
+                
+                -- No permission found
+                SELECT 0 AS hasPermission
+            END
+        `);
+        migrations.push('sp_CheckUserPermission stored procedure created');
+        
+        // Create stored procedure for getting user permissions
+        await pool.request().query(`
+            IF OBJECT_ID('sp_GetUserPermissions', 'P') IS NOT NULL
+                DROP PROCEDURE sp_GetUserPermissions
+        `);
+        
+        await pool.request().query(`
+            CREATE PROCEDURE sp_GetUserPermissions
+                @userId NVARCHAR(50)
+            AS
+            BEGIN
+                SET NOCOUNT ON;
+                
+                SELECT DISTINCT
+                    p.permission,
+                    p.resource,
+                    p.action,
+                    p.description,
+                    p.category
+                FROM [dbo].[vw_UserPermissions] vup
+                INNER JOIN [dbo].[Permissions] p ON vup.permission = p.permission
+                WHERE vup.userId = @userId
+                ORDER BY p.category, p.resource, p.action
+            END
+        `);
+        migrations.push('sp_GetUserPermissions stored procedure created');
+        
         // Note: Ticket numbers are generated in the application code during insert
         // to avoid conflicts with OUTPUT clause
         
