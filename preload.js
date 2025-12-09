@@ -99,6 +99,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('update-error', (event, data) => callback(data));
     },
     
+    // User Profile
+    userProfileGet: (userId) => ipcRenderer.invoke('user-profile:get', userId),
+    userProfileGetActivity: (userId, limit) => ipcRenderer.invoke('user-profile:get-activity', userId, limit),
+    userProfileGetStats: (userId) => ipcRenderer.invoke('user-profile:get-stats', userId),
+    userProfileGetPermissions: (userId) => ipcRenderer.invoke('user-profile:get-permissions', userId),
+    userProfileUpdate: (userId, updates) => ipcRenderer.invoke('user-profile:update', userId, updates),
+    
     // App info
     isElectron: true,
     platform: process.platform

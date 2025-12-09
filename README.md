@@ -735,6 +735,55 @@ npm run build:win
 
 ## 📝 Changelog
 
+### Version 1.5.5 - December 9, 2024
+
+#### ✨ New Feature: User Profile
+
+**Interactive User Profile Modal**
+- Beautiful gradient-themed modal with purple-indigo design
+- Profile avatar system with auto-generated initials
+- Multi-tab interface (Overview, Activity, Permissions)
+- Real-time statistics dashboard
+- Comprehensive account information display
+
+**Overview Tab**
+- Four statistics cards: Total Logins, Total Actions, Last Login, Account Age
+- Account information grid with email, username, role, and department
+- Gradient header with profile badges
+- Edit profile button (prepared for future implementation)
+
+**Activity Tab**
+- Timeline of recent user actions with color-coded icons
+- Activity types: Login, Create, Update, Delete, View
+- Relative time stamps ("2h ago", "3d ago")
+- Refresh button and smart empty states
+
+**Permissions Tab**
+- Permissions grouped by category with emoji icons
+- Category badges showing permission counts
+- Visual checkmarks for granted permissions
+- 8 categories: Environments, Credentials, Users, Agents, Tickets, Servers, Messages, System
+
+**Design Highlights**
+- Smooth animations and hover effects
+- Fully responsive design (desktop, tablet, mobile)
+- Custom scrollbars matching application theme
+- Professional loading and empty states
+- Accessibility-ready with semantic HTML
+
+**Technical Implementation**
+- Modular architecture with service layer (`profile-service.js`)
+- UI controller for interactions (`profile-ui.js`)
+- Comprehensive CSS styling (`profile-ui.css`)
+- Integration with session management and permissions system
+- Prepared for backend API integration
+
+**Files Added**
+- `Functions/UserProfile/profile-service.js` (138 lines)
+- `Functions/UserProfile/profile-ui.js` (454 lines)
+- `Functions/UserProfile/profile-ui.css` (565 lines)
+- `Functions/UserProfile/README.md` (comprehensive documentation)
+
 ### Version 1.1.1
 - Added message encryption (AES-256-CBC)
 - Implemented file attachment support

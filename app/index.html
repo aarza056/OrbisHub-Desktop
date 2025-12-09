@@ -19,6 +19,7 @@
 <link rel="stylesheet" href="../Functions/UserRecovery/recovery-ui.css" />
 <link rel="stylesheet" href="../Functions/DBMaintenance/db-maintenance-ui.css" />
 <link rel="stylesheet" href="../Functions/UserPermissions/permissions-ui.css" />
+<link rel="stylesheet" href="../Functions/UserProfile/profile-ui.css" />
 </head>
 <body>
 
@@ -448,6 +449,190 @@
   <!-- Details will be populated by JavaScript -->
 </div>
 </form>
+</dialog>
+
+<!-- User Profile Modal -->
+<dialog id="userProfileModal" class="modal">
+<div class="card">
+<button type="button" class="modal-close-btn" title="Close">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+</button>
+
+<!-- Profile Header -->
+<div class="profile-header">
+  <div class="profile-header-content">
+    <div class="profile-avatar" id="profileAvatar">
+      <div class="profile-avatar-initials">AD</div>
+    </div>
+    <div class="profile-header-info">
+      <h1 class="profile-full-name" id="profileFullName">Administrator</h1>
+      <div class="profile-username" id="profileUsername">@admin</div>
+      <div class="profile-badges">
+        <span class="profile-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span id="profileRole">Super Admin</span>
+        </span>
+        <span class="profile-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          <span id="profileDepartment">IT</span>
+        </span>
+      </div>
+      <div class="profile-header-actions">
+        <button class="profile-header-btn" id="profileEditBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          Edit Profile
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Profile Tabs -->
+<div class="profile-tabs">
+  <button class="profile-tab-btn active" data-tab="overview">Overview</button>
+  <button class="profile-tab-btn" data-tab="activity">Activity</button>
+  <button class="profile-tab-btn" data-tab="permissions">Permissions</button>
+</div>
+
+<!-- Profile Content -->
+<div class="profile-content">
+  <!-- Overview Tab -->
+  <div id="profileTabOverview" class="profile-tab-pane active">
+    <!-- Statistics -->
+    <div class="profile-stats-grid">
+      <div class="profile-stat-card">
+        <div class="profile-stat-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+            <polyline points="10 17 15 12 10 7"></polyline>
+            <line x1="15" y1="12" x2="3" y2="12"></line>
+          </svg>
+        </div>
+        <div class="profile-stat-label">Total Logins</div>
+        <div class="profile-stat-value" id="statTotalLogins">0</div>
+      </div>
+      <div class="profile-stat-card">
+        <div class="profile-stat-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+        </div>
+        <div class="profile-stat-label">Total Actions</div>
+        <div class="profile-stat-value" id="statTotalActions">0</div>
+      </div>
+      <div class="profile-stat-card">
+        <div class="profile-stat-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+        </div>
+        <div class="profile-stat-label">Last Login</div>
+        <div class="profile-stat-value" id="statLastLogin" style="font-size: 16px;">Never</div>
+      </div>
+      <div class="profile-stat-card">
+        <div class="profile-stat-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+        </div>
+        <div class="profile-stat-label">Account Age</div>
+        <div class="profile-stat-value" id="statAccountAge">0</div>
+      </div>
+    </div>
+
+    <!-- Account Information -->
+    <div class="profile-section">
+      <div class="profile-section-header">
+        <h3 class="profile-section-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          Account Information
+        </h3>
+      </div>
+      <div class="profile-info-grid">
+        <div class="profile-info-item">
+          <div class="profile-info-label">Email Address</div>
+          <div class="profile-info-value" id="profileEmail">admin@orbis.com</div>
+        </div>
+        <div class="profile-info-item">
+          <div class="profile-info-label">Username</div>
+          <div class="profile-info-value" id="profileUsernameInfo">admin</div>
+        </div>
+        <div class="profile-info-item">
+          <div class="profile-info-label">Role</div>
+          <div class="profile-info-value" id="profileRoleInfo">Super Admin</div>
+        </div>
+        <div class="profile-info-item">
+          <div class="profile-info-label">Department</div>
+          <div class="profile-info-value" id="profileDepartmentInfo">IT</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Activity Tab -->
+  <div id="profileTabActivity" class="profile-tab-pane">
+    <div class="profile-section">
+      <div class="profile-section-header">
+        <h3 class="profile-section-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          Recent Activity
+        </h3>
+        <button class="profile-section-action" id="profileRefreshActivityBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          Refresh
+        </button>
+      </div>
+      <div class="profile-activity-list" id="profileActivityList">
+        <div class="profile-loading">Loading activity...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Permissions Tab -->
+  <div id="profileTabPermissions" class="profile-tab-pane">
+    <div class="profile-section">
+      <div class="profile-section-header">
+        <h3 class="profile-section-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          Your Permissions
+        </h3>
+      </div>
+      <div id="profilePermissionsList">
+        <div class="profile-loading">Loading permissions...</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
 </dialog>
 
 <!-- Main Application (hidden until logged in) -->
@@ -2469,7 +2654,7 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
               <div>
                 <h3 style="margin: 0 0 8px 0;">Current Version</h3>
                 <div style="display: flex; align-items: center; gap: 12px;">
-                  <span id="currentVersionNumber" style="font-size: 32px; font-weight: 700; color: var(--primary);">v1.5.3</span>
+                  <span id="currentVersionNumber" style="font-size: 32px; font-weight: 700; color: var(--primary);">v1.5.5</span>
                   <span id="updateStatusLabel" class="status-badge" style="font-size: 12px;">Checking...</span>
                 </div>
               </div>
@@ -2541,12 +2726,55 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
           <p class="muted" style="margin-bottom: 20px;">Review changes and improvements across different versions</p>
           
           <div id="changelogContainer" class="changelog-container">
+            <!-- Version 1.5.5 -->
+            <div class="changelog-version">
+              <div class="changelog-version-header">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <span class="changelog-version-number">v1.5.5</span>
+                  <span class="changelog-version-badge current">Current</span>
+                </div>
+                <span class="changelog-version-date">December 9, 2025</span>
+              </div>
+              <div class="changelog-version-content">
+                <div class="changelog-section">
+                  <h4>✨ New Features - User Profile</h4>
+                  <ul>
+                    <li><strong>Interactive User Profile Modal</strong> - Beautiful gradient-themed modal with comprehensive user information</li>
+                    <li><strong>Profile Avatar System</strong> - Displays user images or auto-generated initials with elegant styling</li>
+                    <li><strong>Multi-Tab Interface</strong> - Overview, Activity, and Permissions tabs for organized content</li>
+                    <li><strong>Statistics Dashboard</strong> - Real-time display of Total Logins, Total Actions, Last Login, and Account Age</li>
+                    <li><strong>Activity Timeline</strong> - Color-coded activity feed with relative timestamps and refresh capability</li>
+                    <li><strong>Permissions Overview</strong> - Grouped permissions by category with visual indicators and counts</li>
+                    <li><strong>Responsive Design</strong> - Fully adaptive layout for desktop, tablet, and mobile devices</li>
+                  </ul>
+                </div>
+                <div class="changelog-section">
+                  <h4>🎨 Design Highlights</h4>
+                  <ul>
+                    <li>Purple-indigo gradient header with grid pattern overlay</li>
+                    <li>Smooth tab animations and hover effects</li>
+                    <li>Custom scrollbars matching application theme</li>
+                    <li>Professional loading and empty states</li>
+                    <li>Category emoji icons (🌐 🔐 👥 🤖 🎫 🖥️ 💬 ⚙️)</li>
+                  </ul>
+                </div>
+                <div class="changelog-section">
+                  <h4>🔧 Technical Implementation</h4>
+                  <ul>
+                    <li>Modular architecture with dedicated service layer</li>
+                    <li>Integration with session management and permissions system</li>
+                    <li>Prepared for backend API integration</li>
+                    <li>3 new files: profile-service.js, profile-ui.js, profile-ui.css</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
             <!-- Version 1.5.3 -->
             <div class="changelog-version">
               <div class="changelog-version-header">
                 <div style="display: flex; align-items: center; gap: 12px;">
                   <span class="changelog-version-number">v1.5.3</span>
-                  <span class="changelog-version-badge current">Current</span>
                 </div>
                 <span class="changelog-version-date">December 9, 2025</span>
               </div>
@@ -5154,6 +5382,9 @@ Channels
 <script src="../Functions/UserPermissions/permissions-service.js"></script>
 <script src="../Functions/UserPermissions/permissions-ui.js"></script>
 <script src="../Functions/UserPermissions/permissions-manager-ui.js"></script>
+<!-- User Profile Module -->
+<script src="../Functions/UserProfile/profile-service.js"></script>
+<script src="../Functions/UserProfile/profile-ui.js"></script>
 <!-- Core -->
 <script src="app-main.js"></script>
 </body>

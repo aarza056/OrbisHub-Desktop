@@ -5190,8 +5190,12 @@ if (userMenuBtn && userMenuDropdown) {
     if (viewProfileBtn) {
         viewProfileBtn.addEventListener('click', () => {
             userMenuDropdown.classList.remove('is-open')
-            alert('View Profile functionality coming soon')
-            // TODO: Navigate to profile view or open profile modal
+            if (window.UserProfileUI && window.UserProfileUI.open) {
+                window.UserProfileUI.open()
+            } else {
+                console.error('User Profile UI not available')
+                showToast('Profile feature not available', 'error')
+            }
         })
     }
 
@@ -5723,7 +5727,8 @@ if (loginForm) {
                 lastActivity: dbUser.lastActivity || Date.now(),
                 ip: dbUser.ip || getLocalIP(),
                 isActive: dbUser.isActive !== undefined ? dbUser.isActive : true,
-                changePasswordOnLogin: dbUser.changePasswordOnLogin !== undefined ? dbUser.changePasswordOnLogin : false
+                changePasswordOnLogin: dbUser.changePasswordOnLogin !== undefined ? dbUser.changePasswordOnLogin : false,
+                createdAt: dbUser.created_at
             }
             
             // Update user's IP and last login info in database, and reset failed attempts
