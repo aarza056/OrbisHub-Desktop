@@ -10318,55 +10318,126 @@ function initializeAutoUpdater() {
     const updateProgressFill = document.getElementById('updateProgressFill')
     const updateProgressText = document.getElementById('updateProgressText')
     
-    // Update status button elements
+    // Update status button elements (may not exist - removed from top bar)
     const updateStatusBtn = document.getElementById('updateStatusBtn')
     const updateStatusText = document.getElementById('updateStatusText')
     const updateStatusBadge = document.getElementById('updateStatusBadge')
     
+    // Orange notification badges
+    const updateAvailableNavBadge = document.getElementById('updateAvailableNavBadge')
+    const updatesTabBadge = document.getElementById('updatesTabBadge')
+    
     let currentUpdateInfo = null
     let isUpdateDownloaded = false
     
-    // Set initial status
-    updateStatusText.textContent = 'Checking...'
+    // Set initial status (only if elements exist)
+    if (updateStatusText) {
+        updateStatusText.textContent = 'Checking...'
+    }
+    
+    // Function to show/hide orange badges
+    function toggleUpdateBadges(show) {
+        if (updateAvailableNavBadge) {
+            updateAvailableNavBadge.style.display = show ? 'inline-flex' : 'none'
+        }
+        if (updatesTabBadge) {
+            updatesTabBadge.style.display = show ? 'inline-flex' : 'none'
+        }
+    }
     
     // Listen for update available
     window.electronAPI.onUpdateAvailable((info) => {
         currentUpdateInfo = info
         
-        // Update button status
-        updateStatusBtn.classList.remove('is-uptodate')
-        updateStatusBtn.classList.add('is-update-available')
-        updateStatusText.textContent = 'Update Available'
-        updateStatusBadge.textContent = '+1'
-        updateStatusBadge.style.display = 'inline-flex'
+        // Update button status (only if elements exist)
+        if (updateStatusBtn) {
+            updateStatusBtn.classList.remove('is-uptodate')
+            updateStatusBtn.classList.add('is-update-available')
+        }
+        if (updateStatusText) {
+            updateStatusText.textContent = 'Update Available'
+        }
+        if (updateStatusBadge) {
+            updateStatusBadge.textContent = '+1'
+            updateStatusBadge.style.display = 'inline-flex'
+        }
+        
+        // Show orange badges
+        toggleUpdateBadges(true)
         
         // Show notification
-        updateTitle.textContent = `Update Available: v${info.version}`
-        updateMessage.textContent = 'A new version is ready to download'
-        updateNotification.style.display = 'block'
-        updateDownloadBtn.style.display = 'inline-block'
-        updateInstallBtn.style.display = 'none'
-        updateProgressBar.style.display = 'none'
+        if (updateTitle) {
+            updateTitle.textContent = `Update Available: v${info.version}`
+        }
+        if (updateMessage) {
+            updateMessage.textContent = 'A new version is ready to download'
+        }
+        if (updateNotification) {
+            updateNotification.style.display = 'block'
+        }
+        if (updateDownloadBtn) {
+            updateDownloadBtn.style.display = 'inline-block'
+        }
+        if (updateInstallBtn) {
+            updateInstallBtn.style.display = 'none'
+        }
+        if (updateProgressBar) {
+            updateProgressBar.style.display = 'none'
+        }
+        
+        // Update the Updates tab if it exists
+        if (window.UpdatesUI && typeof window.UpdatesUI.showUpdateAvailable === 'function') {
+            window.UpdatesUI.showUpdateAvailable(info)
+        }
     })
     
     // Listen for no updates
     window.electronAPI.onUpdateNotAvailable((info) => {
-        updateStatusBtn.classList.add('is-uptodate')
-        updateStatusBtn.classList.remove('is-update-available')
-        updateStatusText.textContent = 'Up to date'
-        updateStatusBadge.textContent = '✓'
-        updateStatusBadge.style.display = 'inline-flex'
+        if (updateStatusBtn) {
+            updateStatusBtn.classList.add('is-uptodate')
+            updateStatusBtn.classList.remove('is-update-available')
+        }
+        if (updateStatusText) {
+            updateStatusText.textContent = 'Up to date'
+        }
+        if (updateStatusBadge) {
+            updateStatusBadge.textContent = '✓'
+            updateStatusBadge.style.display = 'inline-flex'
+        }
+        
+        // Hide orange badges
+        toggleUpdateBadges(false)
+        
+        // Update the Updates tab if it exists
+        if (window.UpdatesUI && typeof window.UpdatesUI.showUpToDate === 'function') {
+            window.UpdatesUI.showUpToDate(info)
+        }
     })
     
     // Listen for download progress
     window.electronAPI.onUpdateDownloadProgress((progress) => {
-        updateProgressBar.style.display = 'block'
-        updateProgressFill.style.width = `${progress.percent.toFixed(0)}%`
-        updateProgressText.textContent = `${progress.percent.toFixed(0)}%`
-        updateMessage.textContent = `Downloading update... (${formatBytes(progress.transferred)} / ${formatBytes(progress.total)})`
+        if (updateProgressBar) {
+            updateProgressBar.style.display = 'block'
+        }
+        if (updateProgressFill) {
+            updateProgressFill.style.width = `${progress.percent.toFixed(0)}%`
+        }
+        if (updateProgressText) {
+            updateProgressText.textContent = `${progress.percent.toFixed(0)}%`
+        }
+        if (updateMessage) {
+            updateMessage.textContent = `Downloading update... (${formatBytes(progress.transferred)} / ${formatBytes(progress.total)})`
+        }
         
         // Update button status
-        updateStatusText.textContent = 'Downloading...'
+        if (updateStatusText) {
+            updateStatusText.textContent = 'Downloading...'
+        }
+        
+        // Update the Updates tab if it exists
+        if (window.UpdatesUI && typeof window.UpdatesUI.updateDownloadProgress === 'function') {
+            window.UpdatesUI.updateDownloadProgress(progress)
+        }
     })
     
     // Listen for update downloaded
@@ -10374,14 +10445,33 @@ function initializeAutoUpdater() {
         isUpdateDownloaded = true
         
         // Update button status
-        updateStatusText.textContent = 'Ready to Install'
-        updateStatusBadge.textContent = '!'
+        if (updateStatusText) {
+            updateStatusText.textContent = 'Ready to Install'
+        }
+        if (updateStatusBadge) {
+            updateStatusBadge.textContent = '!'
+        }
         
-        updateTitle.textContent = 'Update Ready'
-        updateMessage.textContent = `Version ${info.version} has been downloaded`
-        updateProgressBar.style.display = 'none'
-        updateDownloadBtn.style.display = 'none'
-        updateInstallBtn.style.display = 'inline-block'
+        if (updateTitle) {
+            updateTitle.textContent = 'Update Ready'
+        }
+        if (updateMessage) {
+            updateMessage.textContent = `Version ${info.version} has been downloaded`
+        }
+        if (updateProgressBar) {
+            updateProgressBar.style.display = 'none'
+        }
+        if (updateDownloadBtn) {
+            updateDownloadBtn.style.display = 'none'
+        }
+        if (updateInstallBtn) {
+            updateInstallBtn.style.display = 'inline-block'
+        }
+        
+        // Update the Updates tab if it exists
+        if (window.UpdatesUI && typeof window.UpdatesUI.showUpdateDownloaded === 'function') {
+            window.UpdatesUI.showUpdateDownloaded(info)
+        }
     })
     
     // Listen for update errors
@@ -10390,36 +10480,57 @@ function initializeAutoUpdater() {
         
         // If no updates, show up to date
         if (error.message.includes('No published versions') || error.message.includes('404')) {
-            updateStatusBtn.classList.add('is-uptodate')
-            updateStatusBtn.classList.remove('is-update-available')
-            updateStatusText.textContent = 'Up to date'
-            updateStatusBadge.textContent = '✓'
-            updateStatusBadge.style.display = 'inline-flex'
+            if (updateStatusBtn) {
+                updateStatusBtn.classList.add('is-uptodate')
+                updateStatusBtn.classList.remove('is-update-available')
+            }
+            if (updateStatusText) {
+                updateStatusText.textContent = 'Up to date'
+            }
+            if (updateStatusBadge) {
+                updateStatusBadge.textContent = '✓'
+                updateStatusBadge.style.display = 'inline-flex'
+            }
+            
+            // Hide orange badges
+            toggleUpdateBadges(false)
         } else {
-            updateStatusText.textContent = 'Check Failed'
-            updateTitle.textContent = 'Update Error'
-            updateMessage.textContent = error.message
-            updateDownloadBtn.style.display = 'inline-block'
-            updateDownloadBtn.textContent = 'Retry'
-            updateProgressBar.style.display = 'none'
+            if (updateStatusText) {
+                updateStatusText.textContent = 'Check Failed'
+            }
+            if (updateTitle) {
+                updateTitle.textContent = 'Update Error'
+            }
+            if (updateMessage) {
+                updateMessage.textContent = error.message
+            }
+            if (updateDownloadBtn) {
+                updateDownloadBtn.style.display = 'inline-block'
+                updateDownloadBtn.textContent = 'Retry'
+            }
+            if (updateProgressBar) {
+                updateProgressBar.style.display = 'none'
+            }
+        }
+        
+        // Update the Updates tab if it exists
+        if (window.UpdatesUI && typeof window.UpdatesUI.showUpdateError === 'function') {
+            window.UpdatesUI.showUpdateError(error)
         }
     })
     
-    // Update status button click handler
+    // Update status button click handler - Navigate to Updates tab
     if (updateStatusBtn) {
         updateStatusBtn.addEventListener('click', () => {
-            if (isUpdateDownloaded) {
-                // Install update
-                window.electronAPI.installUpdate()
-            } else if (currentUpdateInfo) {
-                // Show update notification
-                updateNotification.style.display = 'block'
-            } else {
-                // Manual check for updates
-                updateStatusText.textContent = 'Checking...'
-                updateStatusBadge.style.display = 'none'
-                window.electronAPI.checkForUpdates()
-            }
+            // Show system configuration view
+            showView('system-configuration')
+            
+            // Switch to updates tab
+            setTimeout(() => {
+                if (window.SystemConfig && typeof window.SystemConfig.switchTab === 'function') {
+                    window.SystemConfig.switchTab('updates')
+                }
+            }, 100)
         })
     }
     
@@ -10794,12 +10905,319 @@ const SystemConfig = {
             if (window.DBMaintenanceUI && typeof window.DBMaintenanceUI.init === 'function') {
                 await window.DBMaintenanceUI.init()
             }
+        } else if (tabName === 'updates') {
+            document.getElementById('systemConfigUpdates')?.classList.add('active')
+            // Initialize Updates tab when shown
+            if (window.UpdatesUI && typeof window.UpdatesUI.init === 'function') {
+                await window.UpdatesUI.init()
+            }
         }
     }
 }
 
 // Make it globally accessible
 window.SystemConfig = SystemConfig
+
+// Setup tab click event listeners
+document.addEventListener('DOMContentLoaded', () => {
+    const systemConfigTabs = document.querySelectorAll('.system-config-tab')
+    systemConfigTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.getAttribute('data-tab')
+            if (tabName && window.SystemConfig) {
+                window.SystemConfig.switchTab(tabName)
+            }
+        })
+    })
+})
+
+// ========== UPDATES TAB UI MODULE ==========
+const UpdatesUI = {
+    currentUpdateInfo: null,
+    isDownloaded: false,
+    
+    async init() {
+        // Get current version from package.json
+        const version = await window.electronAPI.getAppVersion()
+        const versionElement = document.getElementById('currentVersionNumber')
+        if (versionElement && version) {
+            versionElement.textContent = `v${version}`
+        }
+        
+        // Set up event listeners
+        this.setupEventListeners()
+        
+        // Trigger a check for updates
+        this.checkForUpdates()
+    },
+    
+    setupEventListeners() {
+        // Check for updates button
+        const checkUpdateBtn = document.getElementById('checkUpdateBtn')
+        if (checkUpdateBtn) {
+            checkUpdateBtn.addEventListener('click', () => {
+                this.checkForUpdates()
+            })
+        }
+        
+        // Download update button
+        const downloadUpdateBtn = document.getElementById('downloadUpdateBtn')
+        if (downloadUpdateBtn) {
+            downloadUpdateBtn.addEventListener('click', async () => {
+                downloadUpdateBtn.disabled = true
+                downloadUpdateBtn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Downloading...
+                `
+                
+                try {
+                    await window.electronAPI.downloadUpdate()
+                } catch (error) {
+                    console.error('Download failed:', error)
+                    downloadUpdateBtn.disabled = false
+                    downloadUpdateBtn.innerHTML = `
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        Download Update
+                    `
+                }
+            })
+        }
+        
+        // Install update button
+        const installUpdateBtn = document.getElementById('installUpdateBtn')
+        if (installUpdateBtn) {
+            installUpdateBtn.addEventListener('click', () => {
+                window.electronAPI.installUpdate()
+            })
+        }
+        
+        // Dismiss update button
+        const dismissUpdateBtn = document.getElementById('dismissUpdateBtn')
+        if (dismissUpdateBtn) {
+            dismissUpdateBtn.addEventListener('click', () => {
+                const updateSection = document.getElementById('updateAvailableSection')
+                if (updateSection) {
+                    updateSection.style.display = 'none'
+                }
+            })
+        }
+    },
+    
+    checkForUpdates() {
+        const statusLabel = document.getElementById('updateStatusLabel')
+        if (statusLabel) {
+            statusLabel.textContent = 'Checking...'
+            statusLabel.className = 'status-badge'
+            statusLabel.style.background = 'var(--ring)'
+            statusLabel.style.color = 'var(--text)'
+        }
+        
+        // Add animation to the check button
+        const checkUpdateBtn = document.getElementById('checkUpdateBtn')
+        if (checkUpdateBtn) {
+            const originalHTML = checkUpdateBtn.innerHTML
+            checkUpdateBtn.disabled = true
+            checkUpdateBtn.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px; animation: spin 1s linear infinite;">
+                    <polyline points="23 4 23 10 17 10"/>
+                    <polyline points="1 20 1 14 7 14"/>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+                Checking...
+            `
+            
+            // Reset button after 3 seconds (or when update check completes)
+            setTimeout(() => {
+                if (checkUpdateBtn) {
+                    checkUpdateBtn.disabled = false
+                    checkUpdateBtn.innerHTML = originalHTML
+                }
+            }, 3000)
+        }
+        
+        window.electronAPI.checkForUpdates()
+    },
+    
+    showUpdateAvailable(info) {
+        this.currentUpdateInfo = info
+        
+        // Re-enable check button
+        const checkUpdateBtn = document.getElementById('checkUpdateBtn')
+        if (checkUpdateBtn) {
+            checkUpdateBtn.disabled = false
+            checkUpdateBtn.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
+                    <polyline points="23 4 23 10 17 10"/>
+                    <polyline points="1 20 1 14 7 14"/>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+                Check for Updates
+            `
+        }
+        
+        // Update status label
+        const statusLabel = document.getElementById('updateStatusLabel')
+        if (statusLabel) {
+            statusLabel.textContent = 'Update Available'
+            statusLabel.style.background = '#f97316'
+            statusLabel.style.color = 'white'
+        }
+        
+        // Show available version
+        const availableVersion = document.getElementById('availableVersion')
+        if (availableVersion) {
+            availableVersion.textContent = info.version
+        }
+        
+        // Show update available section
+        const updateSection = document.getElementById('updateAvailableSection')
+        if (updateSection) {
+            updateSection.style.display = 'block'
+        }
+        
+        // Hide download progress
+        const progressSection = document.getElementById('downloadProgressSection')
+        if (progressSection) {
+            progressSection.style.display = 'none'
+        }
+        
+        // Show download button, hide install button
+        const downloadBtn = document.getElementById('downloadUpdateBtn')
+        const installBtn = document.getElementById('installUpdateBtn')
+        if (downloadBtn) {
+            downloadBtn.style.display = 'inline-block'
+            downloadBtn.disabled = false
+        }
+        if (installBtn) {
+            installBtn.style.display = 'none'
+        }
+    },
+    
+    showUpToDate(info) {
+        // Re-enable check button
+        const checkUpdateBtn = document.getElementById('checkUpdateBtn')
+        if (checkUpdateBtn) {
+            checkUpdateBtn.disabled = false
+            checkUpdateBtn.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
+                    <polyline points="23 4 23 10 17 10"/>
+                    <polyline points="1 20 1 14 7 14"/>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+                Check for Updates
+            `
+        }
+        
+        const statusLabel = document.getElementById('updateStatusLabel')
+        if (statusLabel) {
+            statusLabel.textContent = 'Up to Date'
+            statusLabel.style.background = '#10b981'
+            statusLabel.style.color = 'white'
+        }
+        
+        // Hide update available section
+        const updateSection = document.getElementById('updateAvailableSection')
+        if (updateSection) {
+            updateSection.style.display = 'none'
+        }
+    },
+    
+    updateDownloadProgress(progress) {
+        // Show progress section
+        const progressSection = document.getElementById('downloadProgressSection')
+        if (progressSection) {
+            progressSection.style.display = 'block'
+        }
+        
+        // Update progress bar
+        const progressFill = document.getElementById('downloadProgressFill')
+        const progressText = document.getElementById('downloadProgressText')
+        if (progressFill && progressText) {
+            progressFill.style.width = `${progress.percent.toFixed(0)}%`
+            progressText.textContent = `${progress.percent.toFixed(0)}%`
+        }
+        
+        // Update progress info
+        const progressInfo = document.getElementById('downloadProgressInfo')
+        if (progressInfo) {
+            progressInfo.textContent = `Downloading... (${formatBytes(progress.transferred)} / ${formatBytes(progress.total)})`
+        }
+        
+        // Update status label
+        const statusLabel = document.getElementById('updateStatusLabel')
+        if (statusLabel) {
+            statusLabel.textContent = 'Downloading...'
+            statusLabel.style.background = '#3b82f6'
+            statusLabel.style.color = 'white'
+        }
+    },
+    
+    showUpdateDownloaded(info) {
+        this.isDownloaded = true
+        
+        // Update status label
+        const statusLabel = document.getElementById('updateStatusLabel')
+        if (statusLabel) {
+            statusLabel.textContent = 'Ready to Install'
+            statusLabel.style.background = '#10b981'
+            statusLabel.style.color = 'white'
+        }
+        
+        // Hide progress section
+        const progressSection = document.getElementById('downloadProgressSection')
+        if (progressSection) {
+            progressSection.style.display = 'none'
+        }
+        
+        // Update text
+        const updateText = document.getElementById('updateAvailableText')
+        if (updateText) {
+            updateText.innerHTML = `Version <span id="availableVersion">${info.version}</span> is ready to install`
+        }
+        
+        // Hide download button, show install button
+        const downloadBtn = document.getElementById('downloadUpdateBtn')
+        const installBtn = document.getElementById('installUpdateBtn')
+        if (downloadBtn) {
+            downloadBtn.style.display = 'none'
+        }
+        if (installBtn) {
+            installBtn.style.display = 'inline-block'
+        }
+    },
+    
+    showUpdateError(error) {
+        const statusLabel = document.getElementById('updateStatusLabel')
+        if (statusLabel) {
+            if (error.message.includes('No published versions') || error.message.includes('404')) {
+                statusLabel.textContent = 'Up to Date'
+                statusLabel.style.background = '#10b981'
+                statusLabel.style.color = 'white'
+                
+                // Hide update section
+                const updateSection = document.getElementById('updateAvailableSection')
+                if (updateSection) {
+                    updateSection.style.display = 'none'
+                }
+            } else {
+                statusLabel.textContent = 'Check Failed'
+                statusLabel.style.background = '#ef4444'
+                statusLabel.style.color = 'white'
+            }
+        }
+    }
+}
+
+// Make it globally accessible
+window.UpdatesUI = UpdatesUI
 
 // ========== ORBISAGENT MODULE INITIALIZATION ==========
 // Initialize OrbisAgent UI when view is shown

@@ -592,6 +592,7 @@
     </svg>
     System Configuration
     <span class="nav-badge" id="configNavBadge" style="display:none; margin-left:auto;">1</span>
+    <span class="nav-badge" id="updateAvailableNavBadge" style="display:none; margin-left:auto; background:#f97316;">!</span>
   </button>
   <button class="nav__btn" data-view="settings">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;">
@@ -616,15 +617,6 @@
   <span id="welcomeUserName" style="font-weight:600; color:var(--primary);">User</span>
 </div>
 <div style="flex:1"></div>
-<!-- Update Status Button -->
-<button class="config-status-btn" id="updateStatusBtn" title="App Updates" style="margin-right:12px;">
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-    <path d="M12 8v4l3 3"></path>
-  </svg>
-  <span id="updateStatusText">Checking...</span>
-  <span class="update-badge" id="updateStatusBadge" style="display:none;">0</span>
-</button>
 <!-- Messages Button -->
 <button class="config-status-btn" data-view="messages" title="Messages" style="margin-right:12px;">
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1789,28 +1781,28 @@
 
   <!-- Configuration Tabs -->
   <div class="system-config-tabs">
-    <button class="system-config-tab active" data-tab="coreservice" onclick="SystemConfig.switchTab('coreservice')">
+    <button class="system-config-tab active" data-tab="coreservice">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
         <circle cx="12" cy="12" r="3"/>
       </svg>
       Core Service
     </button>
-    <button class="system-config-tab" data-tab="emailserver" onclick="SystemConfig.switchTab('emailserver')">
+    <button class="system-config-tab" data-tab="emailserver">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
         <polyline points="22,6 12,13 2,6"/>
       </svg>
       Email Server
     </button>
-    <button class="system-config-tab" data-tab="notifications" onclick="SystemConfig.switchTab('notifications')">
+    <button class="system-config-tab" data-tab="notifications">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
         <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
       </svg>
       Notifications
     </button>
-    <button class="system-config-tab" data-tab="dbmaintenance" onclick="SystemConfig.switchTab('dbmaintenance')">
+    <button class="system-config-tab" data-tab="dbmaintenance">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
         <polyline points="12 2 12 12"/>
@@ -1818,6 +1810,16 @@
         <polyline points="12 12 16.5 9.5"/>
       </svg>
       DB Maintenance
+    </button>
+    <button class="system-config-tab" data-tab="updates">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        <path d="M12 8v4l3 3"/>
+        <polyline points="1 4 1 10 7 10"/>
+        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+      </svg>
+      Updates
+      <span class="nav-badge" id="updatesTabBadge" style="display:none; margin-left:auto; background:#f97316;">!</span>
     </button>
   </div>
   
@@ -2430,6 +2432,256 @@ Invoke-RestMethod -Uri "http://localhost:5000/health"</pre>
 
           <div id="healthCheckResults" style="margin-top: 24px;">
             <!-- Health check results will be displayed here -->
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Updates Tab Content -->
+  <div id="systemConfigUpdates" class="system-config-content">
+    <div class="documentation-container">
+      <div class="stack">
+        
+        <!-- Update Status Section -->
+        <div class="maintenance-section">
+          <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;">
+            <div style="width: 64px; height: 64px; border-radius: 16px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                <path d="M12 8v4l3 3"/>
+                <polyline points="1 4 1 10 7 10"/>
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+              </svg>
+            </div>
+            <div style="flex: 1;">
+              <h2 style="margin: 0;">Application Updates</h2>
+              <p class="muted" style="margin: 4px 0 0 0; font-size: 13px;">
+                Keep OrbisHub Desktop up to date with the latest features and improvements
+              </p>
+            </div>
+          </div>
+
+          <!-- Current Version & Update Status -->
+          <div class="doc-card" style="background: var(--bg-secondary); border: 2px solid var(--border);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+              <div>
+                <h3 style="margin: 0 0 8px 0;">Current Version</h3>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <span id="currentVersionNumber" style="font-size: 32px; font-weight: 700; color: var(--primary);">v1.5.3</span>
+                  <span id="updateStatusLabel" class="status-badge" style="font-size: 12px;">Checking...</span>
+                </div>
+              </div>
+              <div>
+                <button id="checkUpdateBtn" class="btn btn-primary">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
+                    <polyline points="23 4 23 10 17 10"/>
+                    <polyline points="1 20 1 14 7 14"/>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                  </svg>
+                  Check for Updates
+                </button>
+              </div>
+            </div>
+
+            <!-- Update Available Section (Hidden by default) -->
+            <div id="updateAvailableSection" style="display: none; padding: 20px; background: color-mix(in srgb, #f97316 10%, var(--panel)); border: 2px solid #f97316; border-radius: 12px; margin-top: 16px;">
+              <div style="display: flex; align-items: start; gap: 16px;">
+                <div style="width: 48px; height: 48px; border-radius: 12px; background: #f97316; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <path d="M12 8v4"/>
+                    <path d="M12 16h.01"/>
+                  </svg>
+                </div>
+                <div style="flex: 1;">
+                  <h3 style="margin: 0 0 8px 0; color: #f97316;">Update Available!</h3>
+                  <p id="updateAvailableText" style="margin: 0 0 16px 0; font-size: 14px;">
+                    Version <span id="availableVersion">1.6.0</span> is ready to download
+                  </p>
+                  
+                  <!-- Download Progress -->
+                  <div id="downloadProgressSection" style="display: none; margin-bottom: 16px;">
+                    <div class="update-progress">
+                      <div id="downloadProgressFill" class="update-progress__fill"></div>
+                      <span id="downloadProgressText" class="update-progress__text">0%</span>
+                    </div>
+                    <p id="downloadProgressInfo" class="muted" style="font-size: 12px; margin-top: 8px;">Downloading...</p>
+                  </div>
+
+                  <div style="display: flex; gap: 12px;">
+                    <button id="downloadUpdateBtn" class="btn" style="background: #f97316; color: white; border: none;">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                      </svg>
+                      Download Update
+                    </button>
+                    <button id="installUpdateBtn" class="btn" style="background: #10b981; color: white; border: none; display: none;">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
+                        <polyline points="23 4 23 10 17 10"/>
+                        <polyline points="1 20 1 14 7 14"/>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                      </svg>
+                      Install & Restart
+                    </button>
+                    <button id="dismissUpdateBtn" class="btn btn-ghost">Later</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Changelog Section -->
+        <div class="maintenance-section">
+          <h3>📋 Version History & Changelog</h3>
+          <p class="muted" style="margin-bottom: 20px;">Review changes and improvements across different versions</p>
+          
+          <div id="changelogContainer" class="changelog-container">
+            <!-- Version 1.5.3 -->
+            <div class="changelog-version">
+              <div class="changelog-version-header">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <span class="changelog-version-number">v1.5.3</span>
+                  <span class="changelog-version-badge current">Current</span>
+                </div>
+                <span class="changelog-version-date">December 9, 2025</span>
+              </div>
+              <div class="changelog-version-content">
+                <div class="changelog-section">
+                  <h4>🎉 New Features</h4>
+                  <ul>
+                    <li>Added comprehensive update management system</li>
+                    <li>Introduced Updates tab in System Configuration</li>
+                    <li>Real-time update notifications with orange badges</li>
+                    <li>Detailed changelog display between versions</li>
+                  </ul>
+                </div>
+                <div class="changelog-section">
+                  <h4>🐛 Bug Fixes</h4>
+                  <ul>
+                    <li>Fixed database connection stability issues</li>
+                    <li>Improved error handling in CoreService integration</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- Version 1.5.2 -->
+            <div class="changelog-version">
+              <div class="changelog-version-header">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <span class="changelog-version-number">v1.5.2</span>
+                </div>
+                <span class="changelog-version-date">November 28, 2025</span>
+              </div>
+              <div class="changelog-version-content">
+                <div class="changelog-section">
+                  <h4>✨ Improvements</h4>
+                  <ul>
+                    <li>Enhanced database maintenance tools</li>
+                    <li>Optimized query performance</li>
+                    <li>Updated UI components for better accessibility</li>
+                  </ul>
+                </div>
+                <div class="changelog-section">
+                  <h4>🔧 Technical</h4>
+                  <ul>
+                    <li>Upgraded Electron to latest stable version</li>
+                    <li>Improved security with updated dependencies</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- Version 1.5.1 -->
+            <div class="changelog-version">
+              <div class="changelog-version-header">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <span class="changelog-version-number">v1.5.1</span>
+                </div>
+                <span class="changelog-version-date">November 15, 2025</span>
+              </div>
+              <div class="changelog-version-content">
+                <div class="changelog-section">
+                  <h4>🎉 New Features</h4>
+                  <ul>
+                    <li>Added Email Server Profile management</li>
+                    <li>Implemented notification system</li>
+                    <li>Enhanced user permission controls</li>
+                  </ul>
+                </div>
+                <div class="changelog-section">
+                  <h4>🐛 Bug Fixes</h4>
+                  <ul>
+                    <li>Resolved login session timeout issues</li>
+                    <li>Fixed agent heartbeat monitoring</li>
+                    <li>Corrected environment deployment status</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- Version 1.5.0 -->
+            <div class="changelog-version">
+              <div class="changelog-version-header">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <span class="changelog-version-number">v1.5.0</span>
+                </div>
+                <span class="changelog-version-date">October 30, 2025</span>
+              </div>
+              <div class="changelog-version-content">
+                <div class="changelog-section">
+                  <h4>🎉 New Features</h4>
+                  <ul>
+                    <li>Introduced OrbisHub CoreService integration</li>
+                    <li>Added Orbis Agent management interface</li>
+                    <li>Implemented ticket management system</li>
+                    <li>Added password manager functionality</li>
+                    <li>New bug reporting module</li>
+                  </ul>
+                </div>
+                <div class="changelog-section">
+                  <h4>✨ Improvements</h4>
+                  <ul>
+                    <li>Complete UI redesign with modern interface</li>
+                    <li>Enhanced security with improved authentication</li>
+                    <li>Better error messages and user feedback</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Release Notes Section -->
+        <div class="maintenance-section">
+          <h3>📝 Release Information</h3>
+          <div class="doc-card" style="background: var(--bg-secondary); border: 1px solid var(--border);">
+            <div style="display: flex; align-items: start; gap: 16px;">
+              <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+              </div>
+              <div style="flex: 1;">
+                <h4 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">Automatic Updates</h4>
+                <p style="margin: 0 0 12px 0; color: var(--muted); font-size: 14px; line-height: 1.6;">OrbisHub Desktop automatically checks for updates on startup. When a new version is available, you'll see an orange notification badge on the System Configuration menu and Updates tab.</p>
+                <p style="margin: 12px 0 8px 0; font-weight: 600; font-size: 14px;">Update Process:</p>
+                <ol style="margin: 0; padding-left: 20px; color: var(--muted); font-size: 13px; line-height: 1.8;">
+                  <li>Click "Download Update" when available</li>
+                  <li>Wait for the download to complete</li>
+                  <li>Click "Install & Restart" to apply the update</li>
+                  <li>Application will restart automatically with the new version</li>
+                </ol>
+              </div>
+            </div>
           </div>
         </div>
 
