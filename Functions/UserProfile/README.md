@@ -393,6 +393,6 @@ Part of OrbisHub Desktop - MIT License
 
 ---
 
-**Version**: 1.5.5  
-**Last Updated**: December 9, 2024  
+**Version**: 1.0.0  
+**Last Updated**: December 15, 2025  
 **Author**: OrbisHub Development Team

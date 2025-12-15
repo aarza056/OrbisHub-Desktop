@@ -735,7 +735,7 @@ npm run build:win
 
 ## 📝 Changelog
 
-### Version 1.5.5 - December 9, 2024
+### Version 1.0.0 - December 15, 2025
 
 #### ✨ New Feature: User Profile
 

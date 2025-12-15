@@ -1,6 +1,6 @@
 {
   "name": "orbis-desktop",
-  "version": "1.5.7",
+  "version": "1.0.0",
   "description": "OrbisHub Desktop - Remote Desktop Connection Manager",
   "main": "main.js",
   "scripts": {

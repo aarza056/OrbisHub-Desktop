@@ -723,7 +723,7 @@ Built by system administrators for system administrators, OrbisHub provides ever
 
 ---
 
-**OrbisHub Desktop v1.5.3**  
+**OrbisHub Desktop v1.0.0**  
 *Empowering IT Teams to Work Smarter*
 
 ---
